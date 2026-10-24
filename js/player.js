@@ -211,7 +211,7 @@
         else P.onGround = false;
         if (P.onGround && _dir.lengthSq() > 0) {
           P.bob += dt * (sprint ? 11 : 8);
-          if (Math.floor(P.bob / Math.PI) !== Math.floor((P.bob - dt * (sprint ? 11 : 8)) / Math.PI) && G.Audio) G.Audio.step(wading ? 'water' : ground < 2 ? 'sand' : 'grass');
+          if (Math.floor(P.bob / Math.PI) !== Math.floor((P.bob - dt * (sprint ? 11 : 8)) / Math.PI) && G.Audio) G.Audio.step(wading ? 'water' : G.Audio.surface ? G.Audio.surface(P) : 'grass');
         }
         if (wading && _dir.lengthSq() > 0 && Math.random() < dt * 5) G.FX.splash(P.pos.x, waterY, P.pos.z, 2);
       }

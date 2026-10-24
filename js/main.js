@@ -27,7 +27,7 @@
   if (!G.settings.gpuChecked) {
     G.settings.gpuChecked = true;
     if ((G.gpuWeak || G.gpuSoft || G.isTouch) && !['minima', 'bassa'].includes(G.settings.preset)) {
-      const keep = { fov: G.settings.fov, sens: G.settings.sens, volume: G.settings.volume };
+      const keep = { fov: G.settings.fov, sens: G.settings.sens, volume: G.settings.volume, vols: G.settings.vols };
       const k = G.gpuSoft || /(^|[^u])hd graphics( [2-6]\d{2,3}\b|$|\s*\()/i.test(G.gpu) ? 'minima' : 'bassa';
       G.settings = Object.assign({}, G.settings, G.PRESETS[k], keep, { preset: k });
       G.autoPreset = k;
@@ -150,7 +150,7 @@
 
   /* ---------------- IMPOSTAZIONI ---------------- */
   G.applyPreset = function (k) {
-    const keep = { fov: G.settings.fov, sens: G.settings.sens, volume: G.settings.volume };
+    const keep = { fov: G.settings.fov, sens: G.settings.sens, volume: G.settings.volume, vols: G.settings.vols };
     if (G.adaptReset) G.adaptReset();
     G.settings = Object.assign({}, G.settings, G.PRESETS[k], keep, { preset: k, basePreset: k });
     for (const key of ['shadows', 'pixel', 'view', 'godrays', 'fx']) G.applySettings(key, true);

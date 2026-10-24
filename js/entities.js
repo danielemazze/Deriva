@@ -206,7 +206,7 @@
       G.People.animate(pp, dt, st.speed, st.atkT > 0 ? 'attack' : 'idle', atkK);
       a.pos.set(st.x, gh + (st.hurt > 0 ? Math.sin(st.hurt * 40) * 0.02 : 0), st.z);
       a.root.rotation.y = st.yaw;
-      if (dP < 14 && Math.random() < dt * 0.05 && G.Audio && G.Audio.grunt) G.Audio.grunt(dP);
+      if (dP < 22 && Math.random() < dt * 0.05 && G.Audio && G.Audio.grunt) G.Audio.grunt(dP, a.pos);
       return;
     }
     if (st.scale !== a.scale) { a.scale = st.scale; a.root.scale.setScalar(st.scale); }
@@ -224,7 +224,7 @@
     else a.body.position.z *= 0.8;
     if (st.speed < 0.15 && !def.hostile) { const t = performance.now() / 1000 + a.scale * 10; const graze = Math.max(0, Math.sin(t * (a.sp === 'gallina' ? 3 : 0.5))); a.head.rotation.x = graze * (a.sp === 'gallina' ? 0.9 : 0.6); }
     else a.head.rotation.x *= 0.9;
-    if (dP < 12 && Math.random() < dt * 0.04 && G.Audio) G.Audio.animal(a.sp, dP);
+    if (dP < 40 && Math.random() < dt * (def.hostile ? 0.07 : 0.05) && G.Audio) G.Audio.animal(a.sp, dP, a.pos);
   }
   // un predatore o un pirata ti colpisce (in giocatore singolo; in multigiocatore arriva dal server come 'hurt')
   E.onAttack = function (a, atk) {
@@ -264,7 +264,7 @@
   E.hit = function (a, dmg, player) {
     const p = G.Player.pos;
     if (a.def.peaceful) { a.st.flee = 1; G.UI.toast('La tartaruga si ritira nel guscio'); return; }
-    if (G.Audio) G.Audio.hit('soft');
+    if (G.Audio) { G.Audio.hit('soft'); if (G.Audio.animalHurt) G.Audio.animalHurt(a.sp, a.pos); }
     const willDie = !a.remote && a.st.hp !== undefined && a.st.hp - dmg <= 0;
     E.hitFx(a, Math.round(dmg * 10) / 10, willDie);
     if (a.remote) { a.st.hurt = 0.35; G.Net.send({ t: 'ahit', id: a.id, dmg }); return; }

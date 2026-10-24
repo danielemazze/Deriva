@@ -88,8 +88,9 @@ G.servedByHost = (() => { try { return !window.deriva && location.protocol === '
 /* telefono o tablet: comandi touch, grafica leggera */
 G.isTouch = (() => { try { const q = location.search; if (/[?&]touch=1/.test(q)) return true; if (/[?&]touch=0/.test(q)) return false; return !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && (navigator.maxTouchPoints || 0) > 0); } catch (e) { return false; } })();
 G.defaultSettings = function () {
-  if (G.isTouch) return Object.assign({ preset: 'bassa', fov: 80, sens: 1.0, volume: 0.6, dynres: true, fpsTarget: 30 }, G.PRESETS.bassa);
-  return Object.assign({ preset: 'media', fov: 75, sens: 1.0, volume: 0.6 }, G.PRESETS.media);
+  const vols = { amb: 1, room: 1, ani: 1, wx: 1, sfx: 1, ui: 1 };
+  if (G.isTouch) return Object.assign({ preset: 'bassa', fov: 80, sens: 1.0, volume: 0.6, vols, dynres: true, fpsTarget: 30 }, G.PRESETS.bassa);
+  return Object.assign({ preset: 'media', fov: 75, sens: 1.0, volume: 0.6, vols }, G.PRESETS.media);
 };
 G.hiQ = () => { const S = G.settings; if (!S) return false; const p = S.preset === 'custom' ? S.basePreset : S.preset; return p === 'alta' || p === 'ultra'; };
 G.lowQ = () => { const S = G.settings; if (!S) return false; const p = S.preset === 'custom' ? S.basePreset : S.preset; return p === 'minima' || p === 'bassa'; };

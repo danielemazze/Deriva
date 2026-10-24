@@ -654,7 +654,9 @@
         <h3 class="sub3">Interfaccia</h3>
         ${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
         ${opt('o-sens', 'Sensibilità mouse', 0.3, 2.5, 0.05, S.sens, (v) => `${(+v).toFixed(2)}×`)}
-        ${opt('o-vol', 'Volume', 0, 1, 0.05, S.volume, (v) => `${Math.round(v * 100)}%`)}
+        <h3 class="sub3">Audio</h3>
+        ${opt('o-vol', 'Volume generale', 0, 1, 0.05, S.volume, (v) => `${Math.round(v * 100)}%`)}
+        ${(G.Audio ? G.Audio.BUSES : []).map(([k, n, d]) => { const v = S.vols && S.vols[k] !== undefined ? S.vols[k] : 1; return `<div class="opt"><label for="o-av-${k}">${n}<small>${d}</small></label><output id="o-av-${k}-o">${Math.round(v * 100)}%</output><input type="range" id="o-av-${k}" min="0" max="1.5" step="0.05" value="${v}"></div>`; }).join('')}
         <p class="note">${G.gpuName ? `Scheda video: <b>${esc(G.gpuName)}</b>${G.gpuSoft ? ' — <span class="warnc">il gioco non sta usando la scheda video: aggiorna i driver</span>' : G.gpuWeak ? ' (integrata: consigliate Bassa o Minima)' : ''}. ` : ''}Le texture (Alta e Ultra) e la densità dell’erba si applicano dal prossimo avvio; il resto cambia subito.</p>
         <div class="mbtns"><button class="mbtn" data-m="main">Indietro</button></div></div>`;
     } else if (UI.menu === 'controls') {
@@ -818,6 +820,12 @@
     if (t.id === 'o-wind') { G.setWind(+t.value); $('o-wind-o').textContent = windName(G.WIND.level); G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; return; }
     if (!t.id || !t.id.startsWith('o-')) return;
     const S = G.settings; const v = t.type === 'checkbox' ? t.checked : parseFloat(t.value);
+    if (t.id.startsWith('o-av-')) {
+      const k = t.id.slice(5); S.vols = Object.assign({ amb: 1, room: 1, ani: 1, wx: 1, sfx: 1, ui: 1 }, S.vols); S.vols[k] = v;
+      $(t.id + '-o').textContent = `${Math.round(v * 100)}%`; if (G.Audio) G.Audio.setBus(k, v); G.store.set('deriva_settings', S);
+      clearTimeout(UI._avT); UI._avT = setTimeout(() => { if (!G.Audio || !G.Audio.ctx) return; const demo = { amb: 'chirp', room: 'drip', ani: 'farAnimal', wx: 'thunder', sfx: 'thud', ui: 'coins' }[k]; if (demo === 'thunder') G.Audio.thunder(300); else G.Audio[demo](); }, 250);
+      return;
+    }
     const base = G.PRESETS[S.preset] || G.PRESETS.media;
     const map = { 'o-shadow': ['shadows', v ? (base.shadows || 1024) : 0], 'o-god': ['godrays', v], 'o-fx': ['fx', v], 'o-view': ['view', v], 'o-grass': ['grass', v], 'o-pixel': ['pixel', v], 'o-fov': ['fov', v], 'o-sens': ['sens', v], 'o-vol': ['volume', v],
       'o-ao': ['ao', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
