@@ -48,7 +48,7 @@
     }
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0); let b = 0;
-    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b = 0.985 * b + 0.15 * w; d[i] = b * 0.9 + w * 0.08; }
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b = 0.985 * b + 0.15 * w; d[i] = b * 0.9 + w * 0.02; } // quasi niente fruscio acuto nel rumore di base
     A.white = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const wd = A.white.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;
     // tappeti continui
@@ -117,7 +117,7 @@
       const dx = pos.x - P.pos.x, dz = pos.z - P.pos.z; d = dist !== undefined ? dist : Math.hypot(dx, dz);
       const rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw); pan = G.clamp((dx * rx + dz * rz) / Math.max(1, Math.hypot(dx, dz)), -1, 1) * 0.85;
     }
-    const g = ctx.createGain(); g.gain.value = 1 / (1 + Math.pow(d / 7, 1.35));
+    const g = ctx.createGain(); g.gain.value = (bus === 'ani' ? 1.6 : 1) / (1 + Math.pow(d / 7, 1.35));
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = Math.max(700, 16000 * Math.exp(-d / 45));
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     g.connect(f); if (p) { p.pan.value = pan; f.connect(p); p.connect(A.bus[bus]); } else f.connect(A.bus[bus]);
@@ -156,22 +156,24 @@
     // mare, vento, foglie, cicale
     const shore = Math.max(0, 1 - Math.abs(S.h) / 12);
     const swell = 0.6 + 0.4 * Math.sin(t * 0.55) * Math.sin(t * 0.21 + 1), wind = G.shared.uWind.value;
-    A.sea.g.gain.setTargetAtTime((0.18 + shore * 0.35 + env.boat * 0.1) * swell, n, 0.3);
-    A.sea.f.frequency.setTargetAtTime(380 + swell * 500, n, 0.3);
-    A.wind.g.gain.setTargetAtTime(0.03 + wind * 0.03 + Math.max(0, P.pos.y - 8) * 0.004 + (S.bi === G.BIOME.NEVE ? 0.03 : 0), n, 0.5);
+    // onde: crescono e si ritirano (non un fruscio fisso), forti solo vicino alla riva
+    const wave = Math.pow(Math.max(0, Math.sin(t * 0.85) * 0.5 + 0.5), 1.6) * (0.75 + 0.25 * Math.sin(t * 0.23));
+    A.sea.g.gain.setTargetAtTime((0.022 + shore * 0.085 + env.boat * 0.03) * (0.3 + 0.7 * wave), n, 0.35);
+    A.sea.f.frequency.setTargetAtTime(240 + wave * 420, n, 0.35);
+    A.wind.g.gain.setTargetAtTime((0.006 + wind * 0.012 + Math.min(0.02, Math.max(0, P.pos.y - 8) * 0.0012) + (S.bi === G.BIOME.NEVE ? 0.01 : 0)) * (0.6 + 0.4 * Math.sin(t * 0.21) * Math.sin(t * 0.53)), n, 0.8);
     A.wind.f.frequency.setTargetAtTime(600 + Math.sin(t * 0.3) * 250, n, 0.5);
-    A.leaves.g.gain.setTargetAtTime(S.forest * (0.006 + wind * 0.008) * (0.35 + 0.65 * Math.max(0, Math.sin(t * 0.9) * Math.sin(t * 0.37 + 2) * 0.5 + 0.5)), n, 0.8); // fruscio a raffiche
+    A.leaves.g.gain.setTargetAtTime(S.forest * (0.0018 + wind * 0.003) * (0.35 + 0.65 * Math.max(0, Math.sin(t * 0.9) * Math.sin(t * 0.37 + 2) * 0.5 + 0.5)), n, 0.8); // fruscio a raffiche
     const hot = G.Climate && G.Climate.airTemp ? G.clamp((G.Climate.airTemp(P.pos.x, P.pos.z) - 24) / 8, 0, 1) : 0;
     const cic = G.sky.day > 0.6 ? hot * (S.forest || S.bi === G.BIOME.DESERTO || S.bi === G.BIOME.PIANURA ? 1 : 0.3) : 0;
-    A.cicada.g.gain.setTargetAtTime(cic * 0.012, n, 1.2);
-    A.lava.g.gain.setTargetAtTime(Math.max(0, S.volc) * 0.4, n, 0.8);
+    A.cicada.g.gain.setTargetAtTime(cic * 0.004, n, 1.2);
+    A.lava.g.gain.setTargetAtTime(Math.max(0, S.volc) * 0.15, n, 0.8);
     // stanze e grotte
-    A.under.g.gain.setTargetAtTime(env.under * 0.35, n, 0.15);
-    A.roomIn.g.gain.setTargetAtTime(env.indoor * 0.07, n, 0.4);
-    A.roomCave.g.gain.setTargetAtTime(env.cave * 0.16, n, 0.4);
-    A.caveMoan.g.gain.setTargetAtTime(env.cave * 0.025, n, 0.6); A.caveMoan.f.frequency.setTargetAtTime(230 + Math.sin(t * 0.13) * 60, n, 1);
-    A.fireLoop.g.gain.setTargetAtTime(env.fire * 0.06, n, 0.3);
-    A.hull.g.gain.setTargetAtTime(env.boat * (0.05 + Math.abs((P.boat && P.boat.speed) || 0) * 0.008) * swell, n, 0.3);
+    A.under.g.gain.setTargetAtTime(env.under * 0.15, n, 0.15);
+    A.roomIn.g.gain.setTargetAtTime(env.indoor * 0.016, n, 0.4);
+    A.roomCave.g.gain.setTargetAtTime(env.cave * 0.05, n, 0.4);
+    A.caveMoan.g.gain.setTargetAtTime(env.cave * 0.008, n, 0.6); A.caveMoan.f.frequency.setTargetAtTime(230 + Math.sin(t * 0.13) * 60, n, 1);
+    A.fireLoop.g.gain.setTargetAtTime(env.fire * 0.02, n, 0.3);
+    A.hull.g.gain.setTargetAtTime(env.boat * (0.014 + Math.abs((P.boat && P.boat.speed) || 0) * 0.003) * swell, n, 0.3);
     A.hull.f.frequency.setTargetAtTime(320 + swell * 160, n, 0.4);
     // eventi a caso: ogni effetto ha la sua probabilità al secondo
     const day = G.sky.day > 0.55, night = G.sky.night > 0.6, outdoor = 1 - Math.max(env.cave, env.under), land = S.h > 1.5;
@@ -197,7 +199,7 @@
     if (env.cave > 0.5 && r(0.6)) A.drip();
     if (env.under > 0.5 && r(0.8)) A.bubbles();
     if (env.fire > 0.05 && r(9 * env.fire)) A.crackle(env.fire);
-    if (env.indoor > 0.5 && wet > 0.2) A.rainRoof.g.gain.setTargetAtTime(wet * 0.09, n, 0.5); else A.rainRoof.g.gain.setTargetAtTime(0, n, 0.5);
+    if (env.indoor > 0.5 && wet > 0.2) A.rainRoof.g.gain.setTargetAtTime(wet * 0.035, n, 0.5); else A.rainRoof.g.gain.setTargetAtTime(0, n, 0.5);
   };
   function fireNear(P) {
     let k = P.heldTorch ? 0.35 : 0;
@@ -212,10 +214,10 @@
   A.weather = function (c, vort) {
     if (!A.ctx || !A.rain) return;
     const n = now();
-    A.rain.g.gain.setTargetAtTime((c.rain * 0.22 + c.storm * 0.08) * (1 - env.indoor * 0.6), n, 0.6);
-    A.rumble.g.gain.setTargetAtTime(Math.min(1, vort) * 0.45, n, 0.6);
+    A.rain.g.gain.setTargetAtTime((c.rain * 0.085 + c.storm * 0.035) * (1 - env.indoor * 0.6), n, 0.6);
+    A.rumble.g.gain.setTargetAtTime(Math.min(1, vort) * 0.3, n, 0.6);
   };
-  A.falls = function (k) { if (A.fallsL) A.fallsL.g.gain.setTargetAtTime(k * 0.35, now(), 0.4); };
+  A.falls = function (k) { if (A.fallsL) A.fallsL.g.gain.setTargetAtTime(k * 0.18, now(), 0.4); };
   A.thunder = function (dist) {
     if (!A.ctx) return;
     const delay = Math.min(3.5, dist / 340), v = Math.max(0.25, 1 - dist / 800), W = A.bus.wx;
@@ -312,8 +314,8 @@
       if (dist > 14 && G.sky.night > 0.5) return howlTo(d);
       voc(d, { pts: [[0, 90], [1, 75]], dur: 1.0, peak: 0.2, att: 0.08, trem: [24, 0.7], form: [[350, 3, 1], [800, 4, 0.5]], breath: [400, 1, 0.5] });
     },
-    orso: (d, hurt) => voc(d, { pts: hurt ? [[0, 220], [1, 150]] : [[0, 120], [0.3, 140], [1, 70]], dur: hurt ? 0.6 : 1.3, peak: 0.25, att: 0.06, trem: [18, 0.4], form: [[420, 3, 1], [950, 4, 0.6]], breath: [500, 1, 0.8] }),
-    giaguaro: (d, hurt) => { const n = hurt ? 1 : 4 + (Math.random() * 3 | 0); for (let i = 0; i < n; i++) voc(d, { pts: [[0, hurt ? 300 : 150], [1, hurt ? 220 : 120]], dur: 0.22, peak: 0.18, att: 0.02, delay: i * 0.34, form: [[480, 3, 1], [1100, 4, 0.5]], breath: [800, 1, 0.9] }); },
+    orso: (d, hurt) => voc(d, { pts: hurt ? [[0, 220], [1, 150]] : [[0, 120], [0.3, 140], [1, 70]], dur: hurt ? 0.6 : 1.3, peak: 0.17, att: 0.06, trem: [18, 0.4], form: [[420, 3, 1], [950, 4, 0.6]], breath: [500, 1, 0.8] }),
+    giaguaro: (d, hurt) => { const n = hurt ? 1 : 4 + (Math.random() * 3 | 0); for (let i = 0; i < n; i++) voc(d, { pts: [[0, hurt ? 300 : 150], [1, hurt ? 220 : 120]], dur: 0.22, peak: 0.14, att: 0.02, delay: i * 0.34, form: [[480, 3, 1], [1100, 4, 0.5]], breath: [800, 1, 0.9] }); },
     serpente: (d) => noise(1.1, 'highpass', 4500, 0.6, 0.12, 0, d, A.white),
     coccodrillo: (d, hurt) => { voc(d, { pts: [[0, 62], [1, 55]], dur: hurt ? 0.5 : 1.4, peak: 0.25, att: 0.1, trem: [14, 0.6], form: [[200, 3, 1], [500, 4, 0.4]] }); noise(0.6, 'highpass', 3500, 0.5, 0.05, 0.2, d); },
     squalo: (d) => {},
