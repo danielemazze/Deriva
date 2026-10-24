@@ -7,7 +7,7 @@
    ========================================================== */
 (function () {
   const G = globalThis.G;
-  const A = (G.Audio = { ctx: null, vol: 0.6, bus: {} });
+  const A = (G.Audio = { ctx: null, vol: 0.6, bus: {}, BED: 0.5 }); // BED: livello dei rumori di fondo continui (0.5 = -6 dB)
   // [chiave, nome, cosa comprende] — usato anche dal menu Impostazioni
   A.BUSES = [
     ['amb', 'Ambiente', 'mare, vento, uccelli, insetti, foglie'],
@@ -51,8 +51,9 @@
     for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b = 0.985 * b + 0.15 * w; d[i] = b * 0.9 + w * 0.02; } // quasi niente fruscio acuto nel rumore di base
     A.white = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const wd = A.white.getChannelData(0); for (let i = 0; i < wd.length; i++) wd[i] = Math.random() * 2 - 1;
-    // tappeti continui
-    const loop = (bus, type, freq, q, buf) => { const s = ctx.createBufferSource(); s.buffer = buf || noiseBuf; s.loop = true; s.loopStart = Math.random(); const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = ctx.createGain(); g.gain.value = 0; s.connect(f); f.connect(g); g.connect(A.bus[bus]); s.start(0, Math.random() * 2); return { s, f, g }; };
+    // tappeti continui: tutti passano da un taglio fisso di -6 dB (A.BED), così restano solo percettibili
+    const bedTrim = {}; const trim = (bus) => { const t = ctx.createGain(); t.gain.value = A.BED; t.connect(A.bus[bus]); return t; };
+    const loop = (bus, type, freq, q, buf) => { const s = ctx.createBufferSource(); s.buffer = buf || noiseBuf; s.loop = true; s.loopStart = Math.random(); const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = ctx.createGain(); g.gain.value = 0; s.connect(f); f.connect(g); g.connect(bedTrim[bus] || (bedTrim[bus] = trim(bus))); s.start(0, Math.random() * 2); return { s, f, g }; };
     A.sea = loop('amb', 'lowpass', 500, 0.4);
     A.wind = loop('amb', 'bandpass', 900, 2.5);
     A.leaves = loop('amb', 'highpass', 2600, 0.6, A.white);
