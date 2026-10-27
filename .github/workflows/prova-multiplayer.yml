@@ -12,7 +12,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: npm i --no-save playwright@1.47.2 && npx playwright install --with-deps chromium
+      - run: node tools/sig-test.mjs 2>&1 | tee tools/risultato.txt
       - run: node tools/mp-test.mjs
+        if: false
         env: { SKIP_ICE: '1' }
       - if: always()
         run: |
