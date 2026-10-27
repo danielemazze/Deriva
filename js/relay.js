@@ -142,6 +142,9 @@
         if (pc) return;
         pc = new RTCPeerConnection(R.ICE); iq = iceQueue(pc);
         pc.onicecandidate = (e) => { if (e.candidate) peer.reply('C', JSON.stringify(e.candidate.toJSON ? e.candidate.toJSON() : e.candidate)); };
+        // collegamento diretto caduto (chi entra ha chiuso il gioco o perso la rete): libera il posto
+        let dT = null;
+        pc.onconnectionstatechange = () => { const st = pc && pc.connectionState; if (st === 'failed' || st === 'closed') { if (mode === 'p2p') peer.close(); } else if (st === 'disconnected') { clearTimeout(dT); dT = setTimeout(() => { if (pc && pc.connectionState !== 'connected' && mode === 'p2p') peer.close(); }, 8000); } };
         pc.ondatachannel = (e) => {
           const ch = e.channel, rx = joiner(toLocal);
           ch.onmessage = (ev) => { if (typeof ev.data === 'string') rx(ev.data); };

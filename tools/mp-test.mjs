@@ -28,7 +28,9 @@ async function round(label, setup, code) {
   const r = await J.evaluate(async (code) => { const s = G.Relay.join(code); const c = await G.Net.connect(s, 'Prova' + Math.floor(Math.random() * 1000), false); return { ok: c.ok, reason: c.reason || null, mode: s.mode }; }, code || h.code);
   log(`[${label}]`, JSON.stringify(r), `${Date.now() - t1} ms`);
   if (r.ok) {
-    await J.evaluate(() => new Promise((res) => setTimeout(res, 6000)));
+    // 30 secondi di gioco simulato: posizione 15 volte al secondo, ping ogni 2 secondi
+    const pings = await J.evaluate(() => new Promise((res) => { const out = []; let n = 0; const t = setInterval(() => { n++; G.Net.send({ t: 'st', p: [n % 50, 3, 1], yaw: 0, pitch: 0, h: null, hp: 100 }); if (n % 30 === 0) { out.push(G.Net.ping); G.Net.send({ t: 'ping', c: performance.now() }); } if (n >= 450) { clearInterval(t); res(out); } }, 1000 / 15); }));
+    log(`[${label}] ping in ms durante 30 s: ` + pings.join(' '));
     log(`[${label}] ping:`, await J.evaluate(() => G.Net.ping + ' ms'), 'giocatori sul server:', await H.evaluate(() => G.Relay.peers.size));
   }
   log(`[${label}] traccia: ` + (await J.evaluate(() => G.Relay.debug.join(' | '))));
