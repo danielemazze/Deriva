@@ -700,6 +700,8 @@
     P.explored = new Set(d.explored || []); P.kills = d.kills || {}; P.rareFound = d.rareFound || {}; P.stats = d.stats || {}; P.known = d.known || {};
     P.equip = Array.isArray(d.equip) ? d.equip.slice(0, 4).concat([null, null, null, null]).slice(0, 4) : [null, null, null, null];
     if (typeof d.temp === 'number') P.temp = d.temp;
+    // il libro non sta più nell'inventario: si apre con B
+    P.inv = P.inv.map((st) => (st && st.id === 'libro' ? null : st)); P.equip = P.equip.map((st) => (st && st.id === 'libro' ? null : st));
     P.vmLId = undefined; P.vmId = undefined;
   };
 })();

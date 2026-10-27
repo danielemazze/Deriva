@@ -354,6 +354,7 @@
         ${N === 3 ? '<div class="hint" style="margin-top:10px">Le parti della barca (albero, vela, remi, timone) richiedono il banco da lavoro 5×5.</div>' : ''}</div>`;
       html += invSection();
       if (G.creative()) {
+        html = html.replace('</button>', '</button>' + kitBar());
         let c = ''; UI.catalog().forEach((st, i) => { c += slot('cat', i, st); });
         html += `<div><h3>Catalogo<small>modalità creativa</small></h3><div class="catalog">${c}</div><div class="hint" style="margin-top:8px">Clic: una pila in mano · Tasto destro: uno · Maiusc+clic: dritto nell’inventario</div></div>`;
       } else html += `<div><h3>Ricette</h3><input id="recq" class="recq" type="search" placeholder="Cerca una ricetta o un materiale" value="${esc(UI.recQ || '')}" autocomplete="off" spellcheck="false" aria-label="Cerca nel ricettario"><div class="reccats" id="reccats">${recCats()}</div><div class="reclist" id="reclist">${recipeList(N)}</div></div>`;
@@ -453,8 +454,34 @@
     if (G.Audio) G.Audio.craft();
     return true;
   }
+
+  // creativa: inventario rapido a tema (tasti 1-8 con l'inventario aperto)
+  const KITS = [
+    ['Barche', 'fasciame', ['fasciame', 'ponte_barca', 'zavorra', 'timone', 'albero_barca', 'vela', 'remo', 'panca', 'cannone', 'progetto_canoa', 'progetto_catamarano', 'progetto_galeone', 'vela_leggendaria', 'corda', 'stoffa', 'assi', 'chiodi', 'munizioni', 'baule', 'torcia', 'cannocchiale', 'bussola_oro']],
+    ['Legno', 'muro', ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'scala', 'recinto', 'torcia', 'banco', 'baule', 'letto', 'falo', 'trappola', 'assi', 'tronco', 'bastone', 'chiodi', 'corda', 'ascia_ferro']],
+    ['Pietra', 'muro_pietra', ['pavimento_pietra', 'muro_pietra', 'muro_porta_pietra', 'muro_finestra_pietra', 'tetto_pietra', 'scala_pietra', 'pilastro', 'porta', 'torcia', 'camino', 'fornace', 'baule', 'letto', 'banco', 'pietra', 'carbone', 'lingotto_ferro', 'piccone_ferro']],
+    ['Attrezzi', 'piccone_ferro', ['piccone_ferro', 'ascia_ferro', 'pala_ferro', 'coltello', 'canna', 'cannocchiale', 'scudo', 'ciotola', 'lanterna', 'bussola_oro', 'pinne', 'mappa_tesoro', 'piccone', 'ascia', 'pala', 'cappello_lana', 'maglione_lana', 'mantello_pelle', 'stivali_pelle', 'cappello_paglia']],
+    ['Armi', 'spada_ferro', ['spada_ferro', 'sciabola', 'lancia', 'arco', 'freccia', 'pistola', 'pistola_capitano', 'munizioni', 'coltello_ossidiana', 'scudo', 'cannone', 'trappola']],
+    ['Luce', 'torcia', ['torcia', 'lanterna', 'falo', 'camino', 'fornace', 'carbone', 'tronco', 'letto', 'baule', 'banco']],
+    ['Cibo', 'pesce_cotto', ['pesce_cotto', 'pollo_cotto', 'manzo_cotto', 'maiale_cotto', 'montone_cotto', 'coniglio_cotto', 'uovo_cotto', 'funghi_cotti', 'bacche', 'cocco', 'polpa_cactus', 'ciotola_acqua', 'canna', 'falo', 'ciotola', 'pesce_crudo', 'uovo']],
+    ['Natura', 'tronco', ['tronco', 'assi', 'bastone', 'fibra', 'foglie', 'pietra', 'terra', 'carbone', 'ferro_grezzo', 'oro_grezzo', 'lingotto_ferro', 'lingotto_oro', 'ossidiana', 'lana', 'pelle', 'piume', 'conchiglia', 'perla', 'dente_squalo', 'corda', 'stoffa', 'chiodi', 'doblone']],
+  ];
+  UI.kit = -1;
+  function kitBar() {
+    return `<div class="kitbar"><span class="klbl">Inventario rapido</span>${KITS.map(([n, ic], i) => `<button class="kit ${UI.kit === i ? 'on' : ''}" data-kit="${i}" title="Riempie barra e inventario: ${n}"><kbd>${i + 1}</kbd><img src="${G.icon(ic)}" alt="">${n}</button>`).join('')}</div>`;
+  }
+  UI.applyKit = function (n) {
+    const k = KITS[n]; if (!k || !G.creative()) return;
+    const P_ = P(), ids = k[2].filter((id) => G.ITEMS[id]);
+    for (let i = 0; i < P_.inv.length; i++) P_.inv[i] = null;
+    ids.forEach((id, i) => { if (i < P_.inv.length) { const st = G.ITEMS[id].stack || 64; P_.inv[i] = { id, n: st }; } });
+    UI.kit = n; P_.sel = 0;
+    UI.refreshHotbar(); UI.renderPanel();
+    if (G.Audio) G.Audio.click();
+    UI.toast(`Inventario rapido: ${k[0]}`, 'good');
+  };
   // catalogo della modalità creativa: un esemplare di ogni oggetto
-  UI.catalog = () => UI._cat || (UI._cat = Object.keys(G.ITEMS).map((id) => ({ id, n: 1 })));
+  UI.catalog = () => UI._cat || (UI._cat = Object.keys(G.ITEMS).filter((id) => id !== 'libro').map((id) => ({ id, n: 1 })));
   function getArr(src) { return src === 'inv' || src === 'hot' ? P().inv : src === 'equip' ? P().equip : src === 'craft' ? UI.craft : src === 'chest' ? UI.chestInv : src === 'cat' ? UI.catalog() : null; }
   function slotClick(src, i, button, shift) {
     if (src === 'cat') {
@@ -606,6 +633,18 @@
       return `<div class="rcard"><div class="mini" style="grid-template-columns:repeat(${N},20px)">${cells}</div><img src="${G.icon(r.out)}" width="32" height="32" alt=""><div class="nm">${esc(G.ITEMS[r.out].n)}${r.n > 1 ? ' ×' + r.n : ''}</div><div class="badge">${r.size === 5 ? 'banco 5×5' : 'a mano 3×3'}</div></div>`;
     }).join('') + '</div>';
   }
+  const SV = (d) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const MICO = {
+    play: '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>',
+    map: SV('<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'), plus: SV('<path d="M12 5v14M5 12h14"/>'),
+    ppl: SV('<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 14c3 0 6 1.5 6 4.5"/>'),
+    gear: SV('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'),
+    kb: SV('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h1M11 10h1M15 10h1M7 14h10"/>'), exit: SV('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>'),
+    eye: SV('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'), snd: SV('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9a4 4 0 010 6"/>'),
+    mic: SV('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>'), mouse: SV('<rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v3"/>'),
+    ui: SV('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/>'), globe: SV('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>'),
+    swap: SV('<path d="M4 8h13l-3-3M20 16H7l3 3"/>'), tools: SV('<path d="M14 6l4 4-9 9H5v-4z"/><path d="M13 7l4 4"/>'),
+  };
   const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Maiusc', 'correre'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
     ['E · I · Tab', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
@@ -623,24 +662,31 @@
     const side = $('menuSide'); const S = G.settings;
     const worlds = G.Worlds.list(), has = worlds.length > 0, last = worlds[0];
     const started = G.started, mp = G.Net && G.Net.on;
-    let h = `<div><h1 class="logo">Deriva</h1><div class="logo-sub">sopravvivenza tra le isole</div></div><div class="coords" id="coords">${G.coordsText ? G.coordsText() : ''}</div>`;
+    const modal = UI.menu === 'settings' || UI.menu === 'controls';
+    $('menu').classList.toggle('modal', modal);
+    let h = modal ? '' : `<div class="mhead"><h1 class="logo">${UI.menu === 'main' && started ? 'In pausa' : 'Deriva'}</h1><div class="logo-sub">${UI.menu === 'main' && started && G.worldName ? esc(G.worldName) + ' · ' + (G.creative() ? 'Creativa' : 'Sopravvivenza') : 'sopravvivenza tra le isole'}</div></div>${started ? '' : `<div class="coords" id="coords">${G.coordsText ? G.coordsText() : ''}</div>`}`;
+    const row = (m, ic, t, sub, cls) => `<button class="mrow ${cls || ''}" data-m="${m}"><span class="mic">${MICO[ic]}</span><span>${t}${sub ? `<small>${sub}</small>` : ''}</span></button>`;
+    const chip = (m, ic, t) => `<button class="mchip" data-m="${m}">${MICO[ic]}${t}</button>`;
     if (UI.menu === 'main') {
-      h += '<div class="mbtns">';
+      h += '<div class="mlist">';
       if (started) {
-        h += `<button class="mbtn primary" data-m="resume">Riprendi</button>`;
+        h += `<button class="mcont" data-m="resume"><span class="mplay">${MICO.play}</span><span>Riprendi<small>Esc</small></span></button>`;
+        h += '<div class="mcap">Partita</div>';
         if (mp) h += playersHTML();
-        else if (APP()) h += `<button class="mbtn" data-m="mp">Apri agli amici<small>ospita questo mondo in multigiocatore</small></button>`;
+        else if (APP()) h += row('mp', 'ppl', 'Apri agli amici', 'ospita questo mondo in multigiocatore');
+        if (!(G.Net && G.Net.on && !G.Net.isHost)) h += row('togglemode', 'swap', G.creative() ? 'Passa a Sopravvivenza' : 'Passa a Creativa', 'ora: ' + (G.creative() ? 'creativa' : 'sopravvivenza') + ' · F4');
+        if (G.Cmd && G.Cmd.allowed()) h += row('tools', 'tools', 'Strumenti', 'orario, meteo, vento, luna, biomi · K');
+        h += '<div class="mcap">Opzioni</div>' + row('settings', 'gear', 'Impostazioni', 'grafica, audio, voce, controlli') + row('controls', 'kb', 'Comandi', 'tasti e mouse');
+        h += `</div><div class="mfoot">${mp ? chip('leave', 'exit', G.Net.isHost ? 'Chiudi la partita' : 'Esci dalla partita') : chip('savequit', 'exit', 'Salva e torna al titolo')}</div>`;
       } else {
-        if (has) h += `<button class="mbtn primary" data-m="continue">Continua<small>${esc(last.name)} · ${G.Worlds.MODE_N[last.mode] || 'Sopravvivenza'}</small></button>`;
-        h += `<button class="mbtn ${has ? '' : 'primary'}" data-m="${has ? 'worlds' : 'newWorld'}">${has ? 'Mondi' : 'Nuovo mondo'}<small>${has ? `${worlds.length} ${worlds.length === 1 ? 'mondo salvato' : 'mondi salvati'} · crea, importa, esporta` : 'un nuovo arcipelago infinito'}</small></button>`;
-        h += `<button class="mbtn" data-m="mp">Multigiocatore<small>fino a 4 giocatori</small></button>`;
+        if (has) h += `<button class="mcont" data-m="continue"><span class="mplay">${MICO.play}</span><span>Continua<small>${esc(last.name)} · ${G.Worlds.MODE_N[last.mode] || 'Sopravvivenza'}</small></span></button>`;
+        else h += `<button class="mcont" data-m="newWorld"><span class="mplay">${MICO.play}</span><span>Nuovo mondo<small>un arcipelago infinito</small></span></button>`;
+        h += '<div class="mcap">Gioca</div>';
+        if (has) h += row('worlds', 'map', 'Mondi', `${worlds.length} ${worlds.length === 1 ? 'mondo salvato' : 'mondi salvati'} · importa, esporta`) + row('newWorld', 'plus', 'Nuovo mondo', 'un arcipelago mai visto');
+        h += row('mp', 'ppl', 'Multigiocatore', 'codice partita · fino a 4 giocatori');
+        h += `</div><div class="mfoot">${chip('settings', 'gear', 'Impostazioni')}${chip('controls', 'kb', 'Comandi')}${APP() ? chip('quit', 'exit', 'Esci') : ''}</div>`;
       }
-      if (started && !(G.Net && G.Net.on && !G.Net.isHost)) h += `<button class="mbtn" data-m="togglemode">${G.creative() ? 'Passa a Sopravvivenza' : 'Passa a Creativa'}<small>ora: ${G.creative() ? 'creativa (tutti gli oggetti, volo)' : 'sopravvivenza'} · tasto F4</small></button>`;
-      if (started && G.Cmd && G.Cmd.allowed()) h += `<button class="mbtn" data-m="tools">Strumenti<small>orario, meteo, vento, luna, biomi, villaggi, comparsa · K · console con T</small></button>`;
-      h += `<button class="mbtn" data-m="settings">Impostazioni</button><button class="mbtn" data-m="controls">Comandi</button>`;
-      if (started) h += mp ? `<button class="mbtn" data-m="leave">${G.Net.isHost ? 'Chiudi la partita' : 'Esci dalla partita'}</button>` : `<button class="mbtn" data-m="savequit">Salva e torna al titolo</button>`;
-      else if (APP()) h += `<button class="mbtn" data-m="quit">Esci dal gioco</button>`;
-      h += `</div><p class="note">${started && G.worldName ? esc(G.worldName) + ' · ' + (G.creative() ? 'Creativa' : 'Sopravvivenza') + ' · ' : ''}Il mondo si salva in automatico.</p>`;
+      h += `<p class="note mver">versione ${G.VERSION || ''} · il mondo si salva da solo</p>`;
     } else if (UI.menu === 'worlds') {
       const fmt = (t) => t ? new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
       const rows = worlds.map((w) => `<div class="wrow"><div class="wmain"><b>${esc(w.name || 'Mondo')}</b><span class="wbadge ${w.mode === 'creativa' ? 'cr' : ''}">${G.Worlds.MODE_N[w.mode] || 'Sopravvivenza'}</span><small>seme ${esc(String(w.seed))} · giocato il ${fmt(w.played)}${w.size ? ' · ' + Math.max(1, Math.round(w.size / 1024)) + ' KB' : ''}</small></div>
@@ -682,39 +728,45 @@
           <p class="note">Il codice funziona anche da case diverse, senza aprire porte. Chi ospita lo trova nel menu (Esc).</p></div>`}
         <p class="mperr" id="mp-msg" role="status">${esc(UI.mpMsg)}</p>
         <div class="mbtns"><button class="mbtn" data-m="main">Indietro</button></div></div>`;
-    } else if (UI.menu === 'settings') {
+    } else if (UI.menu === 'settings' || UI.menu === 'controls') {
       const opt = (id, label, min, max, step, val, fmt) => `<div class="opt"><label for="${id}">${label}</label><output id="${id}-o">${fmt(val)}</output><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
       const chk = (id, label, on, note) => `<div class="opt"><label for="${id}">${label}${note ? `<small>${note}</small>` : ''}</label><input type="checkbox" id="${id}" ${on ? 'checked' : ''}></div>`;
-      h += `<div class="mscreen"><h2>Impostazioni</h2>
-        <h3 class="sub3">Grafica</h3>
+      if (UI.menu === 'controls') UI.stab = 'controlli';
+      const TABS = [['grafica', 'eye', 'Grafica'], ['audio', 'snd', 'Audio'], ['voce', 'mic', 'Chat vocale'], ['controlli', 'mouse', 'Controlli'], ['interfaccia', 'ui', 'Interfaccia']].concat(started ? [['mondo', 'globe', 'Questo mondo']] : []);
+      let tab = UI.stab || 'grafica'; if (!TABS.some((t) => t[0] === tab)) tab = 'grafica';
+      let body = '';
+      if (tab === 'grafica') body = `<h5>Qualità</h5>
         <div class="presets">${Object.entries(G.PRESETS).map(([k, p]) => `<button data-preset="${k}" class="${S.preset === k ? 'on' : ''}">${p.label}</button>`).join('')}</div>
-        <div class="opt"><label>Stile<small>Dark Fantasy: notte eterna blu-viola, nebulose e una luna gigante al posto del sole</small></label><div class="seg small">${[['normale', 'Normale'], ['dark', 'Dark Fantasy']].map(([k, n]) => `<button data-gstyle="${k}" class="${(S.style || 'normale') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-        ${S.style === 'dark' ? `<div class="opt"><label>Luna</label><div class="seg small">${[['rossa', 'Rossa'], ['argento', 'Argento']].map(([k, n]) => `<button data-gmoon="${k}" class="${(S.moon || 'rossa') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>` : ''}
+        <h5>Notte</h5><div class="sgrid">        <div class="opt"><label>Luna di notte<small>di notte il cielo diventa blu-viola, con nebulose e una grande luna</small></label><div class="seg small">${[['rossa', 'Rossa'], ['argento', 'Argento']].map(([k, n]) => `<button data-gmoon="${k}" class="${(S.moon || 'rossa') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div></div>
+        <h5>Dettagli</h5><div class="sgrid">
         ${chk('o-shadow', 'Ombre', S.shadows)}${chk('o-ao', 'Occlusione ambientale', S.ao !== false, 'ombre di contatto più realistiche')}${chk('o-god', 'Raggi di sole', S.godrays)}${chk('o-fx', 'Foglie e particelle', S.fx)}
         ${opt('o-view', 'Distanza visiva', 2, 7, 1, S.view, (v) => `${v * 64 * 2} m`)}
         ${opt('o-grass', 'Densità dell’erba', 0, 1.6, 0.1, S.grass, (v) => `${Math.round(v * 100)}%`)}
         ${opt('o-pixel', 'Risoluzione', 0.5, 1.5, 0.05, S.pixel, (v) => `${Math.round(v * 100)}%`)}
         ${chk('o-dyn', 'Grafica adattiva', S.dynres !== false, 'per tenere gli FPS stabili abbassa risoluzione, ombre, raggi e distanza, e li rialza quando c’è margine: ti avvisa ogni volta')}
         <div class="opt"><label>FPS da mantenere</label><div class="seg small">${[30, 45, 60].map((f) => `<button data-fps="${f}" class="${(S.fpsTarget || 60) === f ? 'on' : ''}">${f}</button>`).join('')}</div></div>
-        ${opt('o-fov', 'Campo visivo', 60, 100, 1, S.fov, (v) => `${v}°`)}
         ${APP() ? chk('o-full', 'Schermo intero', S.fullscreen, 'anche con F11') + chk('o-vsync', 'VSync', S.vsync !== false, 'limita gli FPS alla frequenza dello schermo · vale dal prossimo avvio') : ''}
-        ${started ? worldSettingsHTML() : ''}
-        <h3 class="sub3">Interfaccia</h3>
-        ${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
-        ${opt('o-sens', 'Sensibilità mouse', 0.3, 2.5, 0.05, S.sens, (v) => `${(+v).toFixed(2)}×`)}
-        <h3 class="sub3">Audio</h3>
+        </div>        <p class="note">${G.gpuName ? `Scheda video: <b>${esc(G.gpuName)}</b>${G.gpuSoft ? ' — <span class="warnc">il gioco non sta usando la scheda video: aggiorna i driver</span>' : G.gpuWeak ? ' (integrata: consigliate Bassa o Minima)' : ''}. ` : ''}Le texture (Alta e Ultra) e la densità dell’erba si applicano dal prossimo avvio; il resto cambia subito.</p>`;
+      else if (tab === 'audio') body = `<h5>Volumi</h5><div class="sgrid">
         ${opt('o-vol', 'Volume generale', 0, 1, 0.05, S.volume, (v) => `${Math.round(v * 100)}%`)}
         ${(G.Audio ? G.Audio.BUSES : []).map(([k, n, d]) => { const v = S.vols && S.vols[k] !== undefined ? S.vols[k] : 1; return `<div class="opt"><label for="o-av-${k}">${n}<small>${d}</small></label><output id="o-av-${k}-o">${Math.round(v * 100)}%</output><input type="range" id="o-av-${k}" min="0" max="1.5" step="0.05" value="${v}"></div>`; }).join('')}
-        <h3 class="sub3">Chat vocale</h3>
+        </div>`;
+      else if (tab === 'voce') body = `<h5>Chat vocale</h5><div class="sgrid">
         <div class="opt"><label>Microfono<small>si attiva quando sei in partita con altri giocatori</small></label><div class="seg small">${[['open', 'Sempre aperto'], ['ptt', 'Tieni premuto Q'], ['off', 'Spento']].map(([k, n]) => `<button data-voice="${k}" class="${(S.voice && S.voice.mode || 'open') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
         ${opt('o-vvol', 'Volume delle voci', 0, 1.5, 0.05, S.voice ? S.voice.vol : 1, (v) => `${Math.round(v * 100)}%`)}
         ${opt('o-vrange', 'Si sentono fino a', 15, 150, 5, S.voice ? S.voice.range : 60, (v) => `${v} m`)}
         ${opt('o-vsens', 'Sensibilità del microfono', 0, 1, 0.05, S.voice ? S.voice.sens : 0.5, (v) => `${Math.round(v * 100)}%`)}
-        <p class="note">Sempre aperto: il microfono trasmette solo quando senti parlare (più sensibilità = si apre anche con la voce bassa). Con il collegamento diretto o sulla stessa Wi-Fi la voce è immediata; se la partita passa dal server dei codici la voce potrebbe non arrivare.</p>
-        <p class="note">${G.gpuName ? `Scheda video: <b>${esc(G.gpuName)}</b>${G.gpuSoft ? ' — <span class="warnc">il gioco non sta usando la scheda video: aggiorna i driver</span>' : G.gpuWeak ? ' (integrata: consigliate Bassa o Minima)' : ''}. ` : ''}Le texture (Alta e Ultra) e la densità dell’erba si applicano dal prossimo avvio; il resto cambia subito.</p>
-        <div class="mbtns"><button class="mbtn" data-m="main">Indietro</button></div></div>`;
-    } else if (UI.menu === 'controls') {
-      h += `<div class="mscreen"><h2>Comandi</h2><div class="ctrl-dark">${CONTROLS.map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div><div class="mbtns"><button class="mbtn" data-m="main">Indietro</button></div></div>`;
+        </div><p class="note">Sempre aperto: il microfono trasmette solo quando senti parlare (più sensibilità = si apre anche con la voce bassa). Con il collegamento diretto o sulla stessa Wi-Fi la voce è immediata; se la partita passa dal server dei codici la voce potrebbe non arrivare.</p>`;
+      else if (tab === 'controlli') body = `<h5>Mouse e visuale</h5><div class="sgrid">
+        ${opt('o-sens', 'Sensibilità mouse', 0.3, 2.5, 0.05, S.sens, (v) => `${(+v).toFixed(2)}×`)}
+        ${opt('o-fov', 'Campo visivo', 60, 100, 1, S.fov, (v) => `${v}°`)}
+        </div><h5>Comandi</h5><div class="ctrl2">${CONTROLS.map(([k, v]) => `<div class="kp"><kbd>${k}</kbd><span>${v}</span></div>`).join('')}</div>`;
+      else if (tab === 'interfaccia') body = `<h5>A schermo</h5><div class="sgrid">
+        ${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
+        </div>`;
+      else body = `<div class="sgrid">${worldSettingsHTML()}</div>`;
+      h += `<div class="swin" role="dialog" aria-label="Impostazioni"><nav class="stabs"><h2>Impostazioni</h2>${TABS.map(([k, ic, n]) => `<button data-stab="${k}" class="${tab === k ? 'on' : ''}">${MICO[ic]}${n}</button>`).join('')}</nav>
+        <div class="sbody">${body}</div><div class="sbar"><span>Le modifiche si salvano subito</span><button class="mbtn primary" data-m="main">Fatto</button></div></div>`;
     } else if (UI.menu === 'connecting') {
       h += `<div class="mscreen"><h2>Connessione…</h2><p class="note">${esc(UI.mpMsg)}</p></div>`;
     }
@@ -828,8 +880,9 @@
     box.innerHTML = `<li><i style="background:${N.COLOR_CSS[N.slot % 4]}"></i>${esc(G.settings.name || 'Tu')}${G.Voice && G.Voice.talking ? spk : ''}</li>` + [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}${r.speaking ? spk : ''}${G.settings.showPing !== false && r.ping ? `<span>${r.ping} ms</span>` : ''}</li>`).join('');
   };
   function onMenuClick(e) {
-    const b = e.target.closest('[data-m],[data-preset],[data-nwmode],[data-setmode],[data-nwen],[data-seten],[data-fps],[data-voice],[data-gstyle],[data-gmoon]'); if (!b) return;
-    if (b.dataset.gstyle || b.dataset.gmoon) { if (b.dataset.gstyle) G.settings.style = b.dataset.gstyle; else G.settings.moon = b.dataset.gmoon; G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
+    const b = e.target.closest('[data-m],[data-preset],[data-nwmode],[data-setmode],[data-nwen],[data-seten],[data-fps],[data-voice],[data-gmoon],[data-stab]'); if (!b) return;
+    if (b.dataset.stab) { UI.stab = b.dataset.stab; UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
+    if (b.dataset.gmoon) { G.settings.moon = b.dataset.gmoon; G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
     if (b.dataset.voice) { const vs = G.Voice ? G.Voice.settings() : (G.settings.voice = G.settings.voice || { mode: 'open', vol: 1, range: 60, sens: 0.5 }); vs.mode = b.dataset.voice; G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
     if (b.dataset.fps) { G.settings.fpsTarget = +b.dataset.fps; G.adaptReset(); G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); return; }
     if (G.Audio) G.Audio.click();
@@ -913,6 +966,7 @@
       if (!G.started) return;
       if (UI.open) {
         if (k === 'Escape' || k === 'Tab' || k === 'KeyI' || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
+        else if (/^Digit[1-8]$/.test(k) && !UI.hoverSlot && UI.open === 'inv' && G.creative()) UI.applyKit(+k.slice(5) - 1);
         else if (/^Digit[1-9]$/.test(k) && UI.hoverSlot && UI.open !== 'book') {
           // tasto numerico sopra uno slot: scambia con la barra rapida
           const n = +k.slice(5) - 1; const { src, i } = UI.hoverSlot; const arr = getArr(src);
@@ -979,6 +1033,7 @@
       const s = e.target.closest('.slot[data-src]');
       if (s) { e.preventDefault(); slotClick(s.dataset.src, +s.dataset.i, e.button, e.shiftKey); UI.syncShared(); UI.renderPanel(); return; }
       const r = e.target.closest('[data-rec]'); if (r) { fillRecipe(+r.dataset.rec, e.shiftKey); UI.renderPanel(); return; }
+      const kb = e.target.closest('[data-kit]'); if (kb) { e.preventDefault(); UI.applyKit(+kb.dataset.kit); return; }
       const rc = e.target.closest('[data-rcat]'); if (rc) { e.preventDefault(); UI.recCat = rc.dataset.rcat; UI.refreshRecipes(); return; }
       const fb = e.target.closest('[data-fill]');
       if (fb && !fb.disabled && UI.open === 'boat') {

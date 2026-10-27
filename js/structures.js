@@ -648,7 +648,287 @@
   }
 
   /* ---------------- gestione ---------------- */
-  const BUILD = { village: buildVillage, faro: buildFaro, relitto: buildRelitto, covo: buildCovo, tesoro: buildTesoro, rovina: buildRovina, miniera: buildMiniera, accampamento: buildAccampamento };
+
+  // castello: raro e gigantesco, a doppia cinta. Mura con scarpa, contrafforti, beccatelli e merli;
+  // torri con cornici, feritoie e guglie; porte fortificate; mastio gotico cavo; saloni, cappella, pozzo.
+  function castleBase(c) {
+    const HO = 50, rot = quarterRot(c.rotR != null ? c.rotR : 0), ca = Math.cos(rot), sa = Math.sin(rot);
+    let gmin = Infinity, gmax = -Infinity;
+    for (let i = -5; i <= 5; i++) for (let j = -5; j <= 6; j++) { const lx = i * HO / 5, lz = j * HO / 5, h = GROUND(c.x + lx * ca + lz * sa, c.z - lx * sa + lz * ca); gmin = Math.min(gmin, h); gmax = Math.max(gmax, h); }
+    return { gmin, y: Math.max(gmax, G.SEA + 2) + 0.35 };
+  }
+  S.castleBase = (c) => castleBase(c).y;
+  function buildCastello(c) {
+    const rnd = G.mulberry32(c.seed), bk = new Bucket(), cols = [], gen = [];
+    const HO = 50, HI = 30;
+    const b = { x: c.x, z: c.z, rot: quarterRot(c.rotR != null ? c.rotR : rnd()) };
+    const ca = Math.cos(b.rot), sa = Math.sin(b.rot);
+    const W = (lx, lz) => [b.x + lx * ca + lz * sa, b.z - lx * sa + lz * ca];
+    const { gmin, y } = castleBase(c); c.base = y;
+    const M = placer(b, y);
+    const tint = (k) => { const j = (rnd() - 0.5) * 0.07; return [k[0] + j, k[1] + j, k[2] + j * 0.8]; };
+    const ST = [0.8, 0.78, 0.74], ST2 = [0.67, 0.65, 0.62], ST3 = [0.9, 0.88, 0.83], RF = [0.74, 0.77, 0.86], WD = [0.62, 0.5, 0.4];
+    const P = (key, g, col, uv) => put(bk, key, g, M, col || tint(ST), uv);
+    const col = (x0, y0, z0, x1, y1, z1, f) => cols.push(wbox(b, y, Math.min(x0, x1), y0, Math.min(z0, z1), Math.max(x0, x1), y1, Math.max(z0, z1), f));
+    const rotY = (g, a) => g.rotateY(a);
+    const prism = (cx, by, cz, w, d, h, alongZ) => { const sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(0, h); sh.closePath(); const g = new THREE.ExtrudeGeometry(sh, { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); if (!alongZ) g.rotateY(Math.PI / 2); return g.translate(cx, by, cz); };
+    const pyramid = (cx, by, cz, w, h) => { const g = new THREE.CylinderGeometry(0.02, w * 0.72, h, 4); g.rotateY(Math.PI / 4); return g.translate(cx, by + h / 2, cz); };
+    const finial = (x, top, z, flag) => { P('iron', CYL(0.08, 0.05, 3.2, x, top, z, 6), [1, 1, 1], false); P('iron', new THREE.SphereGeometry(0.22, 8, 6).translate(x, top + 1.1, z), [1, 1, 1], false); if (flag) P('cloth', BOX(0.05, 1.2, 2.2, x, top + 2.4, z + 1.1), [0.52, 0.08, 0.1]); };
+    // finestra gotica (rettangolo + punta) sul lato di normale (nx,nz)
+    const gwin = (x, wy, z, nx, nz, w, h, lit) => {
+      const k = lit ? 'glow' : 'dark', t = 0.08, ax = Math.abs(nx) > 0.5;
+      P(k, BOX(ax ? t : w, h, ax ? w : t, x + nx * 0.02, wy + h / 2, z + nz * 0.02), [1, 1, 1], false);
+      const tip = BOX(w * 0.71, w * 0.71, t, 0, 0, 0); tip.rotateZ(Math.PI / 4); if (ax) tip.rotateY(Math.PI / 2); tip.translate(x + nx * 0.02, wy + h, z + nz * 0.02); P(k, tip, [1, 1, 1], false);
+      P('stone', BOX(ax ? 0.35 : w + 0.5, 0.25, ax ? w + 0.5 : 0.35, x + nx * 0.12, wy - 0.12, z + nz * 0.12), ST3); // davanzale
+    };
+    // basamento livellato e scalinata
+    const dep = y - gmin + 3;
+    P('stone', BOX(2 * HO + 10, dep, 2 * HO + 10, 0, -dep / 2, 0), ST2);
+    P('stone', BOX(2 * HO + 10.6, 0.5, 2 * HO + 10.6, 0, -1.2, 0), ST3);
+    P('stone', BOX(2 * HO + 6, 0.3, 2 * HO + 6, 0, 0.0, 0), [0.7, 0.68, 0.64]);
+    col(-HO - 5, -dep, -HO - 5, HO + 5, 0.15, HO + 5, { walk: true });
+    { const [fx, fz] = W(0, HO + 12); const low = Math.min(y - 0.5, GROUND(fx, fz)); const rise = y - low; const L = Math.max(6, rise * 1.7); const n = Math.ceil(L / 0.6);
+      for (let k = 0; k < n; k++) { const sy = rise * (k / n); P('stone', BOX(12, 0.6, 0.62, 0, -sy - 0.3, HO + 5 + k * 0.6 + 0.3), k % 2 ? ST2 : ST); }
+      for (const sx of [-1, 1]) { P('stone', BOX(1.2, 1.3, L, sx * 6.6, -rise / 2 + 0.2, HO + 5 + L / 2), ST3); for (let k = 0; k <= L; k += 6) P('glow', BOX(0.3, 0.45, 0.3, sx * 6.6, -rise * (k / L) + 1.2, HO + 5 + k), [1, 1, 1], false); }
+      cols.push(wslope(b, -6, 6, HO + 5 + L, HO + 5, y - rise, y + 0.15)); }
+    // ---------------- mura ----------------
+    // (x0,z0)->(x1,z1) lungo un asse; out = segno del lato esterno
+    const wall = (x0, z0, x1, z1, WH, WT, out, opts) => {
+      opts = opts || {};
+      const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), L = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      const B = (len, h, th, yy, off, key, cl) => P(key || 'stone', BOX(alongX ? len : th, h, alongX ? th : len, cx + (alongX ? 0 : off * out), yy, cz + (alongX ? off * out : 0)), cl);
+      B(L, WH, WT, WH / 2, 0);
+      B(L, 2.2, WT + 1.6, 1.1, 0.3, 'stone', ST2);           // scarpa alla base
+      B(L, 0.35, WT + 0.5, 2.3, 0.1, 'stone', ST3);           // cordolo
+      B(L, 0.3, WT + 0.35, WH * 0.55, 0.05, 'stone', ST3);    // marcapiano
+      col(alongX ? cx - L / 2 : cx - WT / 2, 0, alongX ? cz - WT / 2 : cz - L / 2, alongX ? cx + L / 2 : cx + WT / 2, WH, alongX ? cz + WT / 2 : cz + L / 2, { walk: true });
+      // contrafforti sul lato esterno
+      const nb = Math.floor(L / 9);
+      for (let k = 1; k < nb; k++) {
+        const t = -L / 2 + k * (L / nb), bx = alongX ? cx + t : cx + out * (WT / 2 + 0.6), bz = alongX ? cz + out * (WT / 2 + 0.6) : cz + t;
+        P('stone', BOX(alongX ? 1.4 : 1.2, WH * 0.62, alongX ? 1.2 : 1.4, bx, WH * 0.31, bz), ST2);
+        const cap = BOX(alongX ? 1.4 : 0.9, 0.9, alongX ? 0.9 : 1.4, 0, 0, 0); cap.rotateX(alongX ? out * 0.6 : 0); cap.rotateZ(alongX ? 0 : -out * 0.6); cap.translate(bx - (alongX ? 0 : out * 0.2), WH * 0.62 + 0.15, bz - (alongX ? out * 0.2 : 0)); P('stone', cap, ST2);
+      }
+      // beccatelli + parapetto sporgente + merli
+      const nc = Math.floor(L / 1.25);
+      for (let k = 0; k < nc; k++) {
+        const t = -L / 2 + (k + 0.5) * (L / nc);
+        const px = alongX ? cx + t : cx + out * (WT / 2 + 0.35), pz = alongX ? cz + out * (WT / 2 + 0.35) : cz + t;
+        P('stone', BOX(alongX ? 0.4 : 0.7, 0.9, alongX ? 0.7 : 0.4, px, WH - 0.45, pz), ST2);
+        P('stone', BOX(alongX ? 0.4 : 0.5, 0.35, alongX ? 0.5 : 0.4, px + (alongX ? 0 : out * 0.15), WH - 1.05, pz + (alongX ? out * 0.15 : 0)), ST2);
+      }
+      B(L, 1.1, 0.7, WH + 0.55, WT / 2 + 0.35, 'stone', ST);
+      const nm = Math.floor(L / 2.2);
+      for (let k = 0; k < nm; k++) {
+        const t = -L / 2 + (k + 0.5) * (L / nm);
+        const mx = alongX ? cx + t : cx + out * (WT / 2 + 0.35), mz = alongX ? cz + out * (WT / 2 + 0.35) : cz + t;
+        P('stone', BOX(alongX ? 1.25 : 0.7, 1.4, alongX ? 0.7 : 1.25, mx, WH + 1.8, mz), tint(ST));
+        P('stone', BOX(alongX ? 1.4 : 0.85, 0.16, alongX ? 0.85 : 1.4, mx, WH + 2.55, mz), ST3);
+        if (k % 2 === 0) P('dark', BOX(alongX ? 0.14 : 0.06, 0.7, alongX ? 0.06 : 0.14, mx + (alongX ? 0 : out * 0.36), WH + 1.8, mz + (alongX ? out * 0.36 : 0)), [1, 1, 1], false);
+        // feritoie lungo il muro
+        if (k % 3 === 1) P('dark', BOX(alongX ? 0.32 : 0.06, 2.0, alongX ? 0.06 : 0.32, alongX ? mx : cx + out * (WT / 2 + 0.03), WH * 0.36, alongX ? cz + out * (WT / 2 + 0.03) : mz), [1, 1, 1], false);
+      }
+      B(L, 0.9, 0.4, WH + 0.45, -(WT / 2 - 0.2), 'stone', ST);  // parapetto interno basso
+      if (opts.walk) B(L, 0.12, WT - 0.2, WH + 0.04, 0, 'stone', [0.6, 0.58, 0.55]);
+    };
+    // ---------------- torri ----------------
+    const tower = (tx, tz, r, th, o) => {
+      o = o || {}; const seg = o.oct ? 8 : 24;
+      P('stone', CYL(r * 1.28, r * 1.02, 3.4, tx, 0, tz, seg), ST2);                   // scarpa
+      P('stone', CYL(r * 1.3, r * 1.3, 0.4, tx, 3.3, tz, seg), ST3);
+      P('stone', CYL(r, r, th - 3.4, tx, 3.4, tz, seg), tint(ST));
+      for (let ry = 9; ry < th - 3; ry += 8) P('stone', CYL(r + 0.18, r + 0.18, 0.32, tx, ry, tz, seg), ST3);  // cornici
+      // feritoie a spirale
+      for (let f = 0, a0 = rnd() * 6.283; f * 3.2 + 5 < th - 4; f++) { const a = a0 + f * 1.9, fx = tx + Math.cos(a) * (r + 0.02), fz = tz + Math.sin(a) * (r + 0.02), g = BOX(0.32, 1.8, 0.08, 0, 0, 0); g.rotateY(-a + Math.PI / 2); g.translate(fx, 5 + f * 3.2, fz); P(f % 4 === 3 ? 'glow' : 'dark', g, [1, 1, 1], false); }
+      // beccatelli in cima e corona merlata
+      const nc = Math.round(r * 4.2);
+      for (let k = 0; k < nc; k++) { const a = (k / nc) * 6.283; const g = BOX(0.5, 1.0, 0.8, 0, 0, 0); g.rotateY(-a + Math.PI / 2); g.translate(tx + Math.cos(a) * (r + 0.3), th - 0.5, tz + Math.sin(a) * (r + 0.3)); P('stone', g, ST2); }
+      P('stone', CYL(r + 0.75, r + 0.75, 1.2, tx, th, tz, seg), ST);
+      const nm = Math.round(r * 2.4);
+      for (let k = 0; k < nm; k++) { const a = (k / nm) * 6.283; const g = BOX(1.1, 1.4, 0.6, 0, 0, 0); g.rotateY(-a + Math.PI / 2); g.translate(tx + Math.cos(a) * (r + 0.45), th + 1.9, tz + Math.sin(a) * (r + 0.45)); P('stone', g, tint(ST)); }
+      if (o.roof !== false) {
+        const rh = o.roofH || r * 2.6;
+        P('stone', CYL(r - 0.2, r - 0.2, 2.2, tx, th + 1.2, tz, seg), ST);                 // tamburo sotto il tetto
+        P('slate', CYL(r + 0.55, r + 0.55, 0.3, tx, th + 3.3, tz, seg), RF);                // gronda
+        P('slate', CYL(r + 0.5, 0.06, rh, tx, th + 3.5, tz, seg), RF);
+        // abbaini
+        for (let k = 0; k < (r > 5 ? 4 : 0); k++) { const a = k * 1.5708 + 0.785, dx = Math.cos(a) * (r * 0.62), dz = Math.sin(a) * (r * 0.62); const g = BOX(1.0, 1.4, 1.0, 0, 0, 0); g.rotateY(-a); g.translate(tx + dx, th + 4.6, tz + dz); P('stone', g, ST3); const rf = pyramid(tx + dx, th + 5.3, tz + dz, 1.3, 1.0); P('slate', rf, RF); P('dark', BOX(0.4, 0.6, 0.4, tx + dx * 1.07, th + 4.6, tz + dz * 1.07), [1, 1, 1], false); }
+        finial(tx, th + 3.5 + rh - 0.2, tz, o.flag);
+      }
+      col(tx - r * 1.05, 0, tz - r * 1.05, tx + r * 1.05, th + 2.5, tz + r * 1.05);
+    };
+    // torretta pensile sugli spigoli (bertesca)
+    const bartizan = (x, by, z, r) => {
+      P('stone', CYL(0.3, r, 2.4, x, by - 2.4, z, 12), ST2);
+      P('stone', CYL(r, r, 3.6, x, by, z, 12), ST);
+      P('stone', CYL(r + 0.15, r + 0.15, 0.25, x, by + 3.6, z, 12), ST3);
+      P('slate', CYL(r + 0.3, 0.05, r * 3.0, x, by + 3.8, z, 12), RF);
+      P('dark', BOX(0.25, 1.1, 0.25, x + r * 0.7, by + 1.6, z + r * 0.7), [1, 1, 1], false);
+      finial(x, by + 3.8 + r * 3, z, false);
+    };
+    // ---------------- porta fortificata ----------------
+    const gatehouse = (gz, gw, gh, depth, H, tr, out) => {
+      const half = gw / 2 + 3.2;
+      for (const sx of [-1, 1]) { P('stone', BOX(3.2, H, depth, sx * (gw / 2 + 1.6), H / 2, gz), tint(ST)); col(sx > 0 ? gw / 2 : -half, 0, gz - depth / 2, sx > 0 ? half : -gw / 2, H, gz + depth / 2); }
+      P('stone', BOX(gw, H - gh - 1.2, depth, 0, gh + 1.2 + (H - gh - 1.2) / 2, gz), tint(ST)); col(-gw / 2, gh, gz - depth / 2, gw / 2, H, gz + depth / 2);
+      // arco a sesto acuto: conci in pietra chiara
+      for (const zz of [gz + depth / 2 + 0.05, gz - depth / 2 - 0.05]) {
+        for (let k = 0; k <= 10; k++) { const a = (k / 10) * Math.PI, ax = Math.cos(a) * (gw / 2 + 0.3), ay = gh + Math.sin(a) * 2.2; const g = BOX(0.7, 0.9, 0.4, 0, 0, 0); g.rotateZ(a - Math.PI / 2); g.translate(ax, ay, zz); P('stone', g, ST3); }
+        P('dark', BOX(gw - 0.2, 2.0, 0.06, 0, gh + 0.9, zz), [1, 1, 1], false);
+      }
+      for (const sx of [-1, 1]) P('stone', BOX(0.5, gh, 0.5, sx * (gw / 2 + 0.15), gh / 2, gz + depth / 2 + 0.15), ST3);
+      // saracinesca (alzata a metà)
+      for (let k = 0; k <= Math.round(gw / 0.9); k++) P('iron', BOX(0.14, 3.2, 0.14, -gw / 2 + 0.3 + k * 0.9, gh - 0.4, gz + depth / 2 - 0.7), [1, 1, 1], false);
+      for (let k = 0; k < 3; k++) P('iron', BOX(gw - 0.2, 0.14, 0.14, 0, gh - 1.8 + k * 1.1, gz + depth / 2 - 0.7), [1, 1, 1], false);
+      // caditoia sopra la porta e merli
+      P('stone', BOX(gw + 2.4, 3.2, 1.6, 0, H - 1.6, gz + out * (depth / 2 + 0.8)), ST);
+      for (let k = 0; k < 7; k++) P('stone', BOX(0.45, 1.1, 1.3, -gw / 2 - 1 + k * ((gw + 2) / 6), H - 3.7, gz + out * (depth / 2 + 0.75)), ST2);
+      for (let k = 0; k < Math.floor((2 * half) / 2.2); k++) P('stone', BOX(1.2, 1.4, 0.7, -half + 1.1 + k * 2.2, H + 0.7, gz + out * (depth / 2 + 1.2)), tint(ST));
+      P('cloth', BOX(gw * 0.6, 4.2, 0.05, 0, H - 6.4, gz + out * (depth / 2 + 1.65)), [0.5, 0.08, 0.1]); // stemma
+      P('glow', BOX(gw * 0.18, gw * 0.18, 0.06, 0, H - 6.2, gz + out * (depth / 2 + 1.69)), [1, 1, 1], false);
+      for (const sx of [-1, 1]) tower(sx * (half + tr * 0.55), gz + out * 1.2, tr, H + 4, { flag: true });
+    };
+    // ---------------- salone gotico ----------------
+    const hall = (hx, hz, w, d, hh, face) => {
+      P('stone', BOX(w, hh, d, hx, hh / 2, hz), tint(ST2)); P('stone', BOX(w + 0.8, 1.4, d + 0.8, hx, 0.7, hz), ST2);
+      P('stone', BOX(w + 0.3, 0.3, d + 0.3, hx, hh - 0.15, hz), ST3);
+      const nb = Math.floor(d / 4.5);
+      for (let k = 0; k <= nb; k++) {
+        const zz = hz - d / 2 + k * (d / nb);
+        for (const sx of [-1, 1]) {
+          P('stone', BOX(1.0, hh * 0.85, 1.1, hx + sx * (w / 2 + 0.5), hh * 0.425, zz), ST2);
+          const cap = BOX(1.0, 1.0, 1.1, 0, 0, 0); cap.rotateZ(sx * 0.7); cap.translate(hx + sx * (w / 2 + 0.25), hh * 0.85 + 0.2, zz); P('stone', cap, ST2);
+          P('stone', CYL(0.22, 0.02, 1.6, hx + sx * (w / 2 + 0.5), hh * 0.85 + 0.5, zz, 4), ST3); // pinnacolo
+          if (k < nb) gwin(hx + sx * (w / 2), 2.2, zz + d / nb / 2, sx, 0, 1.3, hh * 0.45, rnd() < 0.7);
+        }
+      }
+      const rh = w * 0.75;
+      P('slate', prism(hx, hh, hz, w + 1.2, d + 0.8, rh, true), RF);
+      P('iron', BOX(0.18, 0.18, d + 0.8, hx, hh + rh, hz), [1, 1, 1], false);
+      // timpani con rosone
+      for (const sz of [-1, 1]) { P('stone', prism(hx, hh, hz + sz * (d / 2 - 0.1), w, 0.4, rh - 0.3, true), ST2); P(sz === face ? 'glow' : 'dark', CYL(1.1, 1.1, 0.1, 0, 0, 0, 16).rotateX(Math.PI / 2).translate(hx, hh + rh * 0.38, hz + sz * (d / 2 + 0.15)), [1, 1, 1], false); P('stone', new THREE.TorusGeometry(1.15, 0.16, 6, 16).translate(hx, hh + rh * 0.38, hz + sz * (d / 2 + 0.18)), ST3); }
+      // portale
+      P('dark', BOX(2.4, 3.6, 0.1, hx, 1.8, hz + face * (d / 2 + 0.06)), [1, 1, 1], false);
+      P('stone', prism(hx, 3.6, hz + face * (d / 2 + 0.2), 3.4, 0.5, 1.4, true), ST3);
+      // camini
+      for (const zz of [hz - d / 3, hz + d / 4]) { P('stone', BOX(1.2, 3.4, 1.2, hx + w * 0.22, hh + rh * 0.55 + 1.2, zz), ST2); P('stone', BOX(1.5, 0.3, 1.5, hx + w * 0.22, hh + rh * 0.55 + 3.0, zz), ST3); }
+      col(hx - w / 2 - 1, 0, hz - d / 2, hx + w / 2 + 1, hh + rh * 0.8, hz + d / 2);
+    };
+    // =========== CINTA ESTERNA ===========
+    const OH = 15, OT = 3.2, GW = 7;
+    wall(-HO, -HO, HO, -HO, OH, OT, -1, { walk: true });
+    wall(-HO, -HO, -HO, HO, OH, OT, -1, { walk: true });
+    wall(HO, -HO, HO, HO, OH, OT, 1, { walk: true });
+    wall(-HO, HO, -GW / 2 - 3.2, HO, OH, OT, 1, { walk: true });
+    wall(GW / 2 + 3.2, HO, HO, HO, OH, OT, 1, { walk: true });
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tower(sx * HO, sz * HO, 7, 28, { flag: true });
+    for (const [tx, tz] of [[0, -HO], [-HO, 0], [HO, 0], [-HO, -HO / 2], [HO, -HO / 2], [-HO, HO / 2], [HO, HO / 2], [-HO / 2, -HO], [HO / 2, -HO]]) tower(tx, tz, 4.6, 22, { oct: (tx + tz) % 2 === 0, roof: rnd() < 0.75 });
+    gatehouse(HO, GW, 8, 10, OH + 5, 5, 1);
+    // scale lungo il muro ovest per salire sul camminamento
+    { const x0 = -HO + OT / 2 + 1.6, zA = -20, zB = -4.8, n = Math.ceil((zB - zA) / 0.5);
+      for (let k = 0; k < n; k++) { const hh = OH * (1 - k / n); P('stone', BOX(3, hh, 0.52, x0, hh / 2, zA + k * 0.5 + 0.25), k % 2 ? ST2 : ST); }
+      cols.push(wslope(b, x0 - 1.5, x0 + 1.5, zB, zA, y, y + OH)); }
+    // =========== CINTA INTERNA ===========
+    const IH = 19, IT = 3, IG = 5.5;
+    wall(-HI, -HI, HI, -HI, IH, IT, -1); wall(-HI, -HI, -HI, HI, IH, IT, -1); wall(HI, -HI, HI, HI, IH, IT, 1);
+    wall(-HI, HI, -IG / 2 - 3.2, HI, IH, IT, 1); wall(IG / 2 + 3.2, HI, HI, HI, IH, IT, 1);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tower(sx * HI, sz * HI, 6, 32, { flag: true, roofH: 17 });
+    for (const [tx, tz] of [[0, -HI], [-HI, 0], [HI, 0]]) tower(tx, tz, 4.4, 27, {});
+    gatehouse(HI, IG, 7, 8, IH + 4, 4.2, 1);
+    // =========== MASTIO ===========
+    const KZ = -8, KW = 26, KH = 34, KT = 2.4;
+    const kx0 = -KW / 2, kx1 = KW / 2, kz0 = KZ - KW / 2, kz1 = KZ + KW / 2;
+    P('stone', BOX(KW + 2.4, 0.5, KW + 2.4, 0, 0.25, KZ), ST2);
+    for (const [w, d, x, z] of [[KW, KT, 0, kz0 + KT / 2], [KT, KW, kx0 + KT / 2, KZ], [KT, KW, kx1 - KT / 2, KZ]]) { P('stone', BOX(w, KH, d, x, KH / 2, z), tint(ST)); col(x - w / 2, 0, z - d / 2, x + w / 2, KH, z + d / 2); }
+    const DW = 2.4, fz = kz1 - KT / 2;
+    for (const sx of [-1, 1]) { const w = KW / 2 - DW; P('stone', BOX(w, KH, KT, sx * (DW + w / 2), KH / 2, fz), tint(ST)); col(sx > 0 ? DW : kx0, 0, fz - KT / 2, sx > 0 ? kx1 : -DW, KH, fz + KT / 2); }
+    P('stone', BOX(2 * DW, KH - 6, KT, 0, 6 + (KH - 6) / 2, fz), ST); col(-DW, 6, fz - KT / 2, DW, KH, fz + KT / 2);
+    for (let k = 0; k <= 10; k++) { const a = (k / 10) * Math.PI, g = BOX(0.6, 0.8, 0.4, 0, 0, 0); g.rotateZ(a - Math.PI / 2); g.translate(Math.cos(a) * (DW + 0.3), 4.6 + Math.sin(a) * 1.8, kz1 + 0.15); P('stone', g, ST3); }
+    // marcapiani, finestre gotiche, contrafforti angolari
+    for (const ry of [3, 12, 21, 30]) P('stone', BOX(KW + 0.5, 0.35, KW + 0.5, 0, ry, KZ), ST3);
+    for (let f = 0; f < 3; f++) for (let k = 0; k < 4; k++) {
+      const t = kx0 + 4 + k * ((KW - 8) / 3), wy = 5 + f * 9, lit = (k + f) % 3 !== 1;
+      gwin(t, wy, kz0 - 0.01, 0, -1, 1.4, 4.2, lit); gwin(kx0 - 0.01, wy, KZ + t, -1, 0, 1.4, 4.2, lit); gwin(kx1 + 0.01, wy, KZ + t, 1, 0, 1.4, 4.2, !lit);
+      if (f > 0 && (k === 0 || k === 3)) gwin(t, wy, kz1 + 0.01, 0, 1, 1.4, 4.2, lit);
+    }
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      for (const [dx, dz] of [[sx * 0.8, 0], [0, sz * 0.8]]) P('stone', BOX(dx ? 1.6 : 2.4, KH - 4, dz ? 1.6 : 2.4, sx * (KW / 2) + dx, (KH - 4) / 2, KZ + sz * (KW / 2) + dz), ST2);
+      bartizan(sx * (KW / 2 + 0.6), KH - 2, KZ + sz * (KW / 2 + 0.6), 2.0);
+    }
+    // corona del mastio: beccatelli, merli, tetto a piramide con abbaini
+    for (const [L, x, z, ax] of [[KW, 0, kz0, 1], [KW, 0, kz1, 1], [KW, kx0, KZ, 0], [KW, kx1, KZ, 0]]) for (let k = 0; k < 20; k++) { const t = -L / 2 + (k + 0.5) * (L / 20); P('stone', BOX(ax ? 0.4 : 0.8, 0.9, ax ? 0.8 : 0.4, ax ? t : x + Math.sign(x) * 0.3, KH - 0.4, ax ? z + Math.sign(z - KZ) * 0.3 : KZ + t), ST2); if (k % 2 === 0) P('stone', BOX(ax ? 1.2 : 0.6, 1.4, ax ? 0.6 : 1.2, ax ? t : x + Math.sign(x) * 0.5, KH + 1.3, ax ? z + Math.sign(z - KZ) * 0.5 : KZ + t), tint(ST)); }
+    P('stone', BOX(KW + 1.2, 0.8, KW + 1.2, 0, KH + 0.2, KZ), ST);
+    P('slate', pyramid(0, KH + 0.6, KZ, KW - 3, 12), RF);
+    for (const [dx, dz, a] of [[0, -KW / 2 + 4.5, 0], [0, KW / 2 - 4.5, 0], [-KW / 2 + 4.5, 0, 1], [KW / 2 - 4.5, 0, 1]]) { P('stone', BOX(a ? 1.6 : 2, 2.2, a ? 2 : 1.6, dx, KH + 2.2, KZ + dz), ST3); P('slate', prism(dx, KH + 3.3, KZ + dz, 2.4, 2.2, 1.4, !a), RF); P('glow', BOX(a ? 0.06 : 0.8, 1.0, a ? 0.8 : 0.06, dx + Math.sign(dx) * (a ? 0.82 : 0), KH + 2.2, KZ + dz + Math.sign(dz) * (a ? 0 : 1.02)), [1, 1, 1], false); }
+    // torri quadre agli angoli del mastio, più alte
+    for (const [sx, sz] of [[-1, -1], [1, -1]]) {
+      const tx = sx * (KW / 2 - 2.5), tz = KZ + sz * (KW / 2 - 2.5), tw = 6, th = KH + 14;
+      P('stone', BOX(tw, th - KH, tw, tx, KH + (th - KH) / 2, tz), tint(ST));
+      P('stone', BOX(tw + 0.5, 0.3, tw + 0.5, tx, KH + 7, tz), ST3);
+      for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) gwin(tx + nx * tw / 2, KH + 8, tz + nz * tw / 2, nx, nz, 1.0, 3.2, rnd() < 0.5);
+      for (let k = 0; k < 8; k++) { const t = -tw / 2 + 0.4 + k * ((tw - 0.8) / 7); for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (k % 2 === 0) P('stone', BOX(nz ? 0.7 : 0.6, 1.2, nz ? 0.6 : 0.7, tx + (nx ? nx * (tw / 2 - 0.1) : t), th + 0.6, tz + (nz ? nz * (tw / 2 - 0.1) : t)), ST); }
+      P('slate', pyramid(tx, th + 0.2, tz, tw - 0.6, 9), RF); finial(tx, th + 9, tz, true);
+    }
+    // gran torre centrale con cella campanaria e guglia con pinnacoli
+    { const tx = 0, tz = KZ, r = 5.2, top = KH + 30;
+      P('stone', CYL(r, r, top - KH - 8, tx, KH + 6, tz, 24), tint(ST));
+      for (let ry = KH + 12; ry < top - 8; ry += 6) P('stone', CYL(r + 0.2, r + 0.2, 0.3, tx, ry, tz, 24), ST3);
+      for (let f = 0; f < 3; f++) for (let k = 0; k < 4; k++) { const a = k * 1.5708 + f * 0.785, g = BOX(0.7, 2.6, 0.08, 0, 0, 0); g.rotateY(-a + Math.PI / 2); g.translate(tx + Math.cos(a) * (r + 0.02), KH + 9 + f * 6, tz + Math.sin(a) * (r + 0.02)); P(f === 1 ? 'glow' : 'dark', g, [1, 1, 1], false); }
+      // cella campanaria: pilastri e archi aperti
+      const by = top - 8;
+      for (let k = 0; k < 8; k++) { const a = (k / 8) * 6.283; P('stone', BOX(1.1, 5, 1.1, tx + Math.cos(a) * (r - 0.4), by + 2.5, tz + Math.sin(a) * (r - 0.4)), ST); }
+      P('stone', CYL(r + 0.4, r + 0.4, 1.0, tx, by + 5, tz, 24), ST3); P('stone', CYL(r - 0.6, r - 0.6, 0.4, tx, by - 0.2, tz, 16), ST2);
+      P('iron', CYL(1.2, 0.6, 1.8, tx, by + 2.4, tz, 12), [0.85, 0.7, 0.4], false); // campana
+      P('slate', CYL(r + 0.6, 0.06, 20, tx, by + 6, tz, 16), RF);
+      for (let k = 0; k < 4; k++) { const a = k * 1.5708 + 0.785; const px = tx + Math.cos(a) * (r + 0.1), pz = tz + Math.sin(a) * (r + 0.1); P('stone', BOX(0.8, 2.6, 0.8, px, by + 7.3, pz), ST3); P('slate', CYL(0.5, 0.03, 3.2, px, by + 8.6, pz, 4), RF); }
+      finial(tx, by + 25.6, tz, true);
+      col(tx - r, KH, tz - r, tx + r, top, tz + r);
+    }
+    // interno del mastio: colonne, tappeto, bracieri, tesoro
+    bk.lights = [];
+    for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) { const px = sx * 5, pz = KZ - 7 + k * 7; P('stone', CYL(0.7, 0.6, 9, px, 0, pz, 12), ST3); P('stone', BOX(1.7, 0.6, 1.7, px, 9.1, pz), ST3); cols.push(wbox(b, y, px - 0.65, 0, pz - 0.65, px + 0.65, 9, pz + 0.65)); }
+    P('stone', BOX(KW - 2 * KT, 0.4, KW - 2 * KT, 0, 9.6, KZ), ST2);
+    P('cloth', BOX(3.2, 0.05, KW - 7, 0, 0.18, KZ + 1.5), [0.55, 0.1, 0.12]);
+    P('stone', BOX(4.5, 1.0, 2.6, 0, 0.5, kz0 + 4.2), ST3); P('wood', BOX(2.0, 2.6, 0.5, 0, 2.3, kz0 + 3.3), WD); // trono
+    for (const [lx, lz] of [[kx0 + KT + 0.4, KZ - 6], [kx1 - KT - 0.4, KZ - 6], [kx0 + KT + 0.4, KZ + 5], [kx1 - KT - 0.4, KZ + 5]]) { P('glow', BOX(0.28, 0.45, 0.28, lx, 2.7, lz), [1, 1, 1], false); bk.lights.push(new V3(lx, 2.7, lz).applyMatrix4(M)); }
+    // =========== CORTE: saloni, cappella, pozzo, bracieri ===========
+    hall(-HI + 7.5, -6, 9, 26, 10, 1); hall(HI - 7.5, -6, 9, 26, 10, 1);
+    { // cappella nel cortile esterno, con campanile a guglia
+      const cx = HO - 10, cz = -HO + 16, w = 9, d = 16, hh = 11;
+      P('stone', BOX(w, hh, d, cx, hh / 2, cz), tint(ST)); P('slate', prism(cx, hh, cz, w + 1, d + 0.6, w * 0.95, true), RF);
+      for (let k = 0; k < 3; k++) for (const sx of [-1, 1]) { gwin(cx + sx * w / 2, 2.6, cz - d / 2 + 3 + k * 5, sx, 0, 1.2, 5.5, true); P('stone', BOX(0.9, hh * 0.8, 0.9, cx + sx * (w / 2 + 0.45), hh * 0.4, cz - d / 2 + 0.5 + k * 5.5), ST2); }
+      P('stone', prism(cx, hh, cz + d / 2 - 0.1, w, 0.4, w * 0.9, true), ST2);
+      P('glow', CYL(1.3, 1.3, 0.1, 0, 0, 0, 16).rotateX(Math.PI / 2).translate(cx, hh + 2.6, cz + d / 2 + 0.15), [1, 1, 1], false);
+      P('dark', BOX(2.0, 3.4, 0.1, cx, 1.7, cz + d / 2 + 0.06), [1, 1, 1], false);
+      P('stone', BOX(4.5, hh + 9, 4.5, cx, (hh + 9) / 2, cz - d / 2 - 1.5), ST);
+      for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P('dark', BOX(nz ? 1.4 : 0.06, 3.2, nz ? 0.06 : 1.4, cx + nx * 2.26, hh + 5.5, cz - d / 2 - 1.5 + nz * 2.26), [1, 1, 1], false);
+      P('slate', pyramid(cx, hh + 9, cz - d / 2 - 1.5, 4.8, 10), RF); finial(cx, hh + 19, cz - d / 2 - 1.5, false);
+      col(cx - w / 2 - 1, 0, cz - d / 2 - 4, cx + w / 2 + 1, hh + 4, cz + d / 2);
+    }
+    { // pozzo
+      const wx = -HO + 10, wz = HO - 12;
+      P('stone', CYL(1.6, 1.6, 1.0, wx, 0, wz, 16), ST3); P('dark', CYL(1.2, 1.2, 0.05, wx, 1.0, wz, 16), [1, 1, 1], false);
+      for (const sx of [-1, 1]) P('wood', BOX(0.25, 2.6, 0.25, wx + sx * 1.4, 1.3, wz), WD);
+      P('wood', BOX(3.2, 0.2, 0.2, wx, 2.5, wz), WD); P('shingle', prism(wx, 2.6, wz, 3.6, 2.4, 1.2, false), [0.8, 0.7, 0.6]);
+      col(wx - 1.6, 0, wz - 1.6, wx + 1.6, 1.0, wz + 1.6);
+    }
+    // stalle in legno lungo il muro est del cortile esterno
+    { const sx0 = HO - 6.5, z0 = 12.5; P('wood', BOX(6, 0.3, 15, sx0, 3.6, z0), WD); for (let k = 0; k <= 3; k++) P('logs', CYL(0.18, 0.16, 3.6, sx0 - 2.7, 0, z0 - 7.3 + k * 4.86, 7), [0.75, 0.68, 0.6], false); P('shingle', prism(sx0 + 0.3, 3.7, z0, 7, 15.6, 1.5, true), [0.75, 0.62, 0.5]); for (let k = 0; k < 6; k++) P('wood', CYL(0.45, 0.45, 1.0, sx0 + 1.5 - (k % 2) * 1.1, 0, z0 - 6 + k * 1.3, 10), [0.7, 0.55, 0.38]); col(sx0 - 0.2, 0, z0 - 7.5, sx0 + 3.0, 3.6, z0 + 7.5); }
+    // bracieri ai lati del viale
+    for (const zz of [HO - 8, HI + 6, HI - 6]) for (const sx of [-1, 1]) { const bx = sx * 4.5; P('stone', CYL(0.45, 0.3, 1.1, bx, 0, zz, 8), ST3); P('iron', CYL(0.55, 0.6, 0.35, bx, 1.1, zz, 10), [1, 1, 1], false); P('glow', CYL(0.4, 0.2, 0.45, bx, 1.4, zz, 8), [1, 1, 1], false); bk.lights.push(new V3(bx, 1.8, zz).applyMatrix4(M)); }
+    // viale lastricato
+    P('stone', BOX(6, 0.08, HO + 4, 0, 0.17, (HO + 4) / 2 - 4), [0.6, 0.58, 0.55]);
+    // tesori
+    { const [x, z] = W(0, kz0 + 6); gen.push({ t: 'forziere', id: `c:${c.id}:0`, x, y: y + 0.15, z, rot: b.rot, tier: 3 }); }
+    { const [x, z] = W(HO - 10, -HO + 16 - 5); gen.push({ t: 'forziere', id: `c:${c.id}:1`, x, y: y + 0.15, z, rot: b.rot, tier: 3 }); }
+    { const [x, z] = W(-HI + 7.5, -6); gen.push({ t: 'baule', id: `c:${c.id}:2`, x, y: y + 0.15, z, rot: b.rot, tier: 2 }); }
+    { const [x, z] = W(HO - 5, 2); gen.push({ t: 'baule', id: `c:${c.id}:3`, x, y: y + 0.15, z, rot: b.rot, tier: 2 }); }
+    bk.always = true;
+    return { bk, cols, gen };
+  }
+  const BUILD = { village: buildVillage, faro: buildFaro, relitto: buildRelitto, covo: buildCovo, tesoro: buildTesoro, rovina: buildRovina, miniera: buildMiniera, accampamento: buildAccampamento, castello: buildCastello };
+  S.previewBuild = (p) => { const r = BUILD[p.type](p); S.lastBase = p.base; const g = new THREE.Group(); r.bk.build(g); S.group.add(g); return { group: g, r }; };
   S.extraMats = function () {
     const m = S.mats();
     if (!m.wreck) {
@@ -677,6 +957,7 @@
       const px = P.pos.x, pz = P.pos.z, R = visualRange();
       const want = new Map();
       for (const p of G.POI.near(px, pz, R)) want.set(p.id, p);
+      for (const p of G.POI.near(px, pz, Math.min(1100, R * 2.2), 'castello')) want.set(p.id, p); // il castello si vede da lontano
       for (const tr of G.POI.treasuresNear(px, pz, 220)) if (G.state.removed.has('dig:' + tr.id)) want.set(tr.id, tr);
       // rimuovi i lontani
       for (const [id, a] of S.active) if (!want.has(id)) { S.dispose(a); S.active.delete(id); }
@@ -696,8 +977,9 @@
       let changed = false;
       for (const a of S.active.values()) {
         const d = Math.hypot(a.poi.x - px, a.poi.z - pz);
-        if (!a.near && d < 150) { S.enterNear(a); changed = true; }
-        else if (a.near && d > 190) { S.leaveNear(a); changed = true; }
+        const big = a.poi.type === 'castello' ? 60 : 0;
+        if (!a.near && d < 150 + big) { S.enterNear(a); changed = true; }
+        else if (a.near && d > 190 + big) { S.leaveNear(a); changed = true; }
         // scoperta
         const disc = a.poi.type === 'village' ? 60 : a.poi.type === 'relitto' ? 26 : a.poi.type === 'tesoro' ? 0 : 40;
         if (d < disc) S.discover(a.poi);

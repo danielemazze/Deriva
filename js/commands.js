@@ -94,12 +94,19 @@
     return 'Villaggi segnati sulla mappa (M): ' + l.map((v) => `${v.name} ${Math.round(Math.hypot(v.x - p.x, v.z - p.z))} m ${G.Climate.dirName(Math.atan2(v.x - p.x, v.z - p.z) + Math.PI)}`).join(' · ');
   };
   Cmd.goPlace = function (type) {
-    const map = { faro: 'faro', fari: 'faro', relitto: 'relitto', covo: 'covo', pirati: 'covo', rovina: 'rovina', rovine: 'rovina', miniera: 'miniera', accampamento: 'accampamento' };
+    const map = { faro: 'faro', fari: 'faro', relitto: 'relitto', covo: 'covo', pirati: 'covo', rovina: 'rovina', rovine: 'rovina', miniera: 'miniera', accampamento: 'accampamento', castello: 'castello', castelli: 'castello' };
     const t = map[norm(type)]; if (!t) return null;
     const p = P().pos, l = G.POI.near(p.x, p.z, 5000, t).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
     if (!l.length) return `Nessun ${type} trovato entro 5 km`;
     const v = l[0]; Cmd.reveal(v);
     if (t === 'relitto') return Cmd.teleport(v.x + 6, v.z, v.name);
+    if (t === 'castello') {
+      // nel cortile esterno, fra la porta grande e quella interna
+      const r = Math.floor(v.rotR * 4) * Math.PI / 2, x = v.x + Math.sin(r) * 40, z = v.z + Math.cos(r) * 40, pl = P();
+      const msg = Cmd.teleport(x, z, v.name); const y = G.Structures.castleBase(v) + 0.3; pl.pos.y = Math.max(pl.pos.y, y); pl.vel.set(0, 0, 0); pl.yaw = r;
+      for (let k = 0; k < 6; k++) { G.Structures.timer = 0; G.Structures.update(0, pl); } // costruisci subito mura e pavimento
+      return msg;
+    }
     const a = Math.atan2(v.z - p.z, v.x - p.x);
     return Cmd.teleport(v.x - Math.cos(a) * 16, v.z - Math.sin(a) * 16, v.name);
   };
@@ -149,7 +156,7 @@
     ['/luna piena · /luna 2', 'fase lunare'],
     ['/bioma deserto · foresta · pluviale · giungla · montagna · pianura · neve · vulcano', 'vai al bioma più vicino'],
     ['/villaggio [stile] · /villaggi', 'vai al villaggio più vicino · elenco sulla mappa'],
-    ['/vai faro · relitto · covo · rovina · miniera · accampamento', 'vai al luogo più vicino'],
+    ['/vai faro · relitto · covo · rovina · miniera · accampamento · castello', 'vai al luogo più vicino'],
     ['/spawn lupo 3 · /spawn pecora · /spawn pirata · /spawn abitante', 'fa comparire animali, nemici, abitanti'],
     ['/tp 120 -340', 'teletrasporto alle coordinate'],
     ['/modalita creativa · sopravvivenza', 'cambia modalità (anche F4)'],
@@ -236,7 +243,7 @@
       <section><h4>Vai al bioma</h4>
         <div class="tbtns">${[['pianura', 'Pianura'], ['foresta', 'Foresta'], ['pluviale', 'Pluviale'], ['giungla', 'Giungla'], ['deserto', 'Deserto'], ['montagna', 'Montagna'], ['neve', 'Neve'], ['vulcano', 'Vulcano']].filter(([k]) => G.BIOME[Cmd.BIOMES[k]] !== undefined).map(([k, n]) => btn('bioma:' + k, n)).join('')}</div>
         <h4 style="margin-top:10px">Vai al luogo</h4>
-        <div class="tbtns">${[['faro', 'Faro'], ['relitto', 'Relitto'], ['covo', 'Covo'], ['rovina', 'Rovina'], ['miniera', 'Miniera'], ['accampamento', 'Accampamento']].map(([k, n]) => btn('vai:' + k, n)).join('')}</div></section>
+        <div class="tbtns">${[['faro', 'Faro'], ['relitto', 'Relitto'], ['covo', 'Covo'], ['rovina', 'Rovina'], ['miniera', 'Miniera'], ['accampamento', 'Accampamento'], ['castello', 'Castello']].map(([k, n]) => btn('vai:' + k, n)).join('')}</div></section>
       <section><h4>Villaggi vicini</h4>
         <div class="vlist">${vl.map((v) => `<div><span>${esc(v.name)} <small>${esc(v.style)} · ${Math.round(Math.hypot(v.x - p.x, v.z - p.z))} m</small></span>${btn('vill:' + v.id, 'Vai')}</div>`).join('') || '<p class="note">Nessun villaggio entro 5 km</p>'}</div>
         ${btn('villaggi', 'Segna tutti sulla mappa')}</section>

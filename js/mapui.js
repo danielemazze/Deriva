@@ -67,13 +67,13 @@
     }
     return out;
   };
-  const ICON = { village: '⌂', faro: '♜', relitto: '⚓', covo: '☠', tesoro: '✕', rovina: '⛫', miniera: '⛏', accampamento: '⛺' };
+  const ICON = { village: '⌂', faro: '♜', relitto: '⚓', covo: '☠', tesoro: '✕', rovina: '⛫', miniera: '⛏', accampamento: '⛺', castello: '♚' };
 
   /* ---------------- pannello mappa ---------------- */
   MU.open = function () { const p = P().pos; MU.view.x = p.x; MU.view.z = p.z; G.UI.openCustom('map'); };
   MU.render = function () {
     return `<div class="mapwrap"><canvas id="mapc"></canvas>
-      <div class="maplegend"><b>Mappa</b><span><i class="lg you"></i>tu</span><span>⌂ villaggio</span><span>♜ faro</span><span>⚓ relitto</span><span>☠ covo dei pirati</span><span>⛫ rovine</span><span>⛏ miniera</span><span>⛺ accampamento</span><span class="x">✕ tesoro</span><span class="qq">◆ missione</span><small>Rotella: zoom · Trascina: sposta · ${(P().explored || new Set()).size} zone esplorate</small><button class="mini-btn" data-act="center">Centra su di me</button></div></div>`;
+      <div class="maplegend"><b>Mappa</b><span><i class="lg you"></i>tu</span><span>⌂ villaggio</span><span>♜ faro</span><span>⚓ relitto</span><span>☠ covo dei pirati</span><span>⛫ rovine</span><span>⛏ miniera</span><span>⛺ accampamento</span><span>♚ castello</span><span class="x">✕ tesoro</span><span class="qq">◆ missione</span><small>Rotella: zoom · Trascina: sposta · ${(P().explored || new Set()).size} zone esplorate</small><button class="mini-btn" data-act="center">Centra su di me</button></div></div>`;
   };
   MU.mount = function () {
     const c = document.getElementById('mapc'); if (!c) return;
@@ -152,7 +152,7 @@
     } else if (MU.jtab === 'scoperte') {
       const known = MU.knownPOIs().filter((k) => k.seen);
       const cnt = (t) => known.filter((k) => k.poi.type === t).length;
-      body = `<div class="jstats"><span>⌂ Villaggi <b>${cnt('village')}</b></span><span>♜ Fari <b>${cnt('faro')}</b></span><span>⚓ Relitti <b>${cnt('relitto')}</b></span><span>☠ Covi <b>${cnt('covo')}</b></span><span>⛫ Rovine <b>${cnt('rovina')}</b></span><span>⛏ Miniere <b>${cnt('miniera')}</b></span><span>⛺ Accampamenti <b>${cnt('accampamento')}</b></span><span>✕ Tesori <b>${(p.stats || {}).treasures || 0}</b></span></div>
+      body = `<div class="jstats"><span>⌂ Villaggi <b>${cnt('village')}</b></span><span>♜ Fari <b>${cnt('faro')}</b></span><span>⚓ Relitti <b>${cnt('relitto')}</b></span><span>☠ Covi <b>${cnt('covo')}</b></span><span>⛫ Rovine <b>${cnt('rovina')}</b></span><span>⛏ Miniere <b>${cnt('miniera')}</b></span><span>⛺ Accampamenti <b>${cnt('accampamento')}</b></span><span>♚ Castelli <b>${cnt('castello')}</b></span><span>✕ Tesori <b>${(p.stats || {}).treasures || 0}</b></span></div>
         <div class="jlist">${known.sort((a, b) => (p.discovered[b.poi.id] || 0) - (p.discovered[a.poi.id] || 0)).map((k) => `<div>${ICON[k.poi.type]} <b>${esc(k.poi.type === 'village' ? k.poi.name : k.poi.name)}</b> <small>${k.poi.type === 'village' ? G.POI.STYLE_N[k.poi.style] + (k.poi.inhabited ? '' : ', abbandonato') : ''}</small></div>`).join('') || '<p class="note">Ancora niente. Prendi il mare!</p>'}</div>`;
     } else if (MU.jtab === 'collezione') {
       const rf = p.rareFound || {};

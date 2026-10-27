@@ -10,7 +10,7 @@
   const REG = (P.REG = 384), TREG = (P.TREG = 256);
   P.reset = function () { P.cache.clear(); P.tcache.clear(); P.byIdMap.clear(); };
 
-  const hashR = (a, b, s) => { let h = (a * 73856093) ^ (b * 19349663) ^ (s * 83492791) ^ (G.seed | 0); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; };
+  const hashR = (P._hashR = (a, b, s) => { let h = (a * 73856093) ^ (b * 19349663) ^ (s * 83492791) ^ (G.seed | 0); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; });
   const flatOK = (x, z, r, n) => { let ok = 0; for (let i = 0; i < n; i++) { const a = (i / n) * 6.283; if (G.normalAt(x + Math.cos(a) * r, z + Math.sin(a) * r)[1] > 0.9) ok++; } return ok / n; };
 
   /* ---------- nomi ---------- */
@@ -127,6 +127,29 @@
         const ship = SHIP_N[(rnd() * SHIP_N.length) | 0];
         r.push({ id: `w:${rx}:${rz}`, type: 'relitto', x, z, h, yaw: rnd() * 6.283, roll: (rnd() - 0.5) * 0.7, name: 'Relitto: ' + ship, ship, seed: (rnd() * 1e9) | 0 });
         break;
+      }
+    }
+    // castello: rarissimo (circa una regione ogni 14), su colline ampie, lontano dalla partenza
+    {
+      const cr = G.mulberry32(hashR(rx, rz, 13));
+      if (cr() < 0.1 && Math.hypot(x0 + REG / 2, z0 + REG / 2) > 520) {
+        let best = null, bs = -1e9;
+        for (let i = 0; i < 40; i++) {
+          const x = x0 + 75 + cr() * (REG - 150), z = z0 + 75 + cr() * (REG - 150), h = G.heightAt(x, z);
+          if (h < 4 || h > 40) continue;
+          if (G.biomeAt(x, z) === G.BIOME.VULCANO || (G.lakeLevelAt && G.lakeLevelAt(x, z) !== null)) continue;
+          let mn = 1e9, mx = -1e9;
+          for (let a = -2; a <= 2; a++) for (let c = -2; c <= 2; c++) { const g = G.heightAt(x + a * 25, z + c * 25); mn = Math.min(mn, g); mx = Math.max(mx, g); }
+          if (mn < -2.5 || mx - mn > 26) continue;
+          const sc = h * 0.25 - (mx - mn);
+          if (sc > bs) { bs = sc; best = { x, z, h }; }
+        }
+        if (best) {
+          const CN = ['Corvonero', 'Roccascura', 'Montenebbia', 'Pietralunga', 'Valfosca', 'Torrenera', 'Altamura', 'Nidodaquila'];
+          // il castello prende il posto di ciò che c'era sulla collina
+          for (let k = r.length - 1; k >= 0; k--) if (r[k].type !== 'relitto' && Math.hypot(r[k].x - best.x, r[k].z - best.z) < 130) r.splice(k, 1);
+          r.push(Object.assign({ id: `x:${rx}:${rz}`, type: 'castello', name: 'Castello di ' + CN[(cr() * CN.length) | 0], seed: (cr() * 1e9) | 0, rotR: cr() }, best));
+        }
       }
     }
     for (const p of r) P.byIdMap.set(p.id, p);
@@ -315,8 +338,9 @@
   // vegetazione: 0 libero, 1 = dentro un villaggio (niente alberi/rocce), 2 = sotto un edificio (niente erba)
   P.clearAt = function (x, z) {
     let res = 0;
-    for (const p of P.near(x, z, 60)) {
+    for (const p of P.near(x, z, 100)) {
       const d = Math.hypot(p.x - x, p.z - z);
+      if (d > 60 && p.type !== 'castello') continue;
       if (p.type === 'village') {
         if (d > 44) continue;
         res = Math.max(res, 1);
@@ -327,6 +351,11 @@
       else if (p.type === 'covo' && d < 14) res = Math.max(res, d < 9 ? 2 : 1);
       else if ((p.type === 'rovina' || p.type === 'accampamento') && d < 16) res = Math.max(res, d < 11 ? 2 : 1);
       else if (p.type === 'miniera' && d < 9) return 2;
+      else if (p.type === 'castello' && d < 95) {
+        const q = Math.floor(p.rotR * 4) & 3, lx = q & 1 ? (q === 1 ? -(z - p.z) : z - p.z) : (q === 0 ? x - p.x : -(x - p.x)), lz = q & 1 ? (q === 1 ? x - p.x : -(x - p.x)) : (q === 0 ? z - p.z : -(z - p.z));
+        if (Math.abs(lx) < 60 && lz > -60 && lz < 80) return 2;
+        if (Math.abs(lx) < 70 && lz > -70 && lz < 88) res = Math.max(res, 1);
+      }
     }
     return res;
   };

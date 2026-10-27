@@ -297,7 +297,6 @@
       // guarda verso il mare
       let best = 0, bd = 1e9; for (let a = 0; a < 6.28; a += 0.3) { const h = G.heightAt(sp.x - Math.sin(a) * 40, sp.z - Math.cos(a) * 40); if (h < bd) { bd = h; best = a; } }
       G.Player.yaw = best; G.Player.pitch = -0.05;
-      G.Player.give('libro', 1, true);
       if (G.creative()) for (const id of ['ascia', 'piccone', 'coltello', 'canna', 'torcia', 'banco', 'assi', 'tronco']) G.Player.give(id, G.ITEMS[id].stack, true);
     }
     // genera subito i chunk vicini
@@ -344,7 +343,6 @@
       G.Player.inv = new Array(36).fill(null); G.Player.equip = [null, null, null, null]; G.Player.temp = 50;
       const sp = G.findSpawn();
       G.Player.pos.set(sp.x + (Math.random() - 0.5) * 6, sp.y + 0.1, sp.z + (Math.random() - 0.5) * 6);
-      G.Player.give('libro', 1, true);
     }
     G.World.update(G.Player.pos.x, G.Player.pos.z, 400);
     G.settleOnGround();
@@ -427,7 +425,7 @@
 
   /* ---------------- CICLO ---------------- */
   let last = performance.now();
-  const _v = new THREE.Vector3(), _proj = new THREE.Vector3();
+  const _v = new THREE.Vector3(), _proj = new THREE.Vector3(), _hc = new THREE.Color(), _hg = new THREE.Color();
   let fpsAcc = 0, fpsN = 0; G.fps = 60;
   function loop(now) {
     requestAnimationFrame(loop);
@@ -452,13 +450,13 @@
     sun.color.copy(S.light); sun.intensity = 1.0;
     sun.color.multiplyScalar(1.0);
     hemi.color.copy(S.zen).lerp(S.hor, 0.3).multiplyScalar(1.1 + S.day * 0.4); hemi.groundColor.setRGB(0.32, 0.27, 0.2).multiplyScalar(0.25 + S.day * 0.5); hemi.intensity = 0.55;
-    if (S.dark) { hemi.color.copy(S.zen).lerp(S.hor, 0.5).multiplyScalar(1.6); hemi.groundColor.setRGB(0.02, 0.07, 0.06); hemi.intensity = 0.6; }
+    if (S.dark > 0) { const k = S.dark; hemi.color.lerp(_hc.copy(S.zen).lerp(S.hor, 0.5).multiplyScalar(1.6), k); hemi.groundColor.lerp(_hg.setRGB(0.02, 0.07, 0.06), k); hemi.intensity += (0.6 - hemi.intensity) * k; }
     amb.intensity = 0.05 + (1 - S.day) * 0.05 * (G.Climate ? 0.5 + G.Climate.moonLight() : 1);
     if (G.Climate && G.Climate.flash > 0) { hemi.intensity += G.Climate.flash * 2.2; amb.intensity += G.Climate.flash * 0.8; }
     G.shared.uSunInt.value = S.light.r * 0.5;
     const su = sky.material.uniforms;
     su.uCloud.value = G.Climate ? G.Climate.cur.cloud : 0.45; su.uMoonPh.value = G.Climate ? G.Climate.moonPhase() : 0.5;
-    su.uDark.value = S.dark ? 1 : 0; su.uMoonCol.value.copy(G.moonCol()); su.uSun.value.copy(S.sun); su.uMoon.value.copy(S.moon); su.uZen.value.copy(S.zen); su.uHor.value.copy(S.hor); su.uGlow.value.copy(S.glow); su.uSunCol.value.copy(S.sunCol); su.uNight.value = S.night;
+    su.uDark.value = S.dark; su.uMoonCol.value.copy(G.moonCol()); su.uSun.value.copy(S.sun); su.uMoon.value.copy(S.moon); su.uZen.value.copy(S.zen); su.uHor.value.copy(S.hor); su.uGlow.value.copy(S.glow); su.uSunCol.value.copy(S.sunCol); su.uNight.value = S.night;
 
     const P = G.Player;
     if (paused) {
@@ -556,8 +554,8 @@
         mist = morning * 0.6 + bw[1] * 0.45 + (wc ? wc.rain * 0.6 + wc.snow * 0.4 : 0);
         mh = G.SEA - 2 + bw[1] * 9 + morning * 4;
       }
-      if (S.dark) { mist = Math.max(mist, 0.5); mh = Math.max(mh, G.SEA + 4); }
-      pu.uMist.value = mist * (1 - spyK * 0.7); pu.uMistH.value = mh; pu.uDark.value = S.dark ? 1 : 0;
+      if (S.dark > 0) { mist = Math.max(mist, 0.5 * S.dark); mh = Math.max(mh, G.SEA + 4 * S.dark); }
+      pu.uMist.value = mist * (1 - spyK * 0.7); pu.uMistH.value = mh; pu.uDark.value = S.dark;
       const pre = G.settings.preset === 'custom' ? G.settings.basePreset : G.settings.preset;
       pu.uGodK.value = pre === 'ultra' ? 0.62 : pre === 'alta' ? 0.5 : 0.3;
       pu.uCamDepth.value = P.under ? Math.max(0, (G.waterLevelAt ? G.waterLevelAt(camera.position.x, camera.position.z, t, camera.position.y) : G.SEA) - camera.position.y) : 0;
@@ -570,7 +568,7 @@
     pu.uSunScreen.value.set(_proj.x * 0.5 + 0.5, _proj.y * 0.5 + 0.5);
     const edge = Math.max(Math.abs(_proj.x), Math.abs(_proj.y));
     pu.uSunVis.value = inFront ? G.clamp(1.6 - edge, 0, 1) * (P.under ? 0.8 : G.smooth(-0.02, 0.12, S.sun.y)) : 0;
-    pu.uExposure.value = S.dark ? 1.0 : 0.82 + (1 - S.day) * 0.12;
+    pu.uExposure.value = 0.82 + (1 - S.day) * 0.12 + (1.0 - 0.82 - (1 - S.day) * 0.12) * S.dark;
     post.quad.material = post.post;
     const useFxaa = !G.lowQ();
     renderer.setRenderTarget(useFxaa ? rtC : null);
