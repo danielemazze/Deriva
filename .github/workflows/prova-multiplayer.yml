@@ -1,0 +1,17 @@
+name: Prova multiplayer
+on:
+  workflow_dispatch:
+  push:
+    paths: ['tools/**', '.github/workflows/prova-multiplayer.yml']
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm i --no-save playwright@1.47.2 && npx playwright install --with-deps chromium
+      - run: node tools/mp-test.mjs
+      - if: always()
+        run: cat tools/risultato.txt >> $GITHUB_STEP_SUMMARY || true
