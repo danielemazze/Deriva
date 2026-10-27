@@ -8,7 +8,7 @@ const out = [];
 const log = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
 const srv = spawn('node', [root + 'tools/server.js', '7777'], { env: { ...process.env, DERIVA_WEB: root, DERIVA_JS: root + 'js' }, stdio: 'inherit' });
 await new Promise((r) => setTimeout(r, 1500));
-const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 async function page(name) {
   const ctx = await browser.newContext({ bypassCSP: true });
   const p = await ctx.newPage();
@@ -34,6 +34,12 @@ const ICE = await H.evaluate(async () => {
   r.google_stun = await test({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
   r.peerjs_turn = await test({ iceServers: [{ urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' }], iceTransportPolicy: 'relay' });
   r.openrelay_turn = await test({ iceServers: [{ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }], iceTransportPolicy: 'relay' });
+  r.freestun_turn = await test({ iceServers: [{ urls: ['turn:freestun.net:3478', 'turns:freestun.net:5350'], username: 'free', credential: 'free' }], iceTransportPolicy: 'relay' });
+  r.expressturn = await test({ iceServers: [{ urls: ['turn:relay1.expressturn.com:3478'], username: 'efPU52K4SLOQ34W2QY', credential: '1TJPNFxHKXrZfelz' }], iceTransportPolicy: 'relay' });
+  // broker MQTT pubblici via WebSocket (per un ripiego senza TURN)
+  const mq = async (url) => new Promise((res) => { const t0 = performance.now(); let w; try { w = new WebSocket(url, ['mqtt']); } catch (e) { return res('errore ' + e.message); } const to = setTimeout(() => { res('timeout'); try { w.close(); } catch (e) {} }, 8000); w.onopen = () => { clearTimeout(to); res('aperto in ' + Math.round(performance.now() - t0) + ' ms'); w.close(); }; w.onerror = () => { clearTimeout(to); res('errore'); }; });
+  r.mqtt = {};
+  for (const u of ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081', 'wss://mqtt.eclipseprojects.io/mqtt', 'wss://public.mqtthq.com:8084/mqtt']) r.mqtt[u] = await mq(u);
   return r;
 });
 log('ICE:', JSON.stringify(ICE));
