@@ -1,5 +1,5 @@
-// Prova del multiplayer col codice partita, sui server pubblici veri (PeerJS + TURN).
-// Gira su GitHub Actions: un "PC che ospita" e un "giocatore che entra", due browser separati.
+// Prova del multiplayer col codice partita sui server pubblici veri.
+// Gira su GitHub Actions: un "PC che ospita" (server locale + pagina) e un giocatore che entra da un altro browser.
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -8,69 +8,38 @@ const out = [];
 const log = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
 const srv = spawn('node', [root + 'tools/server.js', '7777'], { env: { ...process.env, DERIVA_WEB: root, DERIVA_JS: root + 'js' }, stdio: 'inherit' });
 await new Promise((r) => setTimeout(r, 1500));
-const browser = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 async function page(name) {
   const ctx = await browser.newContext({ bypassCSP: true });
-  await ctx.addInitScript(() => {
-    window.__tr = [];
-    const T = (x) => { window.__tr.push(((performance.now() / 1000).toFixed(2)) + ' ' + x); };
-    const W = window.WebSocket;
-    window.WebSocket = function (u, pr) { const w = pr ? new W(u, pr) : new W(u); if (/peerjs/.test(u)) { T('ws apre ' + u.split('?')[0]); const s0 = w.send.bind(w); w.send = (d) => { try { const o = JSON.parse(d); if (o.type !== 'HEARTBEAT') T('-> ' + o.type + ' ' + (o.dst || '')); } catch (e) {} return s0(d); }; w.addEventListener('message', (e) => { try { const o = JSON.parse(e.data); T('<- ' + o.type + ' ' + (o.src || '') + (o.payload && o.payload.msg ? ' ' + o.payload.msg : '')); } catch (er) {} }); w.addEventListener('close', (e) => T('ws chiuso ' + e.code)); } return w; };
-    window.WebSocket.prototype = W.prototype; Object.assign(window.WebSocket, { OPEN: 1, CLOSED: 3, CONNECTING: 0, CLOSING: 2 });
-    const PC = window.RTCPeerConnection;
-    window.RTCPeerConnection = function (c) { const pc = new PC(c); T('pc nuovo'); pc.addEventListener('connectionstatechange', () => T('pc ' + pc.connectionState)); pc.addEventListener('iceconnectionstatechange', () => T('ice ' + pc.iceConnectionState)); pc.addEventListener('icecandidateerror', (e) => T('ice err ' + e.errorCode + ' ' + e.url)); return pc; };
-    window.RTCPeerConnection.prototype = PC.prototype;
-  });
   const p = await ctx.newPage();
-  p.on('console', (m) => { if (m.type() === 'error') log(`[${name}] console:`, m.text().slice(0, 200)); });
   p.on('pageerror', (e) => log(`[${name}] errore:`, String(e).slice(0, 200)));
   await p.goto('http://127.0.0.1:7777/?touch=0');
   await p.waitForFunction(() => window.G && G.ready, null, { timeout: 180000 });
-  await p.evaluate(() => { G.pauseLoop = true; });
+  await p.evaluate(() => { G.pauseLoop = true; G.Relay.debug = []; });
   return p;
 }
-// 1. quali candidati si ottengono dai server STUN/TURN
 const H = await page('host');
-const ICE = process.env.SKIP_ICE ? {} : await H.evaluate(async () => {
-  const test = async (cfg, ms = 9000) => {
-    const pc = new RTCPeerConnection(cfg); pc.createDataChannel('x'); const types = new Set(); const errs = [];
-    pc.onicecandidate = (e) => { if (e.candidate) types.add(e.candidate.type || (e.candidate.candidate.match(/typ (\w+)/) || [])[1]); };
-    pc.onicecandidateerror = (e) => errs.push(`${e.url} ${e.errorCode} ${e.errorText}`);
-    await pc.setLocalDescription(await pc.createOffer());
-    await new Promise((r) => { pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); setTimeout(r, ms); });
-    pc.close(); return { types: [...types], errs: errs.slice(0, 4) };
-  };
-  const r = {};
-  r.google_stun = await test({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-  r.peerjs_turn = await test({ iceServers: [{ urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' }], iceTransportPolicy: 'relay' });
-  r.openrelay_turn = await test({ iceServers: [{ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }], iceTransportPolicy: 'relay' });
-  r.freestun_turn = await test({ iceServers: [{ urls: ['turn:freestun.net:3478', 'turns:freestun.net:5350'], username: 'free', credential: 'free' }], iceTransportPolicy: 'relay' });
-  r.expressturn = await test({ iceServers: [{ urls: ['turn:relay1.expressturn.com:3478'], username: 'efPU52K4SLOQ34W2QY', credential: '1TJPNFxHKXrZfelz' }], iceTransportPolicy: 'relay' });
-  // broker MQTT pubblici via WebSocket (per un ripiego senza TURN)
-  const mq = async (url) => new Promise((res) => { const t0 = performance.now(); let w; try { w = new WebSocket(url, ['mqtt']); } catch (e) { return res('errore ' + e.message); } const to = setTimeout(() => { res('timeout'); try { w.close(); } catch (e) {} }, 8000); w.onopen = () => { clearTimeout(to); res('aperto in ' + Math.round(performance.now() - t0) + ' ms'); w.close(); }; w.onerror = () => { clearTimeout(to); res('errore'); }; });
-  r.mqtt = {};
-  for (const u of ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081', 'wss://mqtt.eclipseprojects.io/mqtt', 'wss://public.mqtthq.com:8084/mqtt']) r.mqtt[u] = await mq(u);
-  return r;
-});
-log('ICE:', JSON.stringify(ICE));
-// 2. server dei codici + collegamento diretto + partita vera
-async function round(label, relayOnly) {
+const h = await H.evaluate(async () => await G.Relay.host(7777));
+log('codice:', JSON.stringify(h), 'broker:', await H.evaluate(() => G.Relay.brokers.map((b) => b.url).join(' ')));
+async function round(label, setup, code) {
   const J = await page('entra-' + label);
-  const setIce = (ro) => { if (ro) G.Relay.ICE = Object.assign({}, G.Relay.ICE, { iceTransportPolicy: 'relay' }); };
-  await H.evaluate(setIce, relayOnly); await J.evaluate(setIce, relayOnly);
-  const t0 = Date.now();
-  const h = await H.evaluate(async () => G.Relay.code ? { ok: true, code: G.Relay.code } : await G.Relay.host(7777));
-  log(`[${label}] codice:`, JSON.stringify(h), `${Date.now() - t0} ms`);
-  if (!h.ok) return;
+  if (setup) await J.evaluate(setup);
   const t1 = Date.now();
-  const r = await J.evaluate(async (code) => { const c = await G.Net.connect(G.Relay.join(code), 'Prova', false); return { ok: c.ok, reason: c.reason || null, remotes: G.Net.on ? G.Net.remotes.size : -1 }; }, h.code);
-  log(`[${label}] entra:`, JSON.stringify(r), `${Date.now() - t1} ms`);
-  log(`[${label}] traccia host: ` + (await H.evaluate(() => window.__tr.slice(-25).join(' | '))));
-  log(`[${label}] traccia entra: ` + (await J.evaluate(() => window.__tr.slice(-25).join(' | '))));
+  const r = await J.evaluate(async (code) => { const s = G.Relay.join(code); const c = await G.Net.connect(s, 'Prova', false); return { ok: c.ok, reason: c.reason || null, mode: s.mode }; }, code || h.code);
+  log(`[${label}]`, JSON.stringify(r), `${Date.now() - t1} ms`);
+  if (r.ok) {
+    await J.evaluate(() => new Promise((res) => setTimeout(res, 6000)));
+    log(`[${label}] ping:`, await J.evaluate(() => G.Net.ping + ' ms'), 'giocatori sul server:', await H.evaluate(() => G.Relay.peers.size));
+  }
+  log(`[${label}] traccia: ` + (await J.evaluate(() => G.Relay.debug.join(' | '))));
   await J.close();
 }
-await round('diretto', false);
-await round('solo-TURN', true);
+if (h.ok) {
+  await round('diretto');
+  await round('ponte', () => { G.Relay.P2P_WAIT = 0; G.Relay.ICE = { iceServers: [] }; });
+  await round('codice-sbagliato', null, 'ZZZ-ZZZ');
+  log('traccia host: ' + (await H.evaluate(() => G.Relay.debug.join(' | '))));
+}
 fs.writeFileSync(root + 'tools/risultato.txt', out.join('\n') + '\n');
 await browser.close(); srv.kill();
 process.exit(0);
