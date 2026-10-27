@@ -14,4 +14,6 @@ jobs:
       - run: npm i --no-save playwright@1.47.2 && npx playwright install --with-deps chromium
       - run: node tools/mp-test.mjs
       - if: always()
-        run: cat tools/risultato.txt >> $GITHUB_STEP_SUMMARY || true
+        run: |
+          cat tools/risultato.txt >> $GITHUB_STEP_SUMMARY || true
+          while IFS= read -r l; do echo "::notice::$l"; done < tools/risultato.txt || true
