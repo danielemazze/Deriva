@@ -25,7 +25,7 @@ async function round(label, setup, code) {
   const J = await page('entra-' + label);
   if (setup) await J.evaluate(setup);
   const t1 = Date.now();
-  const r = await J.evaluate(async (code) => { const s = G.Relay.join(code); const c = await G.Net.connect(s, 'Prova', false); return { ok: c.ok, reason: c.reason || null, mode: s.mode }; }, code || h.code);
+  const r = await J.evaluate(async (code) => { const s = G.Relay.join(code); const c = await G.Net.connect(s, 'Prova' + Math.floor(Math.random() * 1000), false); return { ok: c.ok, reason: c.reason || null, mode: s.mode }; }, code || h.code);
   log(`[${label}]`, JSON.stringify(r), `${Date.now() - t1} ms`);
   if (r.ok) {
     await J.evaluate(() => new Promise((res) => setTimeout(res, 6000)));
