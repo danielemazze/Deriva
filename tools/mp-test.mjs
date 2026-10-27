@@ -11,6 +11,16 @@ await new Promise((r) => setTimeout(r, 1500));
 const browser = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 async function page(name) {
   const ctx = await browser.newContext({ bypassCSP: true });
+  await ctx.addInitScript(() => {
+    window.__tr = [];
+    const T = (x) => { window.__tr.push(((performance.now() / 1000).toFixed(2)) + ' ' + x); };
+    const W = window.WebSocket;
+    window.WebSocket = function (u, pr) { const w = pr ? new W(u, pr) : new W(u); if (/peerjs/.test(u)) { T('ws apre ' + u.split('?')[0]); const s0 = w.send.bind(w); w.send = (d) => { try { const o = JSON.parse(d); if (o.type !== 'HEARTBEAT') T('-> ' + o.type + ' ' + (o.dst || '')); } catch (e) {} return s0(d); }; w.addEventListener('message', (e) => { try { const o = JSON.parse(e.data); T('<- ' + o.type + ' ' + (o.src || '') + (o.payload && o.payload.msg ? ' ' + o.payload.msg : '')); } catch (er) {} }); w.addEventListener('close', (e) => T('ws chiuso ' + e.code)); } return w; };
+    window.WebSocket.prototype = W.prototype; Object.assign(window.WebSocket, { OPEN: 1, CLOSED: 3, CONNECTING: 0, CLOSING: 2 });
+    const PC = window.RTCPeerConnection;
+    window.RTCPeerConnection = function (c) { const pc = new PC(c); T('pc nuovo'); pc.addEventListener('connectionstatechange', () => T('pc ' + pc.connectionState)); pc.addEventListener('iceconnectionstatechange', () => T('ice ' + pc.iceConnectionState)); pc.addEventListener('icecandidateerror', (e) => T('ice err ' + e.errorCode + ' ' + e.url)); return pc; };
+    window.RTCPeerConnection.prototype = PC.prototype;
+  });
   const p = await ctx.newPage();
   p.on('console', (m) => { if (m.type() === 'error') log(`[${name}] console:`, m.text().slice(0, 200)); });
   p.on('pageerror', (e) => log(`[${name}] errore:`, String(e).slice(0, 200)));
@@ -21,7 +31,7 @@ async function page(name) {
 }
 // 1. quali candidati si ottengono dai server STUN/TURN
 const H = await page('host');
-const ICE = await H.evaluate(async () => {
+const ICE = process.env.SKIP_ICE ? {} : await H.evaluate(async () => {
   const test = async (cfg, ms = 9000) => {
     const pc = new RTCPeerConnection(cfg); pc.createDataChannel('x'); const types = new Set(); const errs = [];
     pc.onicecandidate = (e) => { if (e.candidate) types.add(e.candidate.type || (e.candidate.candidate.match(/typ (\w+)/) || [])[1]); };
@@ -55,6 +65,8 @@ async function round(label, relayOnly) {
   const t1 = Date.now();
   const r = await J.evaluate(async (code) => { const c = await G.Net.connect(G.Relay.join(code), 'Prova', false); return { ok: c.ok, reason: c.reason || null, remotes: G.Net.on ? G.Net.remotes.size : -1 }; }, h.code);
   log(`[${label}] entra:`, JSON.stringify(r), `${Date.now() - t1} ms`);
+  log(`[${label}] traccia host: ` + (await H.evaluate(() => window.__tr.slice(-25).join(' | '))));
+  log(`[${label}] traccia entra: ` + (await J.evaluate(() => window.__tr.slice(-25).join(' | '))));
   await J.close();
 }
 await round('diretto', false);
