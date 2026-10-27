@@ -194,7 +194,7 @@
     if (P.swim || P.under) T = Math.min(T, 12 + G.climate(x, z).t * 18 - (G.coldAt ? G.coldAt(x, z) * 14 : 0));
     // falò vicini
     let fire = 0;
-    for (const p of G.Build.pieces) if (p.t === 'falo') { const d = Math.hypot(p.x - x, p.z - z); if (d < 7) fire = Math.max(fire, 1 - d / 7); }
+    for (const p of G.Build.pieces) if (p.t === 'falo' || p.t === 'camino' || (p.t === 'fornace' && p.glow > 0.3)) { const d = Math.hypot(p.x - x, p.z - z); if (d < 7) fire = Math.max(fire, 1 - d / 7); }
     if (G.Structures && G.Structures.fireNear) fire = Math.max(fire, G.Structures.fireNear(x, z));
     T += fire * 18;
     if (P.heldTorch) T += 2;

@@ -71,6 +71,14 @@
 
   T.build = function (id) {
     const M = mats();
+    // attrezzi di ferro: stesso modello di quelli di pietra, con la testa di metallo
+    if (/^(ascia|piccone|pala)_ferro$/.test(id) || id === 'spada_ferro') {
+      const g0 = T.build(id === 'spada_ferro' ? 'sciabola' : id.replace('_ferro', '')); if (!g0) return null;
+      const iron = M.iron || (M.iron = new THREE.MeshStandardMaterial({ color: 0xa9aeb3, roughness: 0.35, metalness: 0.85 }));
+      g0.traverse((o) => { if (o.isMesh && (o.material === M.stone || o.material === M.flint || (M.steel && o.material === M.steel))) o.material = iron; });
+      if (id === 'spada_ferro') g0.scale.set(1.08, 1.1, 1.08);
+      return g0;
+    }
     const g = new THREE.Group();
     const add = (m) => { m.castShadow = false; g.add(m); return m; };
     if (id === 'ascia') {

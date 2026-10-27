@@ -87,6 +87,12 @@ G.WEB_URL = 'danielemazze.github.io/Deriva';
 G.servedByHost = (() => { try { return !window.deriva && location.protocol === 'http:' && !!location.port; } catch (e) { return false; } })();
 /* telefono o tablet: comandi touch, grafica leggera */
 G.isTouch = (() => { try { const q = location.search; if (/[?&]touch=1/.test(q)) return true; if (/[?&]touch=0/.test(q)) return false; return !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && (navigator.maxTouchPoints || 0) > 0); } catch (e) { return false; } })();
+// tipo di base dei pezzi di pietra (stesse regole di aggancio e collisione di quelli di legno); serve anche al server
+G.PIECE_KIND = { pavimento_pietra: 'pavimento', muro_pietra: 'muro', muro_porta_pietra: 'muro_porta', muro_finestra_pietra: 'muro_finestra', tetto_pietra: 'tetto', scala_pietra: 'scala' };
+G.pieceKind = (t) => G.PIECE_KIND[t] || t;
+// come si interagisce (timone, bauli, porte, persone): tasto destro, sul telefono il pulsante Usa
+G.useKey = () => (G.isTouch ? 'Usa' : 'Tasto destro');
+G.useHow = () => (G.isTouch ? 'tocca Usa' : 'usa il tasto destro');
 G.defaultSettings = function () {
   const vols = { amb: 1, room: 1, ani: 1, wx: 1, sfx: 1, ui: 1 };
   if (G.isTouch) return Object.assign({ preset: 'bassa', fov: 80, sens: 1.0, volume: 0.6, vols, dynres: true, fpsTarget: 30 }, G.PRESETS.bassa);

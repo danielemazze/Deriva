@@ -111,7 +111,12 @@ button { font-family: inherit; }
 .slot.result { width: 64px; height: 64px; border-color: var(--brass); }
 .slot:hover { border-color: rgba(236,208,153,.6); }
 .slot.slot-ok { border-color: var(--kelp); }
-.reclist { width: 230px; max-height: 470px; overflow: auto; display: grid; gap: 4px; padding-right: 4px; align-content: start; }
+.recq { width: 100%; box-sizing: border-box; height: 34px; margin: 0 0 8px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: rgba(0,0,0,.3); color: var(--foam); font-family: var(--f-ui); font-size: 14px; }
+.recq:focus { outline: none; border-color: var(--brass-hi); }
+.reccats { width: 230px; display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.rcat { font-family: var(--f-ui); font-size: 12px; padding: 3px 8px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--foam); cursor: pointer; }
+.rcat small { color: var(--mist); font-size: 10px; } .rcat.on { background: rgba(201,162,94,.3); border-color: var(--brass-hi); } .rcat.none { opacity: .4; }
+.reclist { width: 230px; max-height: 390px; overflow: auto; display: grid; gap: 4px; padding-right: 4px; align-content: start; }
 .rec { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border-radius: 6px; background: rgba(255,255,255,.03); border: 1px solid transparent; cursor: pointer; color: var(--mist); font-size: 13px; text-align: left; }
 .rec img { width: 30px; height: 30px; }
 .rec.can { color: var(--foam); }
@@ -372,6 +377,14 @@ body.spyglass::after { content: ""; position: fixed; inset: 0; pointer-events: n
   :root { --slot: 40px; }
   .meters { width: 150px; }
 }
+.voicepill { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(132px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 14px; background: rgba(147,196,125,.9); color: #0b1f27; font-weight: 600; font-size: 13px; }
+.plist-hud .spk { color: var(--kelp); font-size: 11px; margin-left: 4px; }
+.fbstats { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: calc(70px + env(safe-area-inset-top, 0px)); width: 260px; box-sizing: border-box; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 4px; font-size: 13px; }
+.fbstats .fbt { font-family: var(--f-display); font-size: 18px; color: var(--brass-hi); margin-bottom: 2px; } .fbstats .fbt small { font-family: var(--f-ui); font-size: 11px; color: var(--mist); margin-left: 6px; }
+.fbstats .fbr { display: flex; justify-content: space-between; gap: 8px; } .fbstats .fbr span { color: var(--mist); } .fbstats .fbr b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.fbstats .fbb { height: 5px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; margin-bottom: 3px; } .fbstats .fbb i { display: block; height: 100%; }
+.fbstats .fbw { margin-top: 4px; padding: 7px 9px; border-radius: 7px; background: var(--brass-hi); color: var(--ink); font-size: 12px; line-height: 1.4; }
+html.touch .fbstats { top: calc(52px + env(safe-area-inset-top, 0px)); width: 220px; font-size: 12px; }
 /* ---------- TELEFONO: comandi touch ---------- */
 html.touch, html.touch body { touch-action: none; overscroll-behavior: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 html.touch { --slot: 38px; }
@@ -388,6 +401,7 @@ html.touch .boathud { right: auto; bottom: auto; left: max(12px, env(safe-area-i
 html.touch .boathud .spd { font-size: 22px; } html.touch .boathud canvas { width: 54px; height: 54px; }
 html.touch .placebar { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); font-size: 12px; white-space: normal; max-width: 50vw; }
 html.touch .placebar kbd, html.touch .target .thint kbd { display: none; }
+html.touch .voicepill { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 html.touch .heldname { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
 html.touch .target { min-width: 0; max-width: 40vw; }
 html.touch .perf { top: auto; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
@@ -399,6 +413,7 @@ html.touch .compass .win { width: 150px; }
 html.touch .clock { font-size: 12px; }
 html.touch .panel:not(.wide) { grid-template-columns: auto auto; }
 html.touch .panel:not(.wide) > div:nth-of-type(3) { grid-column: 1 / -1; }
+html.touch .reccats { width: auto; }
 html.touch .reclist { width: auto; max-height: 150px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 html.touch .catalog { max-height: 150px; grid-template-columns: repeat(auto-fill, var(--slot)); }
 html.touch .compass { left: 38%; }
@@ -450,6 +465,8 @@ html.touch #console { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px
     <div class="perf" id="perf" hidden></div>
     <ul class="plist-hud" id="plist" hidden></ul>
     <div class="hints" id="hints"></div>
+    <div class="fbstats" id="fbstats" hidden></div>
+    <div class="voicepill" id="voicepill" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Stai parlando</div>
   </div>
   <div class="overlay" id="panelWrap" hidden><div class="panel" id="panel"></div></div>
   <div class="overlay" id="bookWrap" hidden></div>
@@ -474,6 +491,7 @@ html.touch #console { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px
 <script src="js/entities.js"></script>
 <script src="js/build.js"></script>
 <script src="js/boats.js"></script>
+<script src="js/freeboat.js"></script>
 <script src="js/tools.js"></script>
 <script src="js/people.js"></script>
 <script src="js/structures.js"></script>
@@ -489,6 +507,7 @@ html.touch #console { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px
 <script src="js/worlds.js"></script>
 <script src="js/relay.js"></script>
 <script src="js/net.js"></script>
+<script src="js/voice.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/commands.js"></script>
 <script src="js/touch.js"></script>

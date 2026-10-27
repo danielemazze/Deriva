@@ -92,12 +92,39 @@
   };
 
   /* ---------------- scavare ---------------- */
-  D.dig = function (P, tool) {
+  /* ---------------- vene di minerale nella roccia ----------------
+     Celle di 7 m: in ognuna può esserci una vena (sfera) di carbone, ferro o oro,
+     sempre sotto la superficie. Deterministiche: tutti i giocatori le trovano uguali. */
+  const VC = 7;
+  const h3 = (a, b, c, k) => { let h = (a * 374761393 + b * 668265263 + c * 1442695041 + k * 2246822519 + (G.seed | 0) * 3266489917) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  const ORE_IDS = { 1: 'carbone', 2: 'ferro_grezzo', 3: 'oro_grezzo' };
+  function veinIn(cx, cy, cz) {
+    const r0 = h3(cx, cy, cz, 1); if (r0 > 0.46) return null;
+    const r = 1.4 + h3(cx, cy, cz, 2) * 1.2, m = r + 0.2;
+    const x = cx * VC + m + h3(cx, cy, cz, 3) * (VC - 2 * m), y = cy * VC + m + h3(cx, cy, cz, 4) * (VC - 2 * m), z = cz * VC + m + h3(cx, cy, cz, 5) * (VC - 2 * m);
+    const surf = G.heightAt(x, z), depth = surf - y;
+    if (depth < r + 0.6 || surf < G.SEA + 1) return null;
+    const mt = surf > 14 || G.biomeAt(x, z) === G.BIOME.MONTAGNA || G.biomeAt(x, z) === G.BIOME.NEVE, vol = G.volcanoNear && G.volcanoNear(x, z);
+    const k = h3(cx, cy, cz, 6);
+    let type = 1;
+    if ((depth > 9 || vol) && k < 0.16) type = 3;
+    else if ((mt || depth > 5) && k < 0.55) type = 2;
+    else if (r0 > 0.34) return null;
+    return { x, y, z, r, type, ore: ORE_IDS[type] };
+  }
+  G.oreAt = function (x, y, z) { const v = veinIn(Math.floor(x / VC), Math.floor(y / VC), Math.floor(z / VC)); if (!v) return null; const dx = x - v.x, dy = y - v.y, dz = z - v.z; return dx * dx + dy * dy + dz * dz < v.r * v.r ? v : null; };
+  D.veinsNear = function (x, y, z, rad) {
+    const out = [], n = Math.ceil(rad / VC), cx = Math.floor(x / VC), cy = Math.floor(y / VC), cz = Math.floor(z / VC);
+    for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) for (let k = -n; k <= n; k++) { const v = veinIn(cx + i, cy + j, cz + k); if (v) out.push(v); }
+    return out;
+  };
+  D.dig = function (P, tool, pow) {
+    pow = pow || 1;
     const o = P.cam.position, d = P.lookDir(new V3());
     const t = D.raycast(o, d, 4.6); if (t < 0) return false;
     const hx = o.x + d.x * t, hy = o.y + d.y * t, hz = o.z + d.z * t;
     if (hy < -45) { G.UI.toast('Troppo in profondità', 'warn'); return true; }
-    const r = tool === 'pala' ? 0.95 : tool === 'piccone' ? 0.8 : 0.55;
+    const r = (tool === 'pala' ? 0.95 : tool === 'piccone' ? 0.8 : 0.55) * (pow > 1 ? 1.18 : 1);
     const c = [hx + d.x * r * 0.55, hy + d.y * r * 0.55, hz + d.z * r * 0.55, r];
     // non si scava sotto un villaggio o una costruzione
     for (const b of G.Build.boxes) if (hx > b.x0 - 1 && hx < b.x1 + 1 && hz > b.z0 - 1 && hz < b.z1 + 1 && hy > b.y0 - 1.5 && hy < b.y1 + 0.5) { G.UI.toast('Qui sopra c’è una costruzione', 'warn'); return true; }
@@ -106,9 +133,12 @@
     const surf = G.heightAt(hx, hz) - hy, rocky = G.normalAt(hx, hz)[1] < 0.82 || (G.climate(hx, hz).mt > 0.5 && surf > 0.6) || surf > 1.6;
     const vol = G.biomeAt(hx, hz) === G.BIOME.VULCANO;
     if (!G.creative()) {
-      if (rocky || vol) P.give('pietra', tool === 'piccone' ? 2 : 1);
+      const vein = G.oreAt(c[0], c[1], c[2]);
+      if (vein && tool === 'piccone') { P.give(vein.ore, vein.type === 3 ? (Math.random() < 0.6 ? 1 : 0) : 1); P.give('pietra', 1); if (!D._veinTip) { D._veinTip = 1; G.UI.toast('Hai trovato una vena di ' + { 1: 'carbone', 2: 'ferro', 3: 'oro' }[vein.type] + '!', 'good'); } }
+      else if (vein) { if (!D._veinPala || performance.now() - D._veinPala > 5000) { D._veinPala = performance.now(); G.UI.toast('Qui c’è una vena di minerale: per estrarlo serve il piccone', 'warn'); } P.give('pietra', 1); }
+      else if (rocky || vol) P.give('pietra', tool === 'piccone' ? 2 : 1);
       else P.give('terra', tool === 'pala' ? 2 : 1);
-      if (surf > 3 && Math.random() < 0.18) P.give('carbone', 1);
+      if (!vein && surf > 3 && Math.random() < 0.06) P.give('carbone', 1);
       if (vol && Math.random() < 0.3) P.give('ossidiana', 1);
     }
     G.FX.burst(hx, hy, hz, rocky ? [0.55, 0.53, 0.5] : [0.42, 0.31, 0.2], 14, 2.4);
@@ -125,15 +155,20 @@
     const rockMap = PH.gravel || T.rockT.map, dirtMap = PH.dirt || T.sandT.map, rockN = PH.gravelN || T.rockT.normal;
     mat = new THREE.MeshStandardMaterial({ map: rockMap, normalMap: rockN, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.95, vertexColors: true, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
-      sh.uniforms.tDirt = { value: dirtMap };
+      sh.uniforms.tDirt = { value: dirtMap }; sh.uniforms.uVein = D.U.uVein; sh.uniforms.uVeinN = D.U.uVeinN;
       sh.vertexShader = 'attribute float aDepth; varying float vDepth; varying vec3 vWp; varying vec3 vWn;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vDepth = aDepth; vWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vWn = normalize(mat3(modelMatrix) * objectNormal);');
-      sh.fragmentShader = 'uniform sampler2D tDirt; varying float vDepth; varying vec3 vWp; varying vec3 vWn;\n' + sh.fragmentShader
+      sh.fragmentShader = 'uniform sampler2D tDirt; uniform vec4 uVein[16]; uniform int uVeinN; varying float vDepth; varying vec3 vWp; varying vec3 vWn;\nfloat vh(vec3 p){ return fract(sin(dot(floor(p), vec3(12.99, 78.23, 37.71))) * 43758.55); }\n' + sh.fragmentShader
         .replace('#include <map_fragment>', `
           vec3 bw = pow(abs(vWn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
           vec4 rk = texture2D(map, vWp.zy * 0.3) * bw.x + texture2D(map, vWp.xz * 0.3) * bw.y + texture2D(map, vWp.xy * 0.3) * bw.z;
           vec4 dt = texture2D(tDirt, vWp.zy * 0.33) * bw.x + texture2D(tDirt, vWp.xz * 0.33) * bw.y + texture2D(tDirt, vWp.xy * 0.33) * bw.z;
           vec4 tc = mix(dt, rk, smoothstep(0.6, 2.2, vDepth));
-          diffuseColor *= tc;`)
+          diffuseColor *= tc;
+          for (int i = 0; i < 16; i++) { if (i >= uVeinN) break; vec4 V = uVein[i]; float vr = floor(V.w); float vt = fract(V.w) * 10.0;
+            float d = length(vWp - V.xyz) / vr; if (d > 1.15) continue;
+            float sp = step(0.62, vh(vWp * 5.0)) * smoothstep(1.15, 0.7, d);
+            vec3 oc = vt < 1.5 ? vec3(0.05) : vt < 2.5 ? vec3(0.62, 0.3, 0.17) : vec3(1.0, 0.78, 0.22);
+            diffuseColor.rgb = mix(diffuseColor.rgb, oc, sp * 0.9); }`)
         .replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;', 'vec3 mapN = (texture2D(normalMap, vWp.xz * 0.3).xyz * bw.y + texture2D(normalMap, vWp.zy * 0.3).xyz * bw.x + texture2D(normalMap, vWp.xy * 0.3).xyz * bw.z) * 2.0 - 1.0;')
         // al buio sottoterra: sole e cielo non arrivano in fondo alle gallerie, le torce sì
         .replace('#include <lights_fragment_begin>', 'float caveK = mix(1.0, 0.04, smoothstep(0.6, 4.5, vDepth));\n' + THREE.ShaderChunk.lights_fragment_begin
@@ -209,11 +244,27 @@
     if (D.uniformDirty || (D._ut = (D._ut || 0) + 1) % 30 === 0) updateUniforms();
   };
   // il terreno normale si "buca" dentro le sfere scavate più vicine (fino a 48)
-  D.U = { uDig: { value: Array.from({ length: 48 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigN: { value: 0 } };
+  D.U = { uVein: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, -999, 0, 1)) }, uVeinN: { value: 0 }, uDig: { value: Array.from({ length: 48 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigN: { value: 0 },
+    // per l'acqua: solo gli scavi sotto terra ferma (montagne, colline): lì il mare non deve comparire
+    uDigW: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigWN: { value: 0 } };
   function updateUniforms() {
     D.uniformDirty = false;
     const P = G.Player, list = D.list.length > 48 ? D.list.slice().sort((a, b) => Math.hypot(a[0] - P.pos.x, a[2] - P.pos.z) - Math.hypot(b[0] - P.pos.x, b[2] - P.pos.z)).slice(0, 48) : D.list;
     for (let i = 0; i < 48; i++) { const s = list[i]; if (s) D.U.uDig.value[i].set(s[0], s[1], s[2], s[3] - 0.04); else D.U.uDig.value[i].set(0, -999, 0, 0); }
     D.U.uDigN.value = list.length;
+    let n = 0;
+    for (const s of list) { if (n >= 24) break; if (G.heightAt(s[0], s[2]) > G.SEA + 1) D.U.uDigW.value[n++].set(s[0], s[1], s[2], s[3] + 0.4); }
+    for (let i = n; i < 24; i++) D.U.uDigW.value[i].set(0, -999, 0, 0);
+    D.U.uDigWN.value = n;
+    // vene vicine al giocatore (solo dove si scava si vedono)
+    const vs = D.list.length ? D.veinsNear(P.pos.x, P.pos.y, P.pos.z, 14).filter((v) => near(v.x, v.z)).slice(0, 16) : [];
+    vs.forEach((v, i) => D.U.uVein.value[i].set(v.x, v.y, v.z, Math.floor(v.r + 0.5) + v.type / 10 + 0.001));
+    D.U.uVeinN.value = vs.length;
   }
+  // un punto dentro uno scavo sotto terra ferma: niente mare (anche se è sotto il livello del mare)
+  D.dryAt = function (x, y, z) {
+    const l = near(x, z); if (!l || G.heightAt(x, z) <= G.SEA + 1) return false;
+    for (const i of l) { const s = D.list[i]; const dx = x - s[0], dy = y - s[1], dz = z - s[2]; if (dx * dx + dy * dy + dz * dz < (s[3] + 1.5) * (s[3] + 1.5)) return true; }
+    return false;
+  };
 })();

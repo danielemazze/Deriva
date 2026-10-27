@@ -111,7 +111,7 @@
     const w = norm(what);
     if (w === 'npc' || w === 'abitante' || w === 'mercante' || w === 'persona') {
       for (let i = 0; i < n; i++) G.Structures.spawnWanderer(p.pos.x - Math.sin(p.yaw) * 3 + (Math.random() - 0.5) * 3, p.pos.z - Math.cos(p.yaw) * 3 + (Math.random() - 0.5) * 3, w === 'mercante' ? 'mercante' : 'abitante');
-      return `${n} ${n > 1 ? 'abitanti' : 'abitante'} accanto a te: premi E per parlarci`;
+      return `${n} ${n > 1 ? 'abitanti' : 'abitante'} accanto a te: ${G.useHow()} per parlarci`;
     }
     const sp = Cmd.SPAWN[w]; if (!sp || !G.SPECIES[sp]) return `Comparsa: ${Object.keys(Cmd.SPAWN).filter((k, i, a) => a.indexOf(k) === i && !k.endsWith('i') && !k.endsWith('e')).join(', ')}, abitante, mercante`;
     if (G.isHostile(sp) && G.enemiesOff) return 'I nemici sono disattivati in questo mondo (/nemici si)';

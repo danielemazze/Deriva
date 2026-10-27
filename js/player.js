@@ -145,7 +145,7 @@
   P.update = function (dt, t) {
     const k = P.keys;
     P.refreshHeld();
-    const waterY = G.waterLevelAt ? G.waterLevelAt(P.pos.x, P.pos.z, t) : G.waveHeight(P.pos.x, P.pos.z, t);
+    const waterY = G.waterLevelAt ? G.waterLevelAt(P.pos.x, P.pos.z, t, P.pos.y + 0.5) : G.waveHeight(P.pos.x, P.pos.z, t);
     if (P.boat) updateBoatRide(dt, t);
     else {
       const ground = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.05));
@@ -239,7 +239,7 @@
       }
     }
     P.eye.set(P.pos.x, P.pos.y + (P.boat && P.helm && P.boat.T.sit ? 0.95 : EYE), P.pos.z);
-    P.under = P.eye.y < (G.waterLevelAt ? G.waterLevelAt(P.eye.x, P.eye.z, t) : G.waveHeight(P.eye.x, P.eye.z, t)) - 0.05;
+    P.under = P.eye.y < (G.waterLevelAt ? G.waterLevelAt(P.eye.x, P.eye.z, t, P.eye.y) : G.waveHeight(P.eye.x, P.eye.z, t)) - 0.05;
     P.inLake = P.under && G.lakeLevelAt && G.lakeLevelAt(P.eye.x, P.eye.z) !== null;
     P.underground = !!(G.Dig && G.Dig.activeAt(P.pos.x, P.pos.z) && G.heightAt(P.pos.x, P.pos.z) - P.eye.y > 1.2);
     // camera
@@ -289,7 +289,28 @@
     P._boatYaw = b.yaw;
     P.swim = false; P.onGround = true;
     if (P.helm) {
-      P.local.set(T.helm[0], T.deck + (T.sit || 0), T.helm[1]); P.lvy = 0;
+      P.local.set(T.helm[0], (T.free ? G.FreeBoat.topAt(b, T.helm[0], T.helm[1]) || T.deck : T.deck) + (T.sit || 0), T.helm[1]); P.lvy = 0;
+    } else if (T.free) {
+      // barca libera: si cammina sopra i pezzi; oltre il bordo, saltando, si finisce in mare
+      const FB = G.FreeBoat;
+      const inputF = G.clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + P.ax.f, -1, 1), inputR = G.clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + P.ax.r, -1, 1);
+      const wx = -Math.sin(P.yaw) * inputF + Math.cos(P.yaw) * inputR, wz = -Math.cos(P.yaw) * inputF - Math.sin(P.yaw) * inputR;
+      const c = Math.cos(b.yaw), s = Math.sin(b.yaw);
+      let lx = wx * c - wz * s, lz = wx * s + wz * c; const l = Math.hypot(lx, lz); if (l > 0) { lx /= l; lz /= l; }
+      const sp = (k.ShiftLeft || k.ShiftRight) ? 4.4 : 2.9;
+      const cur = FB.topAt(b, P.local.x, P.local.z);
+      for (const [ax, az] of [[lx, lz], [lx, 0], [0, lz]]) {
+        if (!ax && !az) continue;
+        const nx = P.local.x + ax * sp * dt, nz = P.local.z + az * sp * dt, top = FB.topAt(b, nx, nz);
+        if (top === null) { if (k.Space && ax === lx && az === lz) { P.jumpOverboard(Math.sign(lx * Math.cos(0)) || 1); return; } continue; }
+        if (top <= P.local.y + 0.6) { P.local.x = nx; P.local.z = nz; break; }
+      }
+      const floor = FB.topAt(b, P.local.x, P.local.z);
+      const fy = floor === null ? (cur === null ? T.deck : cur) : floor;
+      if (k.Space && P.local.y <= fy + 0.001) P.lvy = 5.2;
+      P.lvy -= 20 * dt; P.local.y += P.lvy * dt;
+      if (P.local.y < fy) { P.local.y = fy; P.lvy = 0; }
+      if (l > 0 && P.local.y <= fy + 0.01) { P.bob += dt * 8; if (Math.floor(P.bob / Math.PI) !== Math.floor((P.bob - dt * 8) / Math.PI) && G.Audio) G.Audio.step('wood'); }
     } else {
       const inputF = G.clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + P.ax.f, -1, 1), inputR = G.clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + P.ax.r, -1, 1);
       // direzione nel mondo -> direzione nello scafo
@@ -319,11 +340,11 @@
     const b = P.boat;
     if (b.net && performance.now() - b.net.t < 1500) { G.UI.toast('Un altro giocatore sta guidando questa barca', 'warn'); return; }
     P.helm = true; P.cam3 = false; P.endFish(); G.UI.setBoatHud(true);
-    G.UI.toast(b.T.oars ? 'Ai remi: A remo sinistro · D remo destro · insieme per andare dritto · S + remi per indietro · E per alzarti'
-      : b.tpl === 'zattera' ? 'Al remo: W/S avanti e indietro · A/D per girare · E per lasciare'
-      : 'Al timone: W/S vele · A/D timone · V visuale · E per lasciare', 'good');
+    G.UI.toast(b.T.oars ? 'Ai remi: A remo sinistro · D remo destro · insieme per andare dritto · S + remi per indietro · ' + G.useKey() + ' per alzarti'
+      : b.tpl === 'zattera' ? 'Al remo: W/S avanti e indietro · A/D per girare · ' + G.useKey() + ' per lasciare'
+      : 'Al timone: W/S vele · A/D timone · V visuale · ' + G.useKey() + ' per lasciare', 'good');
   };
-  P.leaveHelm = function () { P.helm = false; P.cam3 = false; G.UI.setBoatHud(false); P.local.set(P.boat.T.helm[0] + 0.5, P.boat.T.deck, P.boat.T.helm[1] + 0.2); G.Boats.clampDeck(P.boat.T, P.local); };
+  P.leaveHelm = function () { P.helm = false; P.cam3 = false; G.UI.setBoatHud(false); P.local.set(P.boat.T.helm[0] + 0.5, P.boat.T.deck, P.boat.T.helm[1] + 0.2); if (P.boat.free) G.FreeBoat.snapOn(P.boat, P.local); else G.Boats.clampDeck(P.boat.T, P.local); };
   P.jumpOverboard = function (side) {
     const b = P.boat; P.boat = null; P.helm = false; P._boatYaw = undefined; G.UI.setBoatHud(false);
     const out = P.local.clone(); out.x += side * 1.1; out.y += 0.4;
@@ -386,55 +407,66 @@
     const b = G.Build.raycast(o, _dir, max); if (b && (!best || b.t < best.t)) best = { kind: 'piece', t: b.t, piece: b.piece };
     const rp = G.Net && G.Net.on ? G.Net.raycast(o, _dir, max) : null; if (rp && (!best || rp.t < best.t)) best = { kind: 'remote', t: rp.t, remote: rp.remote };
     const np = G.Structures ? G.Structures.raycastNPC(o, _dir, 4) : null; if (np && (!best || np.t < best.t)) best = { kind: 'npc', t: np.t, npc: np.npc };
-    const bt = G.Boats.raycast(o, _dir, 7); if (bt && bt.boat !== P.boat && (!best || bt.t < best.t + (bt.boat.filled[bt.part] ? 0 : 3))) best = { kind: 'boat', t: bt.t, boat: bt.boat, part: bt.part };
+    const bt = G.Boats.raycast(o, _dir, 7); if (bt && (bt.boat !== P.boat || bt.boat.free) && (!best || bt.t < best.t + (bt.boat.free || bt.boat.filled[bt.part] ? 0 : 3))) best = { kind: 'boat', t: bt.t, boat: bt.boat, part: bt.part };
     // non mirare attraverso il terreno
     if (best && best.kind !== 'boat') { const th = G.Build.terrainHit(o, _dir, best.t); if (th >= 0 && th < best.t - 0.2) best = null; }
     P.target = best;
+    if (G.FreeBoat) G.FreeBoat.updateGhost(P);
   }
 
   /* ---------------- AZIONE PRIMARIA (colpire) ---------------- */
   P.primary = function () {
-    const it = P.held(), tool = it ? it.id : null;
+    const it = P.held(), toolId = it ? it.id : null, tool = G.toolClass(toolId), pow = G.toolPower(toolId);
     if (tool === 'arco') return; // l'arco si tende tenendo premuto (vedi combat.js)
     if (tool === 'pistola' || tool === 'pistola_capitano') { if (!P.boat || !P.helm) G.Combat.fire(P, tool); P.actionCd = 0.3; return; }
-    const W = G.ITEMS[tool] || {};
+    const W = G.ITEMS[toolId] || {};
     P.swingT = 1; P.actionCd = W.cd || (tool === 'ascia' || tool === 'piccone' || tool === 'coltello' ? 0.42 : 0.55);
     if (tool === 'pala' && G.Treasure && G.Treasure.dig()) return;
     const tg = P.target;
     // piccone e pala sul terreno (senza bersagli davanti): si scava
-    if ((tool === 'piccone' || tool === 'pala') && (!tg || tg.kind === 'piece' && false) && G.Dig) { if (G.Dig.dig(P, tool)) { P.actionCd = tool === 'pala' ? 0.5 : 0.45; return; } }
+    if ((tool === 'piccone' || tool === 'pala') && (!tg || tg.kind === 'piece' && false) && G.Dig) { if (G.Dig.dig(P, tool, pow)) { P.actionCd = (tool === 'pala' ? 0.5 : 0.45) / Math.sqrt(pow); return; } }
     if (!tg) return;
     const melee = W.dmg || (tool === 'coltello' ? 2.5 : tool === 'ascia' ? 2 : tool === 'piccone' ? 1.5 : 1);
-    if (tg.kind === 'res') hitResource(tg.res, tool);
+    if (tg.kind === 'res') hitResource(tg.res, tool, pow);
     else if (tg.kind === 'remote') { G.Net.hit(tg.remote, Math.round(melee * 4)); }
     else if (tg.kind === 'animal') { G.Entities.hit(tg.ent, melee, P); if (G.Audio && W.dmg) G.Audio.hit('soft'); }
     else if (tg.kind === 'npc') { G.UI.toast(`${tg.npc.def.name}: «Ehi! Metti giù quell’arma!»`); }
+    else if (tg.kind === 'boat' && tg.boat.free && !tg.boat.sunk) { G.FreeBoat.hit(P, tg.boat); }
     else if (tg.kind === 'piece') {
       const p = tg.piece;
-      if (p.gen) { G.UI.toast(p.t === 'letto' ? 'Questo letto è della locanda' : 'Non puoi smontarlo'); return; } p.hp = (p.hp === undefined ? 3 : p.hp) - (tool === 'ascia' ? 1.5 : 1);
+      if (p.gen) { G.UI.toast(p.t === 'letto' ? 'Questo letto è della locanda' : 'Non puoi smontarlo'); return; } p.hp = (p.hp === undefined ? (G.Build.isStone && G.Build.isStone(p.t) ? 6 : 3) : p.hp) - (tool === 'ascia' ? 1.5 : tool === 'piccone' ? 1.5 * pow : 1);
       G.FX.burst(P.cam.position.x + _dir.x * tg.t, P.cam.position.y + _dir.y * tg.t, P.cam.position.z + _dir.z * tg.t, [0.75, 0.55, 0.3], 6, 2);
       if (G.Audio) G.Audio.hit('wood');
       if (p.hp <= 0) {
         if (p.inv) for (const s of p.inv) if (s) P.give(s.id, s.n, true);
-        if (p.cook) { if (p.cook.in) P.give(p.cook.in.id, p.cook.in.n, true); if (p.cook.out) P.give(p.cook.out.id, p.cook.out.n, true); }
-        if (p.t === 'muro_porta') { const door = G.Build.pieces.find((d) => d.t === 'porta' && Math.hypot(d.x - p.x, d.z - p.z) < 0.1 && Math.abs(d.y - p.y) < 0.1); if (door) { G.Build.remove(door); P.give('porta', 1, true); } }
+        if (p.cook) { if (p.cook.in) P.give(p.cook.in.id, p.cook.in.n, true); if (p.cook.out) P.give(p.cook.out.id, p.cook.out.n, true); if (p.cook.fuel) P.give(p.cook.fuel.id, p.cook.fuel.n, true); }
+        if (G.pieceKind(p.t) === 'muro_porta') { const door = G.Build.pieces.find((d) => d.t === 'porta' && Math.hypot(d.x - p.x, d.z - p.z) < 0.1 && Math.abs(d.y - p.y) < 0.1); if (door) { G.Build.remove(door); P.give('porta', 1, true); } }
         if (G.Net && G.Net.on) G.Net.send({ t: 'bdel', id: p.id });
         G.Build.remove(p); P.give(p.t, 1); G.saveSoon();
       }
     }
   };
-  function hitResource(res, tool) {
+  function hitResource(res, tool, pow) {
+    pow = pow || 1;
     const hp = (n) => { res.hp -= G.creative() ? 999 : n; return res.hp <= 0; };
     const hitPos = new V3(res.x, res.y + Math.min(1.2, res.height * 0.5), res.z);
     if (res.type === 'tree') {
       G.FX.burst(hitPos.x, hitPos.y, hitPos.z, [0.6, 0.42, 0.25], 7, 2.2);
       if (G.Audio) G.Audio.hit('wood');
-      if (hp(tool === 'ascia' ? 1.8 : 0.5)) fellTree(res);
+      if (hp(tool === 'ascia' ? 1.8 * pow : 0.5)) fellTree(res);
       else if (tool !== 'ascia' && res.hp < 4 && !res.warned) { res.warned = true; G.UI.toast('Con un’ascia faresti molto prima'); }
     } else if (res.type === 'rock') {
+      // le pietre grosse e le vene di minerale si rompono solo col piccone
+      if ((res.size > 0.7 || res.vein) && tool !== 'piccone') {
+        if (G.Audio) G.Audio.hit('stone');
+        if (!P._rockTip || performance.now() - P._rockTip > 4000) { P._rockTip = performance.now(); G.UI.toast(res.vein ? 'Per estrarre il minerale serve un piccone' : 'Questa pietra è troppo grossa: serve un piccone', 'warn'); }
+        return;
+      }
       G.FX.burst(hitPos.x, res.y + res.height * 0.6, hitPos.z, [0.6, 0.58, 0.55], 7, 2.4);
       if (G.Audio) G.Audio.hit('stone');
-      if (hp(tool === 'piccone' ? 2 : 0.5)) { G.World.removeResource(res); P.give('pietra', Math.max(2, Math.round(2 + res.size * 2))); if (res.ore && Math.random() < 0.7) P.give(res.ore, 1 + (Math.random() < 0.3 ? 1 : 0)); else if (Math.random() < 0.12) P.give('carbone', 1); G.FX.burst(res.x, res.y + 0.4, res.z, [0.6, 0.58, 0.55], 20, 3); }
+      if (hp(tool === 'piccone' ? 2 * pow : 0.5)) { G.World.removeResource(res); P.give('pietra', res.vein ? 1 : Math.max(2, Math.round(2 + res.size * 2)));
+        if (res.vein) P.give(res.ore, res.ore === 'oro_grezzo' ? 1 + (Math.random() < 0.4 ? 1 : 0) : 2 + ((Math.random() * 2) | 0));
+        else if (res.ore && Math.random() < 0.7) P.give(res.ore, 1 + (Math.random() < 0.3 ? 1 : 0)); else if (Math.random() < 0.12) P.give('carbone', 1); G.FX.burst(res.x, res.y + 0.4, res.z, [0.6, 0.58, 0.55], 20, 3); }
     } else if (res.type === 'bush') {
       G.FX.burst(hitPos.x, res.y + 0.6, hitPos.z, [0.3, 0.5, 0.2], 10, 2);
       if (G.Audio) G.Audio.hit('leaf');
@@ -449,7 +481,7 @@
       G.FX.burst(hitPos.x, res.y + 0.4, hitPos.z, [0.62, 0.5, 0.36], 7, 2);
       if (G.Audio) G.Audio.hit('wood');
       if (res.sub === 'drift') { G.World.removeResource(res); P.give('bastone', 2); if (Math.random() < 0.5) P.give('tronco', 1); }
-      else if (hp(tool === 'ascia' ? 1.5 : 0.5)) { G.World.removeResource(res); P.give('tronco', res.sub === 'log' ? 3 : 1); if (res.sub === 'log' && Math.random() < 0.4) P.give('funghi', 1); G.FX.burst(res.x, res.y + 0.4, res.z, [0.62, 0.5, 0.36], 16, 2.5); }
+      else if (hp(tool === 'ascia' ? 1.5 * pow : 0.5)) { G.World.removeResource(res); P.give('tronco', res.sub === 'log' ? 3 : 1); if (res.sub === 'log' && Math.random() < 0.4) P.give('funghi', 1); G.FX.burst(res.x, res.y + 0.4, res.z, [0.62, 0.5, 0.36], 16, 2.5); }
     } else if (res.type === 'plant') {
       G.FX.burst(res.x, res.y + 0.3, res.z, [0.35, 0.5, 0.2], 6, 1.5);
       if (G.Audio) G.Audio.hit('leaf');
@@ -491,6 +523,8 @@
   P.secondary = function () {
     const it = P.held(), id = it ? it.id : null, tg = P.target;
     if (P.placing) { G.UI.placeConfirm(); return; }
+    if (G.FreeBoat && G.FreeBoat.cur && G.FreeBoat.tryPlace(P)) return;
+    if (P.wantsInteract()) { P.interact(); return; }
     if (tg && tg.kind === 'boat' && !G.Boats.isComplete(tg.boat)) { G.UI.openBoatBuild(tg.boat); return; }
     if (id === 'libro') { G.UI.openBook(); return; }
     if (id === 'mappa_tesoro') { G.Treasure.read(it); return; }
@@ -503,6 +537,7 @@
     if (id === 'canna') { P.fishAction(); return; }
     if (id === 'ciotola') { if (aimWater(4.5)) { P.take('ciotola', 1); P.give('ciotola_salata', 1); if (G.Audio) G.Audio.splash(); } else G.UI.toast('Mira il mare vicino a te'); return; }
     if (tg && tg.kind === 'animal' && it && G.Pets && G.BREED[tg.ent.sp] && G.BREED[tg.ent.sp].includes(id) && G.Pets.feed(tg.ent, it)) return;
+    if (id === 'torcia') { P.placeTorch(); return; }
     if (id && G.Build.isPlaceable(id)) { P.startPlacing(id); return; }
     if (it && P.consume(it)) return;
     // la mano sinistra: cibo, libro, mappe, cannocchiale e scudo (tenuto premuto)
@@ -529,11 +564,23 @@
   P.aimWater = aimWater;
 
   /* ---------------- E: interagire ---------------- */
+  // c'è qualcosa con cui interagire davanti? (allora il tasto destro interagisce invece di usare l'oggetto in mano)
+  P.wantsInteract = function () {
+    const tg = P.target, it = P.held(), id = it ? it.id : null;
+    if (P.boat) return !!(P.helm || P.inHelmZone() || (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && P.boat.parts[tg.part] && P.boat.parts[tg.part].name === 'Stiva'));
+    if (!tg) return false;
+    if (tg.kind === 'piece') return ['porta', 'baule', 'forziere', 'banco', 'falo', 'letto', 'fornace'].includes(tg.piece.t);
+    if (tg.kind === 'npc') return true;
+    if (tg.kind === 'boat') return true;
+    if (tg.kind === 'animal') return !!(tg.ent.def.shear && tg.ent.st && tg.ent.st.wool !== false && !(G.BREED && G.BREED[tg.ent.sp] && id && G.BREED[tg.ent.sp].includes(id)));
+    if (tg.kind === 'res') return ['shell', 'grass', 'bush', 'plant'].includes(tg.res.type) || (tg.res.type === 'wood' && tg.res.sub === 'drift');
+    return false;
+  };
   P.interact = function () {
     const tg = P.target;
     if (P.boat) {
       if (P.helm) { P.leaveHelm(); return; }
-      if (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && P.boat.parts[tg.part].name === 'Stiva') { G.UI.openChest(P.boat.inv, 'Stiva', { boat: P.boat }); return; }
+      if (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && (P.boat.free || (P.boat.parts[tg.part] && P.boat.parts[tg.part].name === 'Stiva'))) { G.UI.openChest(P.boat.inv, 'Stiva', { boat: P.boat }); return; }
       if (P.inHelmZone()) { P.takeHelm(); return; }
       P.leaveBoat(); return;
     }
@@ -546,7 +593,7 @@
         return;
       }
       if (p.t === 'banco') { G.UI.openInventory(5); return; }
-      if (p.t === 'falo') { G.UI.openFire(p); return; }
+      if (p.t === 'falo' || p.t === 'fornace') { G.UI.openFire(p); return; }
       if (p.t === 'letto') { P.sleep(p); return; }
     }
     if (tg && tg.kind === 'npc') { G.Quests.talk(tg.npc); return; }
@@ -554,8 +601,10 @@
     if (tg && tg.kind === 'res' && (tg.res.type === 'shell' || tg.res.type === 'grass' || tg.res.type === 'bush' || tg.res.type === 'plant' || (tg.res.type === 'wood' && tg.res.sub === 'drift'))) { hitResource(tg.res, P.held() ? P.held().id : null); return; }
     const b = (tg && tg.kind === 'boat' && tg.boat) || G.Boats.nearest(P.pos, 5);
     if (b) {
+      if (b.free && b.flip) { G.FreeBoat.right(b); return; }
+      if (b.free && b.sunk) { if (b.inv) G.UI.openChest(b.inv, 'Baule della barca affondata', { boat: b }); else G.UI.toast('La barca è affondata', 'warn'); return; }
       if (!G.Boats.isComplete(b)) { G.UI.openBoatBuild(b); return; }
-      if (b.inv && tg && tg.kind === 'boat' && b.parts[tg.part].name === 'Stiva') { G.UI.openChest(b.inv, 'Stiva', { boat: b }); return; }
+      if (b.inv && tg && tg.kind === 'boat' && !b.free && b.parts[tg.part] && b.parts[tg.part].name === 'Stiva') { G.UI.openChest(b.inv, 'Stiva', { boat: b }); return; }
       P.boardBoat(b); return;
     }
   };
@@ -563,8 +612,8 @@
     // sali nel punto del ponte più vicino a te
     P.boat = b; P.helm = false; P.cam3 = false; P.endFish(); P._boatYaw = b.yaw;
     G.Boats.worldToLocal(b, P.pos, P.local); P.local.y = b.T.deck; P.lvy = 0;
-    G.Boats.clampDeck(b.T, P.local);
-    if (!P._boardTip || performance.now() - P._boardTip > 60000) { P._boardTip = performance.now(); G.UI.toast(`${climbed ? 'Sei salito a bordo' : 'A bordo'} · il segno dorato indica ${b.T.helmTxt.toLowerCase()}: vai lì e premi E per guidare`, 'good'); }
+    if (b.free) G.FreeBoat.snapOn(b, P.local); else G.Boats.clampDeck(b.T, P.local);
+    if (!P._boardTip || performance.now() - P._boardTip > 60000) { P._boardTip = performance.now(); G.UI.toast(`${climbed ? 'Sei salito a bordo' : 'A bordo'} · il segno dorato indica ${b.T.helmTxt.toLowerCase()}: vai lì e ${G.useHow()} per guidare`, 'good'); }
   };
   P.leaveBoat = function (silent) {
     const b = P.boat; if (!b) return;
@@ -592,6 +641,16 @@
 
   /* ---------------- COSTRUZIONE ---------------- */
   P.startPlacing = function (id) { P.placing = id; };
+  // la torcia si piazza subito, per terra o attaccata alla parete che guardi
+  P.placeTorch = function () {
+    P.lookDir(_dir);
+    const r = G.Build.placeTorch(P.cam.position, _dir);
+    if (!r.ok) { G.UI.toast(r.reason, 'warn'); return; }
+    P.take('torcia', 1);
+    const piece = G.Build.add({ t: 'torcia', x: r.x, y: r.y, z: r.z, rot: r.rot, wall: r.wall });
+    if (G.Net && G.Net.on) G.Net.send({ t: 'badd', p: G.Build.serializeOne(piece) });
+    P.actionCd = 0.25; G.saveSoon();
+  };
 
   /* ---------------- PESCA ---------------- */
   P.fishAction = function () {

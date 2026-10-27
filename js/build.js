@@ -12,7 +12,7 @@
   /* ---------- materiale olografico (anteprima e sagome barche) ---------- */
   G.holoMaterial = function (color) {
     return new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      transparent: true, depthWrite: true, side: THREE.DoubleSide,
       blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
       uniforms: { uColor: { value: new THREE.Color(color) }, uTime: G.shared.uTime, uAlpha: { value: 0.55 } },
       vertexShader: `varying vec3 vN; varying vec3 vW; varying vec3 vV; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); vV = cameraPosition - w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
@@ -90,7 +90,31 @@
     GEO.faloLogs = M.merge([...logs, ash]);
     GEO.torcia = M.merge([M.colorize(new THREE.CylinderGeometry(0.035, 0.03, 1.1, 6).translate(0, 0.55, 0), 0.55, 0.38, 0.22), M.colorize(new THREE.CylinderGeometry(0.06, 0.045, 0.14, 7).translate(0, 1.12, 0), 0.25, 0.18, 0.12)]);
     GEO.egg = M.colorize(new THREE.SphereGeometry(0.05, 10, 8).scale(1, 1.3, 1), 0.98, 0.94, 0.86);
+    // ---- pietra: blocchi pieni, la trama dei conci la dà il materiale
+    const sb = (w, h, d, x, y, z, k) => (k ? darker(boxUV(w, h, d, x, y, z, 0.42), k) : boxUV(w, h, d, x, y, z, 0.42));
+    const T = 0.34;
+    GEO.muro_pietra = M.merge([sb(3, 3, T, 0, 1.5, 0), sb(3.06, 0.18, T + 0.06, 0, 0.09, 0, 0.82)]);
+    GEO.muro_porta_pietra = M.merge([sb(1.05, 3, T, -0.975, 1.5, 0), sb(1.05, 3, T, 0.975, 1.5, 0), sb(0.9, 0.8, T, 0, 2.6, 0), sb(1.1, 0.16, T + 0.08, 0, 2.24, 0, 0.8)]);
+    GEO.muro_finestra_pietra = M.merge([sb(3, 1.1, T, 0, 0.55, 0), sb(3, 0.8, T, 0, 2.6, 0), sb(0.9, 1.1, T, -1.05, 1.65, 0), sb(0.9, 1.1, T, 1.05, 1.65, 0), sb(1.36, 0.12, T + 0.14, 0, 1.12, 0.03, 0.8)]);
+    GEO.pavimento_pietra = M.merge([sb(3, 0.3, 3, 0, -0.15, 0)]);
+    GEO.tetto_pietra = GEO.tetto;
+    { const st = []; for (let i = 0; i < 10; i++) st.push(sb(1.4, (i + 1) * 0.3, 0.3, 0, (i + 1) * 0.15, 1.5 - i * 0.3 - 0.15, i % 2 ? 0.92 : 1)); GEO.scala_pietra = M.merge(st); }
+    GEO.pilastro = M.merge([sb(0.56, 0.2, 0.56, 0, 0.1, 0, 0.85), sb(0.46, 2.6, 0.46, 0, 1.5, 0), sb(0.56, 0.2, 0.56, 0, 2.9, 0, 0.85)]);
+    GEO.camino = M.merge([sb(2.0, 0.25, 0.9, 0, 0.125, 0.15, 0.85), sb(0.4, 1.4, 0.9, -0.8, 0.95, 0.15), sb(0.4, 1.4, 0.9, 0.8, 0.95, 0.15), sb(2.0, 0.3, 0.9, 0, 1.8, 0.15, 0.9), sb(2.1, 0.14, 1.0, 0, 2.0, 0.17, 0.75),
+      sb(1.2, 1.4, 0.2, 0, 0.95, -0.2, 0.6), sb(0.9, 1.0, 0.7, 0, 2.55, 0.05)]);
+    { const body = new THREE.CylinderGeometry(0.55, 0.78, 1.5, 10, 1).translate(0, 0.75, 0); const top = new THREE.CylinderGeometry(0.2, 0.32, 0.5, 8, 1).translate(0, 1.75, 0);
+      GEO.fornace = M.merge([M.colorize(body, 1, 1, 1), darker(M.colorize(top, 1, 1, 1), 0.8), sb(0.62, 0.1, 0.3, 0, 0.32, 0.66, 0.6)]);
+      GEO.fornaceMouth = new THREE.PlaneGeometry(0.44, 0.38).translate(0, 0.55, 0.705); }
+    // torcia a muro: staffa di ferro + manico inclinato verso l'esterno
+    { const stick = M.colorize(new THREE.CylinderGeometry(0.035, 0.03, 0.7, 6).translate(0, 0.35, 0), 0.55, 0.38, 0.22); stick.rotateX(0.5); stick.translate(0, -0.1, 0.12);
+      const head = M.colorize(new THREE.CylinderGeometry(0.06, 0.045, 0.14, 7).translate(0, 0.69, 0), 0.25, 0.18, 0.12); head.rotateX(0.5); head.translate(0, -0.1, 0.12);
+      const br = M.colorize(new THREE.BoxGeometry(0.16, 0.05, 0.2).translate(0, 0.02, 0.07), 0.22, 0.22, 0.24), plate = M.colorize(new THREE.BoxGeometry(0.12, 0.22, 0.03).translate(0, 0.02, 0.0), 0.2, 0.2, 0.22);
+      GEO.torciaMuro = M.merge([stick, head, br, plate]); }
   }
+  const STONE = new Set(['muro_pietra', 'muro_porta_pietra', 'muro_finestra_pietra', 'pavimento_pietra', 'scala_pietra', 'pilastro', 'camino', 'fornace']);
+  const kind = (t) => G.pieceKind(t);
+  B.kind = kind;
+  B.isStone = (t) => STONE.has(t) || t === 'tetto_pietra';
 
   /* ---------- fiamme ---------- */
   G.flameMaterial = function () {
@@ -106,6 +130,7 @@
           float nn = n(vec2(uv.x*4.0, uv.y*3.0 - t*1.6))*0.6 + n(vec2(uv.x*8.0, uv.y*6.0 - t*2.4))*0.4;
           float shape = 1.0 - length(vec2((uv.x-0.5)*2.2/(1.0-uv.y*0.75+0.1), (uv.y-0.25)*1.3));
           float f = clamp(shape + nn*0.6 - 0.45, 0.0, 1.0) * smoothstep(0.0, 0.08, uv.y);
+          if (f < 0.06) discard; // fuori dalla fiamma niente profondità: niente rettangolo sull'acqua
           vec3 c = mix(vec3(1.0,0.25,0.05), vec3(1.0,0.75,0.25), smoothstep(0.1,0.6,f)); c = mix(c, vec3(1.0,0.97,0.8), smoothstep(0.6,0.95,f));
           gl_FragColor = vec4(c*3.5, f); }`,
     });
@@ -132,8 +157,8 @@
   };
 
   /* ---------- creazione pezzi ---------- */
-  const FREE = new Set(['banco', 'falo', 'baule', 'letto', 'torcia', 'trappola']);
-  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'letto', 'torcia', 'trappola'].includes(id);
+  const FREE = new Set(['banco', 'falo', 'baule', 'letto', 'torcia', 'trappola', 'pilastro', 'camino', 'fornace']);
+  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace'].includes(id);
 
   function makeMesh(p) {
     const MAT = G.MAT;
@@ -143,21 +168,41 @@
       add(GEO.faloStones, MAT.rock); add(GEO.faloLogs, MAT.logs);
       const f1 = flame(0.7, 1.0), f2 = flame(0.5, 0.75); f2.position.set(0.12, 0, 0.05); f1.position.y = 0.12; f2.position.y = 0.12; g.add(f1, f2);
       p.light = true; p.lightPos = new V3(p.x, p.y + 0.8, p.z); p.power = 1.2;
+    } else if (p.t === 'torcia' && p.wall) {
+      // torcia a muro: la fiamma sporge in avanti rispetto alla parete
+      add(GEO.torciaMuro, MAT.solid); const f = flame(0.25, 0.42); f.position.set(0, 0.52, 0.47); g.add(f);
+      const c = Math.cos(p.rot), s = Math.sin(p.rot);
+      p.light = true; p.lightPos = new V3(p.x + s * 0.5, p.y + 0.75, p.z + c * 0.5); p.power = 0.7;
     } else if (p.t === 'torcia') {
       add(GEO.torcia, MAT.solid); const f = flame(0.25, 0.42); f.position.y = 1.14; g.add(f);
       p.light = true; p.lightPos = new V3(p.x, p.y + 1.4, p.z); p.power = 0.7;
+    } else if (p.t === 'camino') {
+      const SM = G.Structures.mats(); add(GEO.camino, SM.stone); add(GEO.faloLogs, MAT.logs).position.set(0, 0.25, 0.2);
+      const f1 = flame(0.8, 0.9), f2 = flame(0.55, 0.7); f1.position.set(0, 0.3, 0.22); f2.position.set(0.15, 0.3, 0.3); g.add(f1, f2);
+      const c = Math.cos(p.rot), s = Math.sin(p.rot);
+      p.light = true; p.lightPos = new V3(p.x + s * 0.6, p.y + 0.9, p.z + c * 0.6); p.power = 1.3;
+    } else if (p.t === 'fornace') {
+      const SM = G.Structures.mats(); add(GEO.fornace, SM.stone);
+      const mouth = new THREE.Mesh(GEO.fornaceMouth, SM.glow.clone()); g.add(mouth); p.mouth = mouth;
+      const c = Math.cos(p.rot), s = Math.sin(p.rot);
+      p.light = true; p.lightPos = new V3(p.x + s * 0.9, p.y + 0.6, p.z + c * 0.9); p.power = 0.5;
+    } else if (STONE.has(p.t)) {
+      add(GEO[p.t], G.Structures.mats().stone);
+    } else if (p.t === 'tetto_pietra') {
+      add(GEO.tetto, G.Structures.mats().slate);
     } else if (p.t === 'porta') {
       p.hinge = new THREE.Group(); p.hinge.position.set(-0.475, 0, 0); g.add(p.hinge);
       const m = new THREE.Mesh(GEO.porta, MAT.planks); m.castShadow = true; m.receiveShadow = true; p.hinge.add(m);
       p.hinge.rotation.y = p.open ? -Math.PI / 2 : 0;
     } else add(GEO[p.t], MAT.planks);
-    if (p.t === 'pavimento' && G.World.groundAt) {
+    if (kind(p.t) === 'pavimento' && G.World.groundAt) {
+      const stone = p.t !== 'pavimento';
       // pali di sostegno fino al terreno
       for (const [ox, oz] of [[-1.35, -1.35], [1.35, -1.35], [-1.35, 1.35], [1.35, 1.35], [0, 0]]) {
         const gy = G.World.groundAt(p.x + ox, p.z + oz);
         const len = p.y - 0.2 - gy + 0.4;
         if (len < 0.3) continue;
-        const post = new THREE.Mesh(M.colorize(new THREE.CylinderGeometry(0.11, 0.13, len, 7).translate(ox, -0.2 - len / 2, oz), 0.8, 0.72, 0.62), MAT.logs);
+        const post = stone ? new THREE.Mesh(boxUV(0.4, len, 0.4, ox, -0.3 - len / 2, oz, 0.42), G.Structures.mats().stone) : new THREE.Mesh(M.colorize(new THREE.CylinderGeometry(0.11, 0.13, len, 7).translate(ox, -0.2 - len / 2, oz), 0.8, 0.72, 0.62), MAT.logs);
         post.castShadow = true; post.receiveShadow = true; g.add(post);
       }
     }
@@ -196,7 +241,10 @@
   }
   function colliders(p) {
     const bx = [];
-    switch (p.t) {
+    switch (kind(p.t)) {
+      case 'pilastro': bx.push(rotBox(p, -0.28, 0, -0.28, 0.28, WALL_H, 0.28, { walk: true })); break;
+      case 'camino': bx.push(rotBox(p, -1.05, 0, -0.3, 1.05, 3.05, 0.0, { walk: true }), rotBox(p, -1.05, 0, -0.3, -0.6, 2.1, 0.6, { walk: true }), rotBox(p, 0.6, 0, -0.3, 1.05, 2.1, 0.6, { walk: true }), rotBox(p, -1.05, 1.65, -0.3, 1.05, 2.1, 0.67, { walk: true })); break;
+      case 'fornace': bx.push(rotBox(p, -0.72, 0, -0.72, 0.72, 1.55, 0.72, { walk: true })); break;
       case 'pavimento': bx.push(rotBox(p, -1.5, -0.25, -1.5, 1.5, 0, 1.5, { walk: true })); break;
       case 'muro': bx.push(rotBox(p, -1.5, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
       case 'muro_finestra': bx.push(rotBox(p, -1.5, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
@@ -208,6 +256,7 @@
       case 'baule': case 'forziere': bx.push(rotBox(p, -0.45, 0, -0.28, 0.45, 0.65, 0.28, { walk: true })); break;
       case 'letto': bx.push(rotBox(p, -0.55, 0, -1.05, 0.55, 0.55, 1.05, { walk: true })); break;
       case 'falo': bx.push(rotBox(p, -0.5, 0, -0.5, 0.5, 0.3, 0.5, { soft: true })); break;
+      case 'torcia': break;
       case 'trappola': bx.push(rotBox(p, -0.65, 0, -0.65, 0.65, 1.0, 0.65, { soft: true })); break;
       case 'tetto': bx.push(B.slopeBox(p, 'z', -1.65, 1.65, 1.65, -1.65, p.y - 0.05, p.y + 1.72, { shell: 0.32, piece: p })); break;
     }
@@ -216,10 +265,12 @@
   // per selezionare un pezzo col mirino
   function pickBox(p) {
     if (p.t === 'porta') return rotBox(p, -0.5, 0, -0.15, 0.5, 2.25, 0.15);
+    if (p.t === 'torcia' && p.wall) return rotBox(p, -0.15, -0.15, -0.05, 0.15, 0.85, 0.55);
     if (p.t === 'torcia') return rotBox(p, -0.15, 0, -0.15, 0.15, 1.4, 0.15);
+    if (p.t === 'camino') return rotBox(p, -1.05, 0, -0.3, 1.05, 3.05, 0.67);
     if (p.t === 'falo') return rotBox(p, -0.55, 0, -0.55, 0.55, 0.9, 0.55);
     if (p.t === 'trappola') return rotBox(p, -0.66, 0, -0.66, 0.66, 1.1, 0.66);
-    if (p.t === 'tetto') return rotBox(p, -1.6, -0.1, -1.6, 1.6, 1.8, 1.6);
+    if (kind(p.t) === 'tetto') return rotBox(p, -1.6, -0.1, -1.6, 1.6, 1.8, 1.6);
     return colliders(p)[0] || rotBox(p, -0.5, 0, -0.5, 0.5, 1, 0.5);
   }
 
@@ -228,6 +279,7 @@
     if (!p.id) p.id = Math.random().toString(36).slice(2, 10);
     if ((p.t === 'baule' || p.t === 'forziere') && !p.inv) p.inv = new Array(27).fill(null);
     if (p.t === 'falo' && !p.cook) p.cook = { in: null, out: null, prog: 0 };
+    if (p.t === 'fornace' && !p.cook) p.cook = { in: null, out: null, fuel: null, prog: 0, burn: 0 };
     p.mesh = makeMesh(p);
     G.scene.add(p.mesh);
     p.boxes = colliders(p);
@@ -250,7 +302,7 @@
   B.byId = (id) => B.pieces.find((p) => p.id === id);
   B.serialize = () => B.pieces.filter((p) => !p.gen).map((p) => B.serializeOne(p));
   B.removeGen = function (pred) { const rm = B.pieces.filter((p) => p.gen && pred(p)); for (const p of rm) { G.scene.remove(p.mesh); B.pieces.splice(B.pieces.indexOf(p), 1); } if (rm.length) B.reindex(); };
-  B.serializeOne = (p) => { { const o = { id: p.id, t: p.t, x: +p.x.toFixed(3), y: +p.y.toFixed(3), z: +p.z.toFixed(3), rot: +p.rot.toFixed(4) }; if (p.inv) o.inv = p.inv; if (p.open) o.open = 1; if (p.cook) o.cook = p.cook; return o; } };
+  B.serializeOne = (p) => { { const o = { id: p.id, t: p.t, x: +p.x.toFixed(3), y: +p.y.toFixed(3), z: +p.z.toFixed(3), rot: +p.rot.toFixed(4) }; if (p.inv) o.inv = p.inv; if (p.open) o.open = 1; if (p.cook) o.cook = p.cook; if (p.wall) o.wall = 1; return o; } };
   B.load = function (arr) { for (const p of B.pieces) G.scene.remove(p.mesh); B.pieces = []; for (const d of arr || []) B.add(d, true); };
 
   /* ---------- query fisiche ---------- */
@@ -375,19 +427,19 @@
     let best = null, bd = 1.7;
     for (const p of B.pieces) {
       if (Math.abs(p.x - x) > CELL * 1.05 || Math.abs(p.z - z) > CELL * 1.05) continue;
-      const ys = p.t === 'pavimento' ? [p.y] : p.t.startsWith('muro') ? [p.y + WALL_H, p.y] : [];
+      const kk = kind(p.t), ys = kk === 'pavimento' ? [p.y] : kk.startsWith('muro') || kk === 'pilastro' ? [p.y + WALL_H, p.y] : [];
       for (const y of ys) { const d = Math.abs(y - hitY); if (d < bd) { bd = d; best = y; } }
     }
     return best;
   }
-  B.computePlacement = function (type, o, d) {
-    const MAXD = 7.5;
+  B.computePlacement = function (type0, o, d) {
+    const MAXD = 7.5, type = kind(type0);
     let t = terrainHit(o, d, MAXD);
     const bh = B.raycast(o, d, MAXD);
     if (bh && (t < 0 || bh.t < t)) t = bh.t;
     if (t < 0) return null;
     const hx = o.x + d.x * t, hy = o.y + d.y * t, hz = o.z + d.z * t;
-    const res = { t: type, x: hx, y: hy, z: hz, rot: 0, ok: true, reason: '' };
+    const res = { t: type0, x: hx, y: hy, z: hz, rot: 0, ok: true, reason: '' };
     const yaw = G.Player.yaw;
     if (FREE.has(type)) {
       res.rot = Math.round((yaw + Math.PI) / (Math.PI / 4)) * (Math.PI / 4) + B.rotStep * Math.PI / 2;
@@ -403,7 +455,7 @@
     } else if (type === 'porta') {
       // si aggancia al vano del muro con porta più vicino
       let best = null, bd = 2.5;
-      for (const p of B.pieces) if (p.t === 'muro_porta') { const dd = Math.hypot(p.x - hx, p.y + 1.2 - hy, p.z - hz); if (dd < bd) { bd = dd; best = p; } }
+      for (const p of B.pieces) if (kind(p.t) === 'muro_porta') { const dd = Math.hypot(p.x - hx, p.y + 1.2 - hy, p.z - hz); if (dd < bd) { bd = dd; best = p; } }
       if (!best) { res.ok = false; res.reason = 'Mira un muro con porta'; }
       else {
         Object.assign(res, { x: best.x, y: best.y, z: best.z, rot: best.rot });
@@ -413,7 +465,7 @@
     } else if (type === 'tetto') {
       res.x = snap(hx); res.z = snap(hz);
       let y = null;
-      for (const p of B.pieces) if (p.t.startsWith('muro') && Math.abs(p.x - res.x) <= 1.6 && Math.abs(p.z - res.z) <= 1.6) y = Math.max(y === null ? -Infinity : y, p.y + WALL_H);
+      for (const p of B.pieces) if (kind(p.t).startsWith('muro') && Math.abs(p.x - res.x) <= 1.6 && Math.abs(p.z - res.z) <= 1.6) y = Math.max(y === null ? -Infinity : y, p.y + WALL_H);
       if (y === null) { const sy = supportY(res.x, res.z, hy); y = sy !== null ? sy + WALL_H : G.World.groundAt(res.x, res.z) + WALL_H; }
       res.y = y; res.rot = (Math.round(yaw / (Math.PI / 2)) + B.rotStep) * (Math.PI / 2);
     } else {
@@ -429,12 +481,48 @@
     const ground = G.World.groundAt(res.x, res.z);
     const onPiece = B.groundAt(res.x, res.z, res.y + 0.05, 0.2) > -Infinity;
     if (ground < 0.1 && !onPiece && res.y < 0.4) { res.ok = false; res.reason = 'Non si può costruire in acqua'; }
-    const dup = B.pieces.find((p) => p.t === type && Math.abs(p.x - res.x) < 0.2 && Math.abs(p.z - res.z) < 0.2 && Math.abs(p.y - res.y) < 0.3 && (FREE.has(type) || Math.abs(Math.cos(p.rot - res.rot)) > 0.9));
+    const dup = B.pieces.find((p) => kind(p.t) === type && Math.abs(p.x - res.x) < 0.2 && Math.abs(p.z - res.z) < 0.2 && Math.abs(p.y - res.y) < 0.3 && (FREE.has(type) || Math.abs(Math.cos(p.rot - res.rot)) > 0.9));
     if (dup) { res.ok = false; res.reason = 'Spazio occupato'; }
+    if (FREE.has(type) && type === 'camino') {
+      // il camino si appoggia col retro al muro che guardi
+      const wh = B.raycast(o, d, MAXD);
+      if (wh && kind(wh.piece.t).startsWith('muro')) { const w = wh.piece, c = Math.cos(w.rot), sn = Math.sin(w.rot), nx = sn, nz = c, side = Math.sign((o.x - w.x) * nx + (o.z - w.z) * nz) || 1;
+        res.x = hx + nx * side * 0.32; res.z = hz + nz * side * 0.32; res.y = w.y; res.rot = Math.atan2(nx * side, nz * side); }
+    }
     if (FREE.has(type)) {
       const pl = G.Player.pos; if (Math.hypot(pl.x - res.x, pl.z - res.z) < 0.6 && type !== 'torcia') { res.ok = false; res.reason = 'Troppo vicino'; }
     }
     return res;
+  };
+  // torcia: si piazza subito dove guardi; su una parete (muro, roccia, galleria) si attacca al muro
+  B.placeTorch = function (o, d) {
+    const MAXD = 6;
+    let t = terrainHit(o, d, MAXD), piece = null;
+    const bh = B.raycast(o, d, MAXD);
+    if (bh && (t < 0 || bh.t < t)) { t = bh.t; piece = bh.piece; }
+    if (t < 0) return { ok: false, reason: 'Mira il terreno o un muro più vicino' };
+    const hx = o.x + d.x * t, hy = o.y + d.y * t, hz = o.z + d.z * t;
+    let nx = 0, ny = 1, nz = 0;
+    if (piece) {
+      const k = kind(piece.t);
+      if (k.startsWith('muro') || k === 'pilastro' || k === 'camino') { const c = Math.cos(piece.rot), s = Math.sin(piece.rot); let ax = s, az = c; if (k === 'pilastro') { ax = -d.x; az = -d.z; } const side = Math.sign(-(d.x * ax + d.z * az)) || 1; nx = ax * side; nz = az * side; ny = 0;
+        if (k === 'pilastro') { const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l; } }
+      else if (hy < piece.pick.y1 - 0.05) { nx = -d.x; nz = -d.z; ny = 0; const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l; }
+    } else {
+      // normale della superficie (terreno o parete di una galleria) dai punti pieni intorno
+      let gx = 0, gy = 0, gz = 0; const e = 0.35;
+      for (const [ax, ay, az] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) if (!solid(hx + ax * e, hy + ay * e, hz + az * e)) { gx += ax; gy += ay; gz += az; }
+      const l = Math.hypot(gx, gy, gz); if (l > 0) { nx = gx / l; ny = gy / l; nz = gz / l; }
+    }
+    const pl = G.Player.pos;
+    if (ny > 0.6) {
+      const y = piece ? B.groundAt(hx, hz, hy + 0.1, 0) : gAt(hx, hz, hy + 0.3);
+      return { ok: true, t: 'torcia', x: hx, y: y > -Infinity ? y : hy, z: hz, rot: G.Player.yaw + Math.PI };
+    }
+    if (ny < -0.6) return { ok: false, reason: 'Non si attacca al soffitto: mira il pavimento o una parete' };
+    const hl = Math.hypot(nx, nz) || 1; nx /= hl; nz /= hl;
+    if (Math.hypot(pl.x - hx, pl.z - hz) < 0.25) return { ok: false, reason: 'Troppo vicino' };
+    return { ok: true, t: 'torcia', wall: 1, x: hx + nx * 0.02, y: hy - 0.3, z: hz + nz * 0.02, rot: Math.atan2(nx, nz) };
   };
   B.updateGhost = function (type, o, d) {
     if (!type) { if (B.ghost) { G.scene.remove(B.ghost); B.ghost = null; B.ghostType = null; } return null; }
@@ -468,6 +556,7 @@
     // porte animate e cottura sul falò
     for (const p of B.pieces) {
       if (p.hinge) { const tgt = p.open ? -Math.PI / 2 : 0; p.hinge.rotation.y += (tgt - p.hinge.rotation.y) * Math.min(1, dt * 8); }
+      if (p.t === 'fornace') { smelt(p, dt); continue; }
       if (p.cook && p.cook.in) {
         const raw = p.cook.in.id, out = G.COOK[raw];
         if (out && (!p.cook.out || (p.cook.out.id === out && p.cook.out.n < 64))) {
@@ -484,5 +573,25 @@
     }
     B.updateLights(player, t);
   };
+  // fornace: un minerale ogni 6 secondi; il combustibile si consuma un pezzo alla volta
+  function smelt(p, dt) {
+    const c = p.cook, out = c.in && G.SMELT[c.in.id];
+    const can = out && (!c.out || (c.out.id === out && c.out.n < 64));
+    if (can && c.burn <= 0 && c.fuel && G.SMELT_FUEL[c.fuel.id]) { c.burn += G.SMELT_FUEL[c.fuel.id]; c.fuel.n--; if (c.fuel.n <= 0) c.fuel = null; }
+    const on = can && c.burn > 0;
+    if (on) {
+      c.prog += dt / 6;
+      if (c.prog >= 1) {
+        c.prog = 0; c.burn -= 1; c.in.n--; if (c.in.n <= 0) c.in = null;
+        if (c.out) c.out.n++; else c.out = { id: out, n: 1 };
+        if (G.UI.onCookTick) G.UI.onCookTick(p);
+      }
+      if (Math.random() < dt * 3) G.FX.burst(p.x, p.y + 2.05, p.z, [0.3, 0.29, 0.28], 1, 0.4, { g: -1.2, size: 3 });
+    } else c.prog = Math.max(0, c.prog - dt * 0.05);
+    const k = on ? 1 : c.burn > 0 ? 0.4 : 0.05;
+    p.glow = (p.glow || 0) + (k - (p.glow || 0)) * Math.min(1, dt * 2);
+    if (p.mouth) p.mouth.material.emissiveIntensity = p.glow * 2.2;
+    p.power = 0.15 + p.glow * 0.7;
+  }
   B.WALL_H = WALL_H;
 })();

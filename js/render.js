@@ -343,6 +343,7 @@
         uAmb: { value: new THREE.Color() }, uFogDen: { value: 0.002 }, uUnder: { value: 0 }, uOffset: { value: new THREE.Vector2() },
         uVort: { value: [new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0)] },
         uSSR: { value: 0 }, uVP: { value: new THREE.Matrix4() },
+        uDigW: (G.Dig && G.Dig.U.uDigW) || { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigWN: (G.Dig && G.Dig.U.uDigWN) || { value: 0 },
       },
       vertexShader: GLSL_WAVES() + `
         uniform float uTime; uniform vec2 uOffset; uniform vec3 uCam; uniform vec4 uVort[4];
@@ -360,7 +361,7 @@
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        uniform sampler2D tScene, tDepth, tNormal; uniform vec2 uRes; uniform float uNear, uFar, uTime, uFogDen, uUnder, uWaveAmp, uWindLv, uSSR; uniform vec4 uVort[4]; uniform mat4 uVP;
+        uniform sampler2D tScene, tDepth, tNormal; uniform vec2 uRes; uniform float uNear, uFar, uTime, uFogDen, uUnder, uWaveAmp, uWindLv, uSSR; uniform vec4 uVort[4]; uniform mat4 uVP; uniform vec4 uDigW[24]; uniform int uDigWN;
         uniform vec3 uCam, uSunDir, uSunCol, uZen, uHor, uAmb;
         varying vec3 vWPos; varying vec3 vN; varying float vH; varying float vViewZ;
         float lin(float d){ float z = d*2.0-1.0; return 2.0*uNear*uFar/(uFar+uNear - z*(uFar-uNear)); }
@@ -371,6 +372,7 @@
           vec2 suv = gl_FragCoord.xy / uRes;
           float sceneZ = lin(texture2D(tDepth, suv).r);
           if (sceneZ < vViewZ - 0.05) discard;
+          for (int i = 0; i < 24; i++) { if (i >= uDigWN) break; vec3 dd = vWPos - uDigW[i].xyz; if (dot(dd, dd) < uDigW[i].w * uDigW[i].w) discard; }
           vec3 V = uCam - vWPos; float dist = length(V); V /= dist;
           vec2 u1 = vWPos.xz*0.045 + uTime*vec2(0.018,0.011), u2 = vWPos.xz*0.12 - uTime*vec2(0.012,0.026);
           vec3 n1 = texture2D(tNormal, u1).xyz*2.0-1.0, n2 = texture2D(tNormal, u2).xyz*2.0-1.0;

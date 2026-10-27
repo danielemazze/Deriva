@@ -83,33 +83,41 @@
       const r = tg.res;
       if (r.type === 'tree') {
         const max = r.sub === 'pine' ? 6 : 5;
-        return `<div class="tname">${TREE_N[r.sub]}</div><div class="thint">${k('Clic sinistro')} abbatti${held && held.id === 'ascia' ? '' : ' · meglio con l’ascia'}</div><div class="thp"><i style="transform:scaleX(${Math.max(0, r.hp / max)})"></i></div>`;
+        return `<div class="tname">${TREE_N[r.sub]}</div><div class="thint">${k('Clic sinistro')} abbatti${held && G.toolClass(held.id) === 'ascia' ? '' : ' · meglio con l’ascia'}</div><div class="thp"><i style="transform:scaleX(${Math.max(0, r.hp / max)})"></i></div>`;
       }
-      if (r.type === 'rock') return `<div class="tname">Roccia</div><div class="thint">${k('Clic sinistro')} estrai pietra${held && held.id === 'piccone' ? '' : ' · meglio col piccone'}</div>`;
-      if (r.type === 'bush') return `<div class="tname">${r.berry ? 'Cespuglio di bacche' : 'Cespuglio'}</div><div class="thint">${k('E')} raccogli fibra, foglie${r.berry ? ' e bacche' : ''}</div>`;
-      if (r.type === 'grass') return `<div class="tname">${r.flower ? 'Fiori di campo' : 'Erba alta'}</div><div class="thint">${k('E')} raccogli fibra</div>`;
+      if (r.type === 'rock' && r.vein) return `<div class="tname">Vena di ${{ carbone: 'carbone', ferro_grezzo: 'ferro', oro_grezzo: 'oro' }[r.ore]}</div><div class="thint">${k('Clic sinistro')} estrai${held && G.toolClass(held.id) === 'piccone' ? '' : ' · serve il piccone'}</div>`;
+      if (r.type === 'rock' && r.size > 0.7 && !(held && G.toolClass(held.id) === 'piccone')) return `<div class="tname">Masso</div><div class="thint">serve il piccone</div>`;
+      if (r.type === 'rock') return `<div class="tname">Roccia</div><div class="thint">${k('Clic sinistro')} estrai pietra${held && G.toolClass(held.id) === 'piccone' ? '' : ' · meglio col piccone'}</div>`;
+      if (r.type === 'bush') return `<div class="tname">${r.berry ? 'Cespuglio di bacche' : 'Cespuglio'}</div><div class="thint">${k(G.useKey())} raccogli fibra, foglie${r.berry ? ' e bacche' : ''}</div>`;
+      if (r.type === 'grass') return `<div class="tname">${r.flower ? 'Fiori di campo' : 'Erba alta'}</div><div class="thint">${k(G.useKey())} raccogli fibra</div>`;
       if (r.type === 'cliff') return `<div class="tname">Sperone di roccia</div><div class="thint">Troppo grande da scavare</div>`;
-      if (r.type === 'wood') return r.sub === 'drift' ? `<div class="tname">Legno portato dal mare</div><div class="thint">${k('E')} raccogli bastoni</div>` : `<div class="tname">${r.sub === 'log' ? 'Tronco caduto' : 'Ceppo'}</div><div class="thint">${k('Clic sinistro')} taglia${held && held.id === 'ascia' ? '' : ' · meglio con l’ascia'}</div>`;
-      if (r.type === 'plant') return `<div class="tname">${{ mush: 'Funghi', reed: 'Canne', fern: 'Felce', trop: 'Pianta tropicale', cactus: 'Cactus' }[r.sub] || 'Pianta'}</div><div class="thint">${k('E')} raccogli${r.sub === 'mush' ? ' (meglio cotti)' : r.sub === 'cactus' ? ' la polpa · meglio col coltello' : ''}</div>`;
-      if (r.type === 'shell') return `<div class="tname">${r.kind === 'starfish' ? 'Stella marina' : 'Conchiglia'}</div><div class="thint">${k('E')} raccogli</div>`;
+      if (r.type === 'wood') return r.sub === 'drift' ? `<div class="tname">Legno portato dal mare</div><div class="thint">${k(G.useKey())} raccogli bastoni</div>` : `<div class="tname">${r.sub === 'log' ? 'Tronco caduto' : 'Ceppo'}</div><div class="thint">${k('Clic sinistro')} taglia${held && G.toolClass(held.id) === 'ascia' ? '' : ' · meglio con l’ascia'}</div>`;
+      if (r.type === 'plant') return `<div class="tname">${{ mush: 'Funghi', reed: 'Canne', fern: 'Felce', trop: 'Pianta tropicale', cactus: 'Cactus' }[r.sub] || 'Pianta'}</div><div class="thint">${k(G.useKey())} raccogli${r.sub === 'mush' ? ' (meglio cotti)' : r.sub === 'cactus' ? ' la polpa · meglio col coltello' : ''}</div>`;
+      if (r.type === 'shell') return `<div class="tname">${r.kind === 'starfish' ? 'Stella marina' : 'Conchiglia'}</div><div class="thint">${k(G.useKey())} raccogli</div>`;
     }
     if (tg.kind === 'animal') {
       const a = tg.ent, foods = G.BREED && G.BREED[a.sp], lab = G.Pets ? G.Pets.label(a) : '';
       const feed = foods ? ` · ${k('Tasto destro')} con ${foods.map((f) => G.ITEMS[f].n.toLowerCase()).join(' o ')}: ${a.st.trapped ? 'libera dalla trappola' : 'nutri (cuccioli)'}` : '';
-      return `<div class="tname">${a.def.n}${lab ? ` <small>${lab}</small>` : ''}</div><div class="thint">${a.def.peaceful ? 'Lasciala in pace: depone le uova su questa spiaggia' : `${k('Clic sinistro')} caccia${a.def.shear ? ` · ${k('E')} tosa${a.wool ? '' : ' (lana in ricrescita)'}` : ''}${feed}`}</div>`;
+      return `<div class="tname">${a.def.n}${lab ? ` <small>${lab}</small>` : ''}</div><div class="thint">${a.def.peaceful ? 'Lasciala in pace: depone le uova su questa spiaggia' : `${k('Clic sinistro')} caccia${a.def.shear ? ` · ${k(G.useKey())} tosa${a.wool ? '' : ' (lana in ricrescita)'}` : ''}${feed}`}</div>`;
     }
     if (tg.kind === 'piece') {
       const pc = tg.piece; const h = PIECE_HINT[pc.t];
-      return `<div class="tname">${G.ITEMS[pc.t].n}</div><div class="thint">${h ? `${k('E')} ${h} · ` : ''}${k('Clic sinistro')} smonta</div>`;
+      return `<div class="tname">${G.ITEMS[pc.t].n}</div><div class="thint">${h ? `${k(G.useKey())} ${h} · ` : ''}${k('Clic sinistro')} smonta</div>`;
     }
-    if (tg.kind === 'npc') { const n = tg.npc; return `<div class="tname">${esc(n.def.name)}</div><div class="thint">${k('E')} ${n.def.role === 'mercante' ? 'commercia' : n.def.role === 'capo' ? 'missioni e voci' : n.def.role === 'locandiere' ? 'mangia e riposa' : 'parla'}</div>`; }
+    if (tg.kind === 'npc') { const n = tg.npc; return `<div class="tname">${esc(n.def.name)}</div><div class="thint">${k(G.useKey())} ${n.def.role === 'mercante' ? 'commercia' : n.def.role === 'capo' ? 'missioni e voci' : n.def.role === 'locandiere' ? 'mangia e riposa' : 'parla'}</div>`; }
+    if (tg.kind === 'boat' && tg.boat.free) {
+      const b = tg.boat, it = p.held(), piece = it && G.FreeBoat.isPiece(it.id);
+      if (b.sunk) return `<div class="tname">Barca affondata</div><div class="thint">${b.inv ? k(G.useKey()) + ' apri il baule' : ''}</div>`;
+      if (b.flip) return `<div class="tname">Barca ribaltata</div><div class="thint">${k(G.useKey())} raddrizza</div>`;
+      return `<div class="tname">Barca libera</div><div class="thint">${piece ? `${k(G.useKey())} monta ${esc(G.ITEMS[it.id].n.toLowerCase())} · ` : `${k(G.useKey())} sali a bordo · `}${k('Clic sinistro')} togli un pezzo</div>`;
+    }
     if (tg.kind === 'boat') {
       const b = tg.boat, miss = G.Boats.missing(b);
       if (miss.length) {
         const ready = miss.filter((i) => p.count(b.parts[i].item) >= b.parts[i].n).length;
-        return `<div class="tname">${b.T.n} in costruzione</div><div class="need ${ready ? 'ok' : 'no'}">${b.parts.length - miss.length}/${b.parts.length} parti montate${ready ? ` · ${ready} pronte da montare` : ''}</div><div class="thint">${k('Tasto destro')} o ${k('E')} elenco delle parti</div>`;
+        return `<div class="tname">${b.T.n} in costruzione</div><div class="need ${ready ? 'ok' : 'no'}">${b.parts.length - miss.length}/${b.parts.length} parti montate${ready ? ` · ${ready} pronte da montare` : ''}</div><div class="thint">${k('Tasto destro')} o ${k(G.useKey())} elenco delle parti</div>`;
       }
-      return `<div class="tname">${b.T.n}</div><div class="thint">${k('E')} sali a bordo${b.inv ? ` · a bordo ${k('G')} apre la stiva` : ''}</div>`;
+      return `<div class="tname">${b.T.n}</div><div class="thint">${k(G.useKey())} sali a bordo${b.inv ? ` · a bordo ${k('G')} apre la stiva` : ''}</div>`;
     }
     return '';
   }
@@ -151,7 +159,7 @@
     // mirino e bersaglio
     let html = '';
     if (!UI.open && !p.placing && !UI.boatPlacing) html = targetHTML(p.target);
-    if (!UI.open && p.boat && !p.helm && p.inHelmZone() && !html) html = `<div class="tname">${esc(p.boat.T.helmTxt)}</div><div class="thint"><kbd>E</kbd> ${p.boat.T.oars ? 'siediti ai remi' : 'prendi il timone'}</div>`;
+    if (!UI.open && p.boat && !p.helm && p.inHelmZone() && !html) html = `<div class="tname">${esc(p.boat.T.helmTxt)}</div><div class="thint"><kbd>${G.useKey()}</kbd> ${p.boat.T.oars ? 'siediti ai remi' : 'prendi il timone'}</div>`;
     if (html !== UI._tHTML) { UI._tHTML = html; $('target').innerHTML = html; }
     $('cross').classList.toggle('hot', !!p.target && !UI.open);
     // barca
@@ -169,7 +177,7 @@
         const o = G.camera.position, d = p.lookDir(new THREE.Vector3());
         UI.placeRes = G.Build.updateGhost(p.placing, o, d);
         pb.hidden = false;
-        const rot = ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'recinto', 'porta'].includes(p.placing) ? '' : ' · <kbd>R</kbd> ruota';
+        const rot = ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'recinto', 'porta'].includes(G.pieceKind(p.placing)) ? '' : ' · <kbd>R</kbd> ruota';
         pb.innerHTML = `${esc(G.ITEMS[p.placing].n)} · <kbd>Tasto destro</kbd> posa${rot} · <kbd>Esc</kbd> annulla${UI.placeRes && !UI.placeRes.ok ? `<span class="err">${esc(UI.placeRes.reason)}</span>` : ''}`;
       }
     } else if (UI.boatPlacing) {
@@ -198,14 +206,15 @@
     if (p.placing) return ['Costruzione', [['Tasto destro', 'posa'], ['R', 'ruota'], ['Esc', 'annulla']]];
     if (p.boat) {
       const T = p.boat.T;
-      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], ['E', p.inHelmZone() ? 'guida (' + T.helmTxt.toLowerCase() + ')' : 'scendi'], ['Spazio contro la murata', 'tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
-      if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], ['E', 'lascia i remi']]];
-      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], ...(p.boat.inv ? [['G', 'stiva']] : []), ['E', 'lascia il timone']]];
+      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], [G.useKey(), p.inHelmZone() ? 'guida (' + T.helmTxt.toLowerCase() + ')' : 'scendi'], ['Spazio contro la murata', 'tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
+      if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], [G.useKey(), 'lascia i remi']]];
+      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], ...(p.boat.inv ? [['G', 'stiva']] : []), [G.useKey(), 'lascia il timone']]];
     }
     const held = p.held(), id = held && held.id, d = id && G.ITEMS[id];
     if (id === 'arco') k.push(['Tieni premuto clic sinistro', 'tendi e scocca']);
     else if (id === 'pistola' || id === 'pistola_capitano') k.push(['Clic sinistro', 'spara (servono munizioni)']);
-    else if (id === 'pala' || id === 'piccone') k.push(['Clic sinistro sul terreno', id === 'pala' ? 'scava (o scava sulla X)' : 'scava nella roccia']);
+    else if (G.FreeBoat && G.FreeBoat.isPiece(id) && id !== 'torcia' && id !== 'baule') k.push(['Tasto destro', id === 'fasciame' || id === 'ponte_barca' ? 'sul mare: inizia una barca libera · su una barca: monta' : 'su una barca libera: monta']);
+    else if (['pala', 'piccone'].includes(G.toolClass(id))) k.push(['Clic sinistro sul terreno', G.toolClass(id) === 'pala' ? 'scava (o scava sulla X)' : 'scava nella roccia']);
     else if (id === 'cannocchiale') k.push(['Tieni premuto tasto destro', 'guarda lontano']);
     const use = id === 'mappa_tesoro' ? 'leggi la mappa' : d && d.cat === 'blueprint' ? 'impara il progetto' : id === 'libro' ? 'apri il libro' : id === 'canna' ? (p.fish ? 'tira su la lenza' : 'lancia la lenza') : id === 'ciotola' ? 'raccogli acqua' : d && G.Build.isPlaceable(id) ? 'posiziona' : d && (d.food || d.water) ? 'mangia / bevi' : null;
     if (p.fly) k.push(['W A S D', 'vola'], ['Spazio / C', 'sali / scendi'], ['Spazio ×2', 'atterra']);
@@ -216,7 +225,7 @@
     if (use) k.push(['Tasto destro', use]);
     const L = p.equip && p.equip[0];
     if (L && G.ITEMS[L.id].shield) k.push(['Tieni premuto tasto destro', 'para con lo scudo']);
-    k.push(['E', 'interagisci'], ['F', L ? 'scambia con la sinistra' : 'mano sinistra'], ['I', 'inventario'], ['B', 'libro delle barche'], ['M · J', 'mappa · diario'], ...(G.Cmd && G.Cmd.allowed() ? [['T · K', 'comandi · strumenti']] : []), ['H', 'nascondi comandi']);
+    k.push(['E', 'inventario'], ['F', L ? 'scambia con la sinistra' : 'mano sinistra'], ['B', 'libro delle barche'], ['M · J', 'mappa · diario'], ...(G.Cmd && G.Cmd.allowed() ? [['T · K', 'comandi · strumenti']] : []), ['H', 'nascondi comandi']);
     return [p.swim ? (p.under ? 'Sott’acqua' : 'In acqua') : 'A piedi', k];
   }
   function renderHints() {
@@ -246,7 +255,7 @@
     if (G.creative()) nb.parts.forEach((p, i) => { nb.filled[i] = true; nb.meshes[i].material = G.Boats.matFor(p); nb.meshes[i].castShadow = true; });
     if (G.Net && G.Net.on) G.Net.send({ t: 'bnew', b: G.Boats.serializeOne(nb) });
     UI.boatPlacing = null; G.Boats.updateGhost(null);
-    UI.toast(G.creative() ? `${nb.T.n} pronta! Avvicinati e premi E per salire` : 'Sagoma tracciata! Guarda la barca e premi E: vedrai l’elenco delle parti da montare', 'good');
+    UI.toast(G.creative() ? `${nb.T.n} pronta! Avvicinati e ${G.useHow()} per salire` : `Sagoma tracciata! Guarda la barca e ${G.useHow()}: vedrai l’elenco delle parti da montare`, 'good');
     G.saveSoon();
     if (G.Audio) G.Audio.place();
     G.saveSoon();
@@ -347,11 +356,15 @@
       if (G.creative()) {
         let c = ''; UI.catalog().forEach((st, i) => { c += slot('cat', i, st); });
         html += `<div><h3>Catalogo<small>modalità creativa</small></h3><div class="catalog">${c}</div><div class="hint" style="margin-top:8px">Clic: una pila in mano · Tasto destro: uno · Maiusc+clic: dritto nell’inventario</div></div>`;
-      } else html += `<div><h3>Ricette</h3><div class="reclist">${recipeList(N)}</div></div>`;
+      } else html += `<div><h3>Ricette</h3><input id="recq" class="recq" type="search" placeholder="Cerca una ricetta o un materiale" value="${esc(UI.recQ || '')}" autocomplete="off" spellcheck="false" aria-label="Cerca nel ricettario"><div class="reccats" id="reccats">${recCats()}</div><div class="reclist" id="reclist">${recipeList(N)}</div></div>`;
     } else if (UI.open === 'chest') {
       let g = ''; for (let i = 0; i < 27; i++) g += slot('chest', i, UI.chestInv[i]);
       html += `<div><h3>${esc(UI.chestTitle)}</h3><div class="grid" style="grid-template-columns:repeat(9,var(--slot))">${g}</div></div>` + invSection();
       pn.style.gridTemplateColumns = 'auto';
+    } else if (UI.open === 'fire' && UI.fire.t === 'fornace') {
+      const c = UI.fire.cook;
+      html += `<div><h3>Fornace<small>fonde ferro e oro grezzi in lingotti</small></h3><div class="craftwrap"><div style="display:grid;gap:8px">${slot('firein', 0, c.in)}${slot('firefuel', 0, c.fuel)}</div><div><div class="cookbar"><i id="cookbar" style="transform:scaleX(${c.prog})"></i></div><div class="hint" style="margin-top:6px">${c.burn > 0 ? 'Brace: ancora ' + c.burn + (c.burn === 1 ? ' pezzo' : ' pezzi') : 'Spenta'}</div></div>${slot('fireout', 0, c.out, 'result')}</div>
+        <div class="hint" style="margin-top:10px">In alto il minerale, in basso il combustibile: un carbone fonde 2 pezzi, un tronco 1. Ogni lingotto richiede 6 secondi.</div></div>` + invSection();
     } else if (UI.open === 'fire') {
       const c = UI.fire.cook;
       html += `<div><h3>Falò<small>cuoce carne, pesce, uova e bolle l’acqua salata</small></h3><div class="craftwrap">${slot('firein', 0, c.in)}<div><div class="cookbar"><i id="cookbar" style="transform:scaleX(${c.prog})"></i></div></div>${slot('fireout', 0, c.out, 'result')}</div>
@@ -378,11 +391,38 @@
   };
   UI.renderFireProgress = function () { const b = $('cookbar'); if (b) b.style.transform = `scaleX(${UI.fire.cook.prog})`; };
   UI.onCookTick = function (p) { if (UI.open === 'fire' && UI.fire === p) UI.renderPanel(); };
+  // categorie del ricettario
+  const REC_CATS = [['tutte', 'Tutte'], ['attrezzi', 'Attrezzi'], ['armi', 'Armi'], ['costruzioni', 'Costruzioni'], ['luce', 'Luce e fuoco'], ['barche', 'Barche'], ['cibo', 'Cibo'], ['vestiti', 'Vestiti'], ['materiali', 'Materiali']];
+  G.recipeCat = function (id) {
+    const d = G.ITEMS[id] || {};
+    if (['torcia', 'falo', 'camino', 'lanterna'].includes(id)) return 'luce';
+    if (d.cat === 'weapon' || d.shield || id === 'freccia' || id === 'munizioni') return 'armi';
+    if (d.cat === 'tool') return 'attrezzi';
+    if (d.cat === 'place') return 'costruzioni';
+    if (d.cat === 'part' || d.cat === 'hull' || d.free) return 'barche';
+    if (d.cat === 'food' || id === 'ciotola') return 'cibo';
+    if (d.cat === 'wear') return 'vestiti';
+    return 'materiali';
+  };
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ');
+  function recMatch(r) {
+    const cat = UI.recCat || 'tutte';
+    if (cat !== 'tutte' && G.recipeCat(r.out) !== cat) return false;
+    const q = norm(UI.recQ).trim(); if (!q) return true;
+    if (norm(G.ITEMS[r.out].n).includes(q)) return true;
+    return Object.keys(G.recipeNeeds(r)).some((id) => norm(G.ITEMS[id].n).includes(q));
+  }
+  function recCats() {
+    const q = norm(UI.recQ).trim(), cnt = {};
+    for (const r of G.RECIPES) { if (q && !(norm(G.ITEMS[r.out].n).includes(q) || Object.keys(G.recipeNeeds(r)).some((id) => norm(G.ITEMS[id].n).includes(q)))) continue; const c = G.recipeCat(r.out); cnt[c] = (cnt[c] || 0) + 1; cnt.tutte = (cnt.tutte || 0) + 1; }
+    return REC_CATS.map(([k, n]) => `<button class="rcat ${(UI.recCat || 'tutte') === k ? 'on' : ''} ${cnt[k] ? '' : 'none'}" data-rcat="${k}">${n}${cnt[k] ? ` <small>${cnt[k]}</small>` : ''}</button>`).join('');
+  }
+  UI.refreshRecipes = function () { const l = $('reclist'), c = $('reccats'); if (l) l.innerHTML = recipeList(UI.craftN) || '<p class="hint">Nessuna ricetta trovata.</p>'; if (c) c.innerHTML = recCats(); };
   function recipeList(N) {
     const have = (id) => P().count(id) + UI.craft.reduce((s, x) => s + (x && x.id === id ? x.n : 0), 0);
     const seen = new Set();
     const list = G.RECIPES.map((r, i) => { const need = G.recipeNeeds(r); const can = Object.entries(need).every(([id, n]) => have(id) >= n); return { r, i, can, need }; })
-      .filter((x) => { const k = x.r.out + x.r.rows.join(); if (seen.has(k)) return false; seen.add(k); return true; })
+      .filter((x) => { const k = x.r.out + x.r.rows.join(); if (seen.has(k)) return false; seen.add(k); return recMatch(x.r); })
       .sort((a, b) => (b.can && b.r.size <= N) - (a.can && a.r.size <= N) || a.r.size - b.r.size);
     return list.map(({ r, i, can, need }) => {
       const locked = r.size > N;
@@ -435,9 +475,14 @@
       UI.refreshHotbar(); return;
     }
     let arr, idx = i;
-    if (src === 'firein') {
+    if (src === 'firefuel') {
       const c = UI.fire.cook;
-      if (UI.cursor && !G.COOK[UI.cursor.id]) { UI.toast('Questo non si può cuocere', 'warn'); return; }
+      if (UI.cursor && !G.SMELT_FUEL[UI.cursor.id]) { UI.toast('Qui va il combustibile: carbone o tronchi', 'warn'); return; }
+      const box = [c.fuel]; handleSwap(box, 0, button, shift, 'firein'); c.fuel = box[0]; UI.refreshHotbar(); return;
+    }
+    if (src === 'firein') {
+      const c = UI.fire.cook, smelt = UI.fire.t === 'fornace';
+      if (UI.cursor && !(smelt ? G.SMELT[UI.cursor.id] : G.COOK[UI.cursor.id])) { UI.toast(smelt ? 'Nella fornace vanno ferro o oro grezzi' : 'Questo non si può cuocere', 'warn'); return; }
       arr = { 0: c.in }; const box = [c.in]; arr = box; idx = 0;
       handleSwap(box, 0, button, shift, 'firein');
       c.in = box[0]; UI.refreshHotbar(); return;
@@ -458,7 +503,8 @@
       if (src === 'chest') { const n = P().give(st.id, st.n, true); st.n -= n; if (st.n <= 0) arr[i] = null; }
       else if (src === 'craft' || src === 'firein') { P().give(st.id, st.n, true); arr[i] = null; }
       else if (UI.open === 'chest') { const n = giveTo(UI.chestInv, st.id, st.n); st.n -= n; if (st.n <= 0) arr[i] = null; }
-      else if (UI.open === 'fire' && G.COOK[st.id]) { const c = UI.fire.cook; if (!c.in) { c.in = st; arr[i] = null; } else if (c.in.id === st.id) { c.in.n += st.n; arr[i] = null; } }
+      else if (UI.open === 'fire' && UI.fire.t === 'fornace' && (G.SMELT[st.id] || G.SMELT_FUEL[st.id])) { const c = UI.fire.cook, k = G.SMELT[st.id] ? 'in' : 'fuel'; if (!c[k]) { c[k] = st; arr[i] = null; } else if (c[k].id === st.id) { c[k].n += st.n; arr[i] = null; } }
+      else if (UI.open === 'fire' && UI.fire.t !== 'fornace' && G.COOK[st.id]) { const c = UI.fire.cook; if (!c.in) { c.in = st; arr[i] = null; } else if (c.in.id === st.id) { c.in.n += st.n; arr[i] = null; } }
       else { // tra barra rapida e zaino
         const range = i < 9 ? [9, 36] : [0, 9];
         let left = st.n;
@@ -524,7 +570,7 @@
       <div class="tabs">${['barche', 'ricette', 'guida'].map((t) => `<button class="tab ${t === tab ? 'on' : ''}" data-tab="${t}">${{ barche: 'Barche', ricette: 'Ricettario', guida: 'Guida' }[t]}</button>`).join('')}</div>`;
     let R = '<div class="page r">';
     if (tab === 'barche') {
-      L += `<p>Scegli un progetto, poi tracciane la sagoma sul mare. Poi guarda la barca e premi E (o il tasto destro): si apre l’elenco delle parti con i materiali che servono, e le monti con un clic.</p><div class="boatlist">` +
+      L += `<p><b>Barca libera</b>: niente progetto. Con il fasciame in mano mira il mare e usa il tasto destro: nasce una barca che galleggia subito. Poi aggiungi pezzi dove vuoi (fasciame, ponte, zavorra, timone, albero, vela, remi, baule): ogni pezzo pesa, e la barca si inclina verso dove pesa di più. In alto a destra vedi peso, portata e stabilità.</p><p>Scegli un progetto, poi tracciane la sagoma sul mare. Poi guarda la barca e usa il tasto destro: si apre l’elenco delle parti con i materiali che servono, e le monti con un clic.</p><div class="boatlist">` +
         Object.entries(G.BOAT_TPL).map(([k, T]) => `<button class="bcard ${k === UI.bookBoat ? 'on' : ''} ${G.Boats.unlocked(k) ? '' : 'locked'}" data-boat="${k}"><canvas width="240" height="140" data-sketch="${k}"></canvas><div><strong>${G.Boats.unlocked(k) ? '' : '🔒 '}${T.n}</strong><span>${T.d}</span></div></button>`).join('') + '</div>';
       const T = G.BOAT_TPL[UI.bookBoat], need = G.Boats.needs(UI.bookBoat), parts = G.Boats.parts(UI.bookBoat);
       const all = Object.entries(need).every(([id, n]) => P().count(id) >= n);
@@ -560,10 +606,10 @@
       return `<div class="rcard"><div class="mini" style="grid-template-columns:repeat(${N},20px)">${cells}</div><img src="${G.icon(r.out)}" width="32" height="32" alt=""><div class="nm">${esc(G.ITEMS[r.out].n)}${r.n > 1 ? ' ×' + r.n : ''}</div><div class="badge">${r.size === 5 ? 'banco 5×5' : 'a mano 3×3'}</div></div>`;
     }).join('') + '</div>';
   }
-  const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Maiusc', 'correre'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'usare, mangiare, posare, montare parti'],
-    ['E', 'interagire · salire e scendere dalla barca'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['I / Tab', 'inventario, vestiti e creazione 3×3'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
+  const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Maiusc', 'correre'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
+    ['E · I · Tab', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
-    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
+    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['Q (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Q”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
   UI.CONTROLS = CONTROLS;
 
   /* ---------------- MENU ---------------- */
@@ -657,6 +703,12 @@
         <h3 class="sub3">Audio</h3>
         ${opt('o-vol', 'Volume generale', 0, 1, 0.05, S.volume, (v) => `${Math.round(v * 100)}%`)}
         ${(G.Audio ? G.Audio.BUSES : []).map(([k, n, d]) => { const v = S.vols && S.vols[k] !== undefined ? S.vols[k] : 1; return `<div class="opt"><label for="o-av-${k}">${n}<small>${d}</small></label><output id="o-av-${k}-o">${Math.round(v * 100)}%</output><input type="range" id="o-av-${k}" min="0" max="1.5" step="0.05" value="${v}"></div>`; }).join('')}
+        <h3 class="sub3">Chat vocale</h3>
+        <div class="opt"><label>Microfono<small>si attiva quando sei in partita con altri giocatori</small></label><div class="seg small">${[['open', 'Sempre aperto'], ['ptt', 'Tieni premuto Q'], ['off', 'Spento']].map(([k, n]) => `<button data-voice="${k}" class="${(S.voice && S.voice.mode || 'open') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+        ${opt('o-vvol', 'Volume delle voci', 0, 1.5, 0.05, S.voice ? S.voice.vol : 1, (v) => `${Math.round(v * 100)}%`)}
+        ${opt('o-vrange', 'Si sentono fino a', 15, 150, 5, S.voice ? S.voice.range : 60, (v) => `${v} m`)}
+        ${opt('o-vsens', 'Sensibilità del microfono', 0, 1, 0.05, S.voice ? S.voice.sens : 0.5, (v) => `${Math.round(v * 100)}%`)}
+        <p class="note">Sempre aperto: il microfono trasmette solo quando senti parlare (più sensibilità = si apre anche con la voce bassa). Con il collegamento diretto o sulla stessa Wi-Fi la voce è immediata; se la partita passa dal server dei codici la voce potrebbe non arrivare.</p>
         <p class="note">${G.gpuName ? `Scheda video: <b>${esc(G.gpuName)}</b>${G.gpuSoft ? ' — <span class="warnc">il gioco non sta usando la scheda video: aggiorna i driver</span>' : G.gpuWeak ? ' (integrata: consigliate Bassa o Minima)' : ''}. ` : ''}Le texture (Alta e Ultra) e la densità dell’erba si applicano dal prossimo avvio; il resto cambia subito.</p>
         <div class="mbtns"><button class="mbtn" data-m="main">Indietro</button></div></div>`;
     } else if (UI.menu === 'controls') {
@@ -770,10 +822,12 @@
     const N = G.Net;
     if (!N || !N.on) { box.hidden = true; return; }
     box.hidden = false;
-    box.innerHTML = `<li><i style="background:${N.COLOR_CSS[N.slot % 4]}"></i>${esc(G.settings.name || 'Tu')}</li>` + [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}${G.settings.showPing !== false && r.ping ? `<span>${r.ping} ms</span>` : ''}</li>`).join('');
+    const spk = '<b class="spk" aria-label="parla">♪</b>';
+    box.innerHTML = `<li><i style="background:${N.COLOR_CSS[N.slot % 4]}"></i>${esc(G.settings.name || 'Tu')}${G.Voice && G.Voice.talking ? spk : ''}</li>` + [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}${r.speaking ? spk : ''}${G.settings.showPing !== false && r.ping ? `<span>${r.ping} ms</span>` : ''}</li>`).join('');
   };
   function onMenuClick(e) {
-    const b = e.target.closest('[data-m],[data-preset],[data-nwmode],[data-setmode],[data-nwen],[data-seten],[data-fps]'); if (!b) return;
+    const b = e.target.closest('[data-m],[data-preset],[data-nwmode],[data-setmode],[data-nwen],[data-seten],[data-fps],[data-voice]'); if (!b) return;
+    if (b.dataset.voice) { const vs = G.Voice ? G.Voice.settings() : (G.settings.voice = G.settings.voice || { mode: 'open', vol: 1, range: 60, sens: 0.5 }); vs.mode = b.dataset.voice; G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
     if (b.dataset.fps) { G.settings.fpsTarget = +b.dataset.fps; G.adaptReset(); G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); return; }
     if (G.Audio) G.Audio.click();
     if (b.dataset.preset) { G.applyPreset(b.dataset.preset); UI.showMenu('settings'); return; }
@@ -820,6 +874,11 @@
     if (t.id === 'o-wind') { G.setWind(+t.value); $('o-wind-o').textContent = windName(G.WIND.level); G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; return; }
     if (!t.id || !t.id.startsWith('o-')) return;
     const S = G.settings; const v = t.type === 'checkbox' ? t.checked : parseFloat(t.value);
+    if (t.id === 'o-vvol' || t.id === 'o-vrange' || t.id === 'o-vsens') {
+      const vs = G.Voice ? G.Voice.settings() : (S.voice = S.voice || { mode: 'open', vol: 1, range: 60, sens: 0.5 });
+      const k = { 'o-vvol': 'vol', 'o-vrange': 'range', 'o-vsens': 'sens' }[t.id]; vs[k] = v;
+      $(t.id + '-o').textContent = k === 'range' ? `${v} m` : `${Math.round(v * 100)}%`; G.store.set('deriva_settings', S); return;
+    }
     if (t.id.startsWith('o-av-')) {
       const k = t.id.slice(5); S.vols = Object.assign({ amb: 1, room: 1, ani: 1, wx: 1, sfx: 1, ui: 1 }, S.vols); S.vols[k] = v;
       $(t.id + '-o').textContent = `${Math.round(v * 100)}%`; if (G.Audio) G.Audio.setBus(k, v); G.store.set('deriva_settings', S);
@@ -870,19 +929,20 @@
       else if (k === 'KeyB') UI.openBook();
       else if (k === 'KeyM') G.MapUI.open();
       else if (k === 'KeyJ') G.MapUI.openJournal();
-      else if (k === 'KeyE') { if (P_.placing) UI.cancelPlace(); else P_.interact(); }
+      else if (k === 'KeyE') { if (P_.placing) UI.cancelPlace(); else UI.openInventory(3); }
       else if (k === 'KeyF') P_.swapHands();
       else if (k === 'KeyG') { if (P_.boat && P_.boat.inv) UI.openChest(P_.boat.inv, 'Stiva', { boat: P_.boat }); else { const tg = P_.target; if (tg && tg.kind === 'boat' && !G.Boats.isComplete(tg.boat)) UI.openBoatBuild(tg.boat); } }
       else if (k === 'F4') { e.preventDefault(); UI.toggleMode(); }
       else if (k === 'KeyT' || k === 'Slash' || k === 'NumpadDivide') { e.preventDefault(); P_.keys = {}; G.Cmd.openConsole(k === 'KeyT' ? '' : '/'); }
       else if (k === 'KeyK') UI.openCustom('strumenti');
+      else if (k === 'KeyQ' && G.Voice) G.Voice.setPTT(true);
       else if (k === 'KeyR') G.Build.rotStep = (G.Build.rotStep + 1) % 4;
       else if (k === 'KeyV' && P_.boat) P_.cam3 = !P_.cam3;
       else if (k === 'KeyH') { G.settings.hints = G.settings.hints === false; G.store.set('deriva_settings', G.settings); }
       else if (k === 'F11' && window.deriva) { e.preventDefault(); G.settings.fullscreen = !G.settings.fullscreen; G.applySettings('fullscreen'); }
       else if (k === 'Escape') { if (P_.placing) UI.cancelPlace(); else if (UI.boatPlacing) { UI.boatPlacing = null; G.Boats.updateGhost(null); } }
     });
-    document.addEventListener('keyup', (e) => { P().keys[e.code] = false; });
+    document.addEventListener('keyup', (e) => { P().keys[e.code] = false; if (e.code === 'KeyQ' && G.Voice) G.Voice.setPTT(false); });
     window.addEventListener('blur', () => { P().keys = {}; P().mouse.l = false; });
     canvas.addEventListener('mousedown', (e) => {
       if (!G.started || UI.open || UI.menu) return;
@@ -909,12 +969,14 @@
     canvas.addEventListener('wheel', (e) => { if (!G.started || UI.open) return; P().sel = (P().sel + (e.deltaY > 0 ? 1 : 8)) % 9; UI.refreshHotbar(); }, { passive: true });
     // pannelli
     const pw = $('panelWrap');
+    pw.addEventListener('input', (e) => { if (e.target.id === 'recq') { UI.recQ = e.target.value; UI.refreshRecipes(); } });
     pw.addEventListener('mousedown', (e) => {
       const cu = UI.custom[UI.open];
       if (cu) { if (e.target.closest('[data-act=close]') || e.target === pw) { UI.close(); return; } if (cu.click && cu.click(e)) return; return; }
       const s = e.target.closest('.slot[data-src]');
       if (s) { e.preventDefault(); slotClick(s.dataset.src, +s.dataset.i, e.button, e.shiftKey); UI.syncShared(); UI.renderPanel(); return; }
       const r = e.target.closest('[data-rec]'); if (r) { fillRecipe(+r.dataset.rec, e.shiftKey); UI.renderPanel(); return; }
+      const rc = e.target.closest('[data-rcat]'); if (rc) { e.preventDefault(); UI.recCat = rc.dataset.rcat; UI.refreshRecipes(); return; }
       const fb = e.target.closest('[data-fill]');
       if (fb && !fb.disabled && UI.open === 'boat') {
         if (fb.dataset.fill === 'all') { const n = G.Boats.fillAll(UI.boat); if (!n) UI.toast('Non hai i materiali per nessuna parte', 'warn'); }
@@ -931,7 +993,7 @@
       let st = null;
       const src = s.dataset.src, i = +s.dataset.i;
       if (src === 'res') { const r = G.matchRecipe(UI.craft, UI.craftN); st = r ? { id: r.out } : null; }
-      else if (src === 'firein') st = UI.fire.cook.in; else if (src === 'fireout') st = UI.fire.cook.out;
+      else if (src === 'firein') st = UI.fire.cook.in; else if (src === 'fireout') st = UI.fire.cook.out; else if (src === 'firefuel') st = UI.fire.cook.fuel;
       else { const a = getArr(src); st = a && a[i]; }
       if (!st) { tt.hidden = true; return; }
       const d = G.ITEMS[st.id];

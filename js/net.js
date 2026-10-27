@@ -7,7 +7,7 @@
   const G = globalThis.G;
   const V3 = THREE.Vector3;
   const N = (G.Net = { on: false, isHost: false, ws: null, id: null, slot: 0, ff: true, remotes: new Map(), ping: 0, stT: 0, pingT: 0, pdT: 0, timeT: 0, boatT: 0 });
-  N.PROTOCOL = 4;
+  N.PROTOCOL = 5; // 1.8: chat vocale e barca libera
   Object.defineProperty(N, 'online', { get: () => N.on });
   N.animalSeen = new Map();
   N.COLORS = [0xd9583b, 0x3b8fd9, 0x4fae5a, 0xe0b23a];
@@ -58,6 +58,7 @@
     for (const id of [...N.remotes.keys()]) N.removeRemote(id);
     if (N.isHost && window.deriva) window.deriva.hostStop();
     if (N.isHost && G.Relay) G.Relay.stopHost();
+    if (G.Voice) G.Voice.leaveAll();
     const wasClient = wasOn && !N.isHost;
     N.isHost = false;
     G.UI.refreshPlayers();
@@ -67,6 +68,9 @@
   /* ---------------- messaggi in arrivo ---------------- */
   N.handle = function (m) {
     switch (m.t) {
+      case 'bpcs': if (G.FreeBoat) G.FreeBoat.onRemote(m); break;
+      case 'bdelboat': { const b = G.Boats.byId(m.id); if (b) G.Boats.remove(b); break; }
+      case 'vsig': if (G.Voice) G.Voice.onSignal(m); break;
       case 'join': N.addRemote(m.id, m.name, m.slot); G.UI.toast(`${m.name} si è unito alla partita`, 'good'); G.UI.refreshPlayers(); break;
       case 'leave': N.removeRemote(m.id); G.UI.toast(`${m.name} ha lasciato la partita`); G.UI.refreshPlayers(); break;
       case 'st': { const r = N.remotes.get(m.id); if (r) N.applyState(r, m); break; }
@@ -204,7 +208,7 @@
     N.remotes.set(id, r);
     if (st) N.applyState(r, st);
   };
-  N.removeRemote = function (id) { const r = N.remotes.get(id); if (!r) return; G.scene.remove(r.g); N.remotes.delete(id); };
+  N.removeRemote = function (id) { const r = N.remotes.get(id); if (!r) return; if (G.Voice) G.Voice.closePeer(id); G.scene.remove(r.g); N.remotes.delete(id); };
   N.applyState = function (r, m) {
     r.target.set(m.p[0], m.p[1], m.p[2]);
     if (!r.seen) { r.pos.copy(r.target); r.seen = true; }

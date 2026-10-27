@@ -172,7 +172,10 @@
         const o2 = s.userData.o, spread = 4 + k * 30;
         s.position.set(v.x + Math.sin(wd) * rise * (0.3 + ws * 0.12) + o2[0] * spread, v.rim + 2 + rise, v.z + Math.cos(wd) * rise * (0.3 + ws * 0.12) + o2[1] * spread);
         const sc = 12 + k * 55; s.scale.set(sc, sc, 1);
-        s.material.opacity = Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5) * (1 - k) * 0.5 * (0.35 + (G.sky ? G.sky.day : 1) * 0.65);
+        // stessa nebbia della distanza che nasconde il vulcano: il fumo appare insieme a lui
+        const cd = G.camera.position.distanceTo(s.position) * (G.fogDen || 0.002), vis = Math.exp(-cd * cd);
+        s.material.opacity = Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5) * (1 - k) * 0.5 * (0.35 + (G.sky ? G.sky.day : 1) * 0.65) * vis;
+        s.visible = vis > 0.01;
       }
     }
     // lava: brucia chi ci cade dentro
@@ -188,7 +191,8 @@
     F.lakes.clear(); F.volc.clear();
   };
   // superficie dell'acqua nel punto: mare (con onde) o lago
-  G.waterLevelAt = function (x, z, t) {
+  G.waterLevelAt = function (x, z, t, y) {
+    if (G.Dig && G.Dig.dryAt(x, y === undefined ? G.SEA - 2 : y, z)) { const l0 = G.lakeLevelAt(x, z); return l0 !== null ? l0 : -1e4; }
     const sea = G.waveHeight(x, z, t);
     const l = G.lakeLevelAt(x, z);
     if (l !== null && l > sea) return l;

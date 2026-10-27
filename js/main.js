@@ -483,6 +483,7 @@
       if (performance.now() - (G.lastSave || 0) > 45000) G.save();
       G.World.update(P.pos.x, P.pos.z, 7);
       if (G.Net) G.Net.update(dt, t);
+      if (G.Voice) G.Voice.update(dt);
     } else {
       // camera del titolo: orbita lenta attorno all'isola
       if (G.Player.vm) G.Player.vm.visible = false;
@@ -508,6 +509,7 @@
     const viewDist = G.settings.view * G.CHUNK;
     const wc = G.Climate ? G.Climate.cur : null;
     const fogDen = (G.hiQ() ? 1.3 : 1.5) / viewDist * (wc ? 1 + wc.rain * 1.4 + wc.snow * 2.2 + wc.storm * 0.8 : 1);
+    G.fogDen = fogDen;
 
     if (G.noRender) return; // test: solo logica
     camera.updateMatrixWorld(); _mt = performance.now();
@@ -555,7 +557,7 @@
       pu.uMist.value = mist; pu.uMistH.value = mh;
       const pre = G.settings.preset === 'custom' ? G.settings.basePreset : G.settings.preset;
       pu.uGodK.value = pre === 'ultra' ? 0.62 : pre === 'alta' ? 0.5 : 0.3;
-      pu.uCamDepth.value = P.under ? Math.max(0, (G.waterLevelAt ? G.waterLevelAt(camera.position.x, camera.position.z, t) : G.SEA) - camera.position.y) : 0;
+      pu.uCamDepth.value = P.under ? Math.max(0, (G.waterLevelAt ? G.waterLevelAt(camera.position.x, camera.position.z, t, camera.position.y) : G.SEA) - camera.position.y) : 0;
       pu.uHeat.value = wc ? Math.max(0, wc.heat - 0.2) : 0;
     }
     pu.uDamage.value = P.dmgFlash * 0.6 + (P.health < 25 ? 0.15 + Math.sin(t * 4) * 0.08 : 0);

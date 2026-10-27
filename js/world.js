@@ -187,6 +187,15 @@
       W.treeInfo.faretra0 = { trunk: fq.geo, scanMat: fq.mat, height: fq.size[1], radius: 0.3 };
     }
     for (let v = 0; v < W.VAR.rock && !SC; v++) addKind('rock' + v, [{ geo: M.rock(700 + v, v > 4), lod: M.rock(700 + v, v > 4, 1), mat: MAT.rock, shadow: true }]);
+    // vene di minerale in superficie: rocce con macchie di carbone, ferro o oro
+    const veinGeo = (seed, det, col) => {
+      const g = M.rock(seed, false, det), c = g.attributes.color, p = g.attributes.position, rnd = G.mulberry32(seed + 7);
+      for (let i = 0; i < p.count; i++) { const k = Math.sin(p.getX(i) * 7.1 + seed) * Math.sin(p.getY(i) * 6.3) * Math.sin(p.getZ(i) * 8.7 + 1.3);
+        if (k > 0.12 || rnd() < 0.08) c.setXYZ(i, col[0], col[1], col[2]); else c.setXYZ(i, c.getX(i) * 0.82, c.getY(i) * 0.8, c.getZ(i) * 0.78); }
+      c.needsUpdate = true; return g;
+    };
+    W.VEIN_COL = { 1: [0.07, 0.07, 0.08], 2: [0.72, 0.36, 0.2], 3: [1.25, 0.95, 0.3] };
+    for (const t of [1, 2, 3]) addKind('vena' + t, [{ geo: veinGeo(840 + t, 2, W.VEIN_COL[t]), lod: veinGeo(840 + t, 1, W.VEIN_COL[t]), mat: MAT.rock, shadow: true }]);
     for (let v = 0; v < 3; v++) addKind('fern' + v, [{ geo: M.fern(1000 + v), mat: MAT.fern, shadow: true }], { near: 2 });
     for (let v = 0; v < 3; v++) addKind('trop' + v, [{ geo: M.tropical(1100 + v), mat: MAT.trop, shadow: true }], { near: 3 });
     for (let v = 0; v < 4; v++) addKind('mush' + v, [{ geo: M.mushrooms(1200 + v), mat: MAT.mush }], { near: 2 });
@@ -345,6 +354,12 @@
           const kind = berry ? 'berry' + ((G.hash2(cellX, cellZ, 16) * 2) | 0) : 'bush' + ((G.hash2(cellX, cellZ, 16) * 3) | 0);
           const s = 0.8 + G.hash2(cellX, cellZ, 17) * 0.6;
           add(kind, `${cx},${cz},b,${gx},${gz}`, { m: matrix(x, h - 0.1, z, ry, s) }, { type: 'bush', berry, x, y: h, z, r: 0.7 * s, hp: 1, height: 1.2 * s });
+        } else if (r0 > rockP && h > 6 && (bb === BB.MONTAGNA || bb === BB.NEVE || bb === BB.VULCANO || h > 18) && G.hash2(cellX, cellZ, 31) < 0.2) {
+          // vena di minerale affiorante: si rompe solo col piccone
+          const nrm = G.normalAt(x, z), q = G.hash2(cellX, cellZ, 32);
+          const t = (h > 28 || bb === BB.VULCANO) && q < 0.14 ? 3 : q < 0.5 ? 2 : 1;
+          const s = 0.95 + G.hash2(cellX, cellZ, 18) * 0.5;
+          add('vena' + t, `${cx},${cz},r,${gx},${gz}`, { m: matrix(x, h - 0.2 * s, z, ry, s, _n.set(nrm[0], nrm[1], nrm[2])) }, { type: 'rock', vein: true, x, y: h, z, r: 0.95 * s, hp: Math.ceil(4 + s * 2), height: s * 0.9, size: s, solid: true, ore: { 1: 'carbone', 2: 'ferro_grezzo', 3: 'oro_grezzo' }[t] });
         } else if (r0 > rockP && h > -30) {
           const nrm = G.normalAt(x, z);
           const s = (h > 0 ? 0.5 : 0.7) + G.hash2(cellX, cellZ, 18) * (h > 0 ? 1.2 : 1.8);

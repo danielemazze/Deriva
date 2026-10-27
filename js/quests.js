@@ -126,7 +126,7 @@
     pietra: [['piccone', 1, 6], ['lancia', 1, 12], ['munizioni', 6, 8], ['bussola_oro', 1, 180]],
     oste: [['pesce_cotto', 2, 3], ['manzo_cotto', 2, 5], ['funghi_cotti', 2, 3], ['ciotola_acqua', 1, 2], ['pollo_cotto', 2, 4]],
   };
-  const SELL = { pelle: 4, dente_squalo: 6, perla: 15, conchiglia: 1, lana: 1, pesce_cotto: 1, pesce_crudo: 1, cocco: 1, polpa_cactus: 1, funghi: 1, sciabola: 18, pistola: 40, lancia: 4, arco: 8, cannone: 12, munizioni: 1, piume: 1, uovo: 1, tronco: 1, assi: 1 };
+  const SELL = { pelle: 4, dente_squalo: 6, perla: 15, conchiglia: 1, lana: 1, pesce_cotto: 1, pesce_crudo: 1, cocco: 1, polpa_cactus: 1, funghi: 1, sciabola: 18, pistola: 40, lancia: 4, arco: 8, cannone: 12, munizioni: 1, piume: 1, uovo: 1, tronco: 1, assi: 1, oro_grezzo: 12, lingotto_oro: 35, ferro_grezzo: 2, lingotto_ferro: 5, carbone: 1, spada_ferro: 20 };
   Q.stock = (npc) => npc.def.role === 'locandiere' ? SHOP.oste : SHOP.base.concat(SHOP[npc.village.style] || []);
 
   /* ---------------- voci ---------------- */

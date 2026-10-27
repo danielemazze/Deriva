@@ -46,6 +46,7 @@
       if (k === 'sfx' || k === 'ani' || k === 'room') { const s = ctx.createGain(); s.gain.value = k === 'room' ? 0.7 : 0.45; g.connect(s); s.connect(A.revIn); }
       A.bus[k] = g;
     }
+    A.bus.voice = ctx.createGain(); A.bus.voice.connect(A.master); // voci della chat (il volume si regola in Impostazioni > Voce)
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0); let b = 0;
     for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b = 0.985 * b + 0.15 * w; d[i] = b * 0.9 + w * 0.02; } // quasi niente fruscio acuto nel rumore di base

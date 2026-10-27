@@ -10,7 +10,7 @@ const fs = require('fs');
 const os = require('os');
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-const PROTOCOL = 4;
+const PROTOCOL = 5;
 const path = require('path');
 
 /* logica condivisa col gioco: generazione del mondo e IA degli animali */
@@ -244,6 +244,8 @@ class DerivaServer {
       case 'bnew': if (m.b && m.b.id) { w.boats.set(m.b.id, m.b); this.broadcast(m, c); } break;
       case 'bfill': { const b = w.boats.get(m.id); if (b && b.filled) b.filled[m.part] = true; this.broadcast(m, c); break; }
       case 'bst': { const b = w.boats.get(m.id); if (b) { b.x = m.x; b.z = m.z; b.yaw = m.yaw; } m.by = c.id; this.broadcast(m, c); break; }
+      case 'bpcs': { const b = w.boats.get(m.id); if (b && Array.isArray(m.pcs) && m.pcs.length <= 400) { b.pcs = m.pcs; b.flip = m.flip || 0; b.sunk = m.sunk ? 1 : 0; } this.broadcast(m, c); break; }
+      case 'bdelboat': w.boats.delete(m.id); this.broadcast(m, c); break;
       case 'binv': { const b = w.boats.get(m.id); if (b) b.inv = m.inv; this.broadcast(m, c); break; }
       case 'hit': {
         if (!this.ff) break;
@@ -262,6 +264,8 @@ class DerivaServer {
       case 'pdata': this.saved[c.name.toLowerCase()] = m.data; break;
       case 'chest': if (typeof m.id === 'string' && Array.isArray(m.inv)) { w.chests[m.id] = m.inv; this.broadcast(m, c); } break;
       case 'fx': this.broadcast(m, c); break;
+      // chat vocale: i messaggi per collegarsi vanno solo al giocatore indicato
+      case 'vsig': { for (const o of this.clients.values()) if (o.id === m.to && o !== c) { o.conn.send({ t: 'vsig', from: c.id, d: m.d }); break; } break; }
       case 'dig': if (Array.isArray(m.s) && m.s.length === 4 && m.s.every(isFinite) && w.digs.length < 20000) { w.digs.push(m.s.map(Number)); this.broadcast({ t: 'dig', s: m.s }, c); } break;
       case 'feed': { const a = this.animals.get(m.id); if (!a || !G.BREED[a.sp]) break; const wasTrapped = !!a.trapped; this.adopt(a); const r = G.feedAnimal(a); if (r === 'love') this.broadcast({ t: 'fx', k: 'love', id: a.id }); if (wasTrapped) c.conn.send({ t: 'chat', from: 'Allevamento', text: 'Animale liberato dalla trappola: ora è tuo' }); break; }
       case 'aspawn': {

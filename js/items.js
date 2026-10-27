@@ -101,6 +101,31 @@
     carbone: { n: 'Carbone', d: 'Si trova scavando nella roccia. Fa torce migliori.', cat: 'res' },
     ossidiana: { n: 'Ossidiana', d: 'Vetro vulcanico nero e tagliente, dalle pendici dei vulcani.', cat: 'res' },
     coltello_ossidiana: { n: 'Coltello di ossidiana', d: 'Affilatissimo: colpisce forte e taglia in fretta.', cat: 'weapon', stack: 1, dmg: 4.5, cd: 0.38 },
+    // case di pietra (si mescolano con quelle di legno, stessa griglia)
+    pavimento_pietra: { n: 'Pavimento di pietra', d: 'Base della casa (3×3 m), non brucia.', cat: 'place' },
+    muro_pietra: { n: 'Muro di pietra', d: 'Parete di pietra squadrata.', cat: 'place' },
+    muro_porta_pietra: { n: 'Muro di pietra con porta', d: 'Parete di pietra con il vano per la porta.', cat: 'place' },
+    muro_finestra_pietra: { n: 'Muro di pietra con finestra', d: 'Parete di pietra con finestra.', cat: 'place' },
+    tetto_pietra: { n: 'Tetto di ardesia', d: 'Falda di lastre di pietra da posare sopra i muri.', cat: 'place' },
+    scala_pietra: { n: 'Scala di pietra', d: 'Rampa di gradini in pietra.', cat: 'place' },
+    pilastro: { n: 'Pilastro', d: 'Colonna di pietra alta quanto un muro.', cat: 'place' },
+    camino: { n: 'Camino', d: 'Focolare di pietra: scalda e fa luce. Mettilo contro un muro.', cat: 'place' },
+    fornace: { n: 'Fornace', d: 'Fonde i minerali in lingotti. Ci vuole carbone (o legna).', cat: 'place' },
+    // minerali e metalli
+    ferro_grezzo: { n: 'Ferro grezzo', d: 'Minerale color ruggine dalle vene di ferro. Si fonde nella fornace.', cat: 'res' },
+    oro_grezzo: { n: 'Oro grezzo', d: 'Pepite dalle vene d’oro, rare. Si fonde nella fornace.', cat: 'res' },
+    lingotto_ferro: { n: 'Lingotto di ferro', d: 'Per attrezzi, armi e chiodi di ferro.', cat: 'res' },
+    lingotto_oro: { n: 'Lingotto d’oro', d: 'Prezioso: i mercanti lo pagano molto.', cat: 'res' },
+    chiodi: { n: 'Chiodi di ferro', d: 'Tengono insieme scafi e travi.', cat: 'res' },
+    piccone_ferro: { n: 'Piccone di ferro', d: 'Spacca rocce e vene molto più in fretta.', cat: 'tool', stack: 1 },
+    ascia_ferro: { n: 'Ascia di ferro', d: 'Abbatte gli alberi in pochissimi colpi.', cat: 'tool', stack: 1 },
+    pala_ferro: { n: 'Pala di ferro', d: 'Scava più largo e più in fretta.', cat: 'tool', stack: 1 },
+    spada_ferro: { n: 'Spada di ferro', d: 'Lama pesante e robusta.', cat: 'weapon', stack: 1, dmg: 6.5, cd: 0.5 },
+    // barca libera: pezzi da montare uno per uno (tasto destro sul mare o su un pezzo già messo)
+    fasciame: { n: 'Fasciame', d: 'Pezzo di scafo (1 m). Il primo, mirando il mare, inizia una barca libera: galleggia e regge circa 500 kg.', cat: 'part', free: true },
+    ponte_barca: { n: 'Ponte di barca', d: 'Tavolato leggero su cui camminare. Galleggia poco.', cat: 'part', free: true },
+    zavorra: { n: 'Zavorra', d: 'Blocco di pietra pesante (280 kg): messo in basso tiene dritta la barca, ma la fa affondare di più.', cat: 'part', free: true },
+    panca: { n: 'Panca', d: 'Seduta per la barca libera.', cat: 'part', free: true },
   });
   G.RARE = ['bussola_oro', 'cannocchiale', 'vela_leggendaria', 'pinne', 'lanterna', 'pistola_capitano'];
   for (const k in I) { I[k].id = k; if (!I[k].stack) I[k].stack = 64; }
@@ -109,11 +134,19 @@
     pollo_crudo: 'pollo_cotto', montone_crudo: 'montone_cotto', manzo_crudo: 'manzo_cotto', coniglio_crudo: 'coniglio_cotto',
     maiale_crudo: 'maiale_cotto', pesce_crudo: 'pesce_cotto', uovo: 'uovo_cotto', funghi: 'funghi_cotti', ciotola_salata: 'ciotola_acqua',
   };
+  // fornace: minerale → lingotto; il combustibile (carbone o tronchi) fonde un certo numero di pezzi
+  G.SMELT = { ferro_grezzo: 'lingotto_ferro', oro_grezzo: 'lingotto_oro' };
+  G.SMELT_FUEL = { carbone: 2, tronco: 1 };
+  // classe e forza degli attrezzi (le versioni di ferro fanno lo stesso lavoro, più in fretta)
+  const TOOLCLS = { ascia_ferro: 'ascia', piccone_ferro: 'piccone', pala_ferro: 'pala', coltello_ossidiana: 'coltello' };
+  G.toolClass = (id) => (id ? TOOLCLS[id] || id : null);
+  G.toolPower = (id) => (/_ferro$/.test(id || '') ? 1.8 : 1);
+
 
   /* ----------------- RICETTE -----------------
      Le lettere mappano gli oggetti; '.' è vuoto.
      size: griglia minima richiesta (3 = inventario, 5 = banco) */
-  const K = { T: 'tronco', A: 'assi', B: 'bastone', F: 'fibra', C: 'corda', P: 'pietra', L: 'lana', S: 'stoffa', O: 'foglie', X: 'baule', W: 'piume', H: 'pelle', N: 'carbone', Y: 'ossidiana' };
+  const K = { T: 'tronco', A: 'assi', B: 'bastone', F: 'fibra', C: 'corda', P: 'pietra', L: 'lana', S: 'stoffa', O: 'foglie', X: 'baule', W: 'piume', H: 'pelle', N: 'carbone', Y: 'ossidiana', I: 'lingotto_ferro', R: 'chiodi' };
   const R = (out, n, rows, extra) => Object.assign({ out, n, rows }, extra || {});
   G.RECIPES = [
     R('assi', 4, ['T']),
@@ -160,6 +193,26 @@
     R('trappola', 1, ['B.B', 'CPC', 'B.B']),
     R('torcia', 8, ['N', 'B']),
     R('coltello_ossidiana', 1, ['Y', 'B']),
+    // pietra
+    R('muro_pietra', 1, ['PP', 'PP', 'PP']),
+    R('pavimento_pietra', 1, ['PPPP']),
+    R('muro_porta_pietra', 1, ['PPP', 'P.P', 'P.P']),
+    R('muro_finestra_pietra', 1, ['PPP', 'P.P', 'PPP']),
+    R('tetto_pietra', 1, ['...P', '..PP', '.PPP']),
+    R('scala_pietra', 1, ['P..', 'PP.', 'PPP']),
+    R('pilastro', 1, ['P', 'P', 'P']),
+    R('camino', 1, ['PPPPP', 'P...P', 'P.N.P', 'PPPPP']),
+    R('fornace', 1, ['PPP', 'PNP', 'PPP']),
+    // ferro
+    R('chiodi', 8, ['I']),
+    R('piccone_ferro', 1, ['III', '.B.', '.B.']),
+    R('ascia_ferro', 1, ['II', 'IB', '.B']),
+    R('pala_ferro', 1, ['.I.', '.B.', '.B.']),
+    R('spada_ferro', 1, ['I', 'I', 'B']),
+    R('fasciame', 2, ['AAA']),
+    R('ponte_barca', 3, ['AA']),
+    R('zavorra', 1, ['PP', 'PP']),
+    R('panca', 1, ['AAA', 'B.B']),
   ];
   for (const r of G.RECIPES) {
     // ritaglia le righe/colonne vuote ai bordi
@@ -245,6 +298,21 @@
       rr(ctx, 8 + i * 2, y, 46, 9, 2); ctx.fillStyle = lg(ctx, 0, y, 0, y + 9, ['#d6a46a', '#a8743e']); ctx.fill(); outline(ctx);
       ctx.strokeStyle = 'rgba(90,50,20,0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(14 + i * 2, y + 4); ctx.lineTo(50, y + 5); ctx.stroke();
     }
+  }
+  function stoneWall(ctx, hole) {
+    rr(ctx, 10, 10, 44, 44, 2); ctx.fillStyle = lg(ctx, 10, 0, 54, 0, ['#b3b7bb', '#7d8287']); ctx.fill(); outline(ctx);
+    ctx.strokeStyle = 'rgba(30,30,30,0.5)'; ctx.lineWidth = 1.5;
+    for (let r = 0; r < 4; r++) { const y = 10 + r * 11; ctx.beginPath(); ctx.moveTo(10, y + 11); ctx.lineTo(54, y + 11); ctx.stroke(); for (let x = 10 + (r % 2) * 7 + 14; x < 54; x += 14) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 11); ctx.stroke(); } }
+    if (hole === 'door') { rr(ctx, 24, 24, 16, 30, 1); ctx.fillStyle = '#2a1c10'; ctx.fill(); }
+    if (hole === 'win') { rr(ctx, 22, 22, 20, 16, 1); ctx.fillStyle = '#7fb8d8'; ctx.fill(); }
+  }
+  function ore(ctx, rock, spot) {
+    ctx.beginPath(); ctx.moveTo(10, 44); ctx.lineTo(18, 18); ctx.lineTo(36, 10); ctx.lineTo(54, 22); ctx.lineTo(56, 44); ctx.lineTo(36, 54); ctx.closePath(); ctx.fillStyle = lg(ctx, 0, 10, 0, 54, rock); ctx.fill(); outline(ctx);
+    ctx.fillStyle = spot; for (const [x, y, r] of [[24, 30, 5], [38, 24, 4], [42, 38, 6], [28, 44, 3.5], [33, 34, 3]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+  }
+  function ingot(ctx, cols) {
+    ctx.beginPath(); ctx.moveTo(8, 44); ctx.lineTo(18, 26); ctx.lineTo(50, 26); ctx.lineTo(58, 44); ctx.closePath(); ctx.fillStyle = lg(ctx, 0, 26, 0, 44, cols); ctx.fill(); outline(ctx);
+    ctx.beginPath(); ctx.moveTo(18, 26); ctx.lineTo(22, 18); ctx.lineTo(46, 18); ctx.lineTo(50, 26); ctx.closePath(); ctx.fillStyle = cols[0]; ctx.fill(); outline(ctx);
   }
   function wallIcon(ctx, hole) {
     rr(ctx, 10, 10, 44, 44, 2); ctx.fillStyle = lg(ctx, 10, 0, 54, 0, ['#c99558', '#9b6a36']); ctx.fill(); outline(ctx);
@@ -388,6 +456,30 @@
     carbone(c) { for (const [x, y, r] of [[24, 38, 13], [40, 34, 12], [32, 24, 10]]) { c.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047 + x; c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.9); } c.closePath(); c.fillStyle = lg(c, 0, y - r, 0, y + r, ['#4a4a4e', '#18181a']); c.fill(); outline(c, 1.5); } },
     ossidiana(c) { c.beginPath(); c.moveTo(32, 8); c.lineTo(50, 26); c.lineTo(42, 56); c.lineTo(20, 52); c.lineTo(14, 24); c.closePath(); c.fillStyle = lg(c, 14, 8, 50, 56, ['#5a4a70', '#120e18', '#2a2236']); c.fill(); outline(c); c.strokeStyle = 'rgba(200,180,255,0.5)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(30, 14); c.lineTo(22, 44); c.stroke(); },
     coltello_ossidiana(c) { stick(c, 14, 54, 28, 38, 5, '#7a4e26'); c.beginPath(); c.moveTo(26, 40); c.lineTo(50, 10); c.lineTo(34, 42); c.closePath(); c.fillStyle = lg(c, 26, 40, 50, 10, ['#2a2236', '#6a5a88']); c.fill(); outline(c); },
+    // pietra
+    muro_pietra(c) { stoneWall(c); }, muro_porta_pietra(c) { stoneWall(c, 'door'); }, muro_finestra_pietra(c) { stoneWall(c, 'win'); },
+    pavimento_pietra(c) { c.save(); c.translate(32, 36); c.scale(1, 0.55); c.rotate(Math.PI / 4); rr(c, -22, -22, 44, 44, 2); c.fillStyle = lg(c, -22, 0, 22, 0, ['#a9adb1', '#7d8287']); c.fill(); outline(c, 3);
+      c.strokeStyle = 'rgba(30,30,30,0.5)'; c.lineWidth = 2; for (let i = -11; i < 22; i += 11) { c.beginPath(); c.moveTo(i, -22); c.lineTo(i, 22); c.moveTo(-22, i); c.lineTo(22, i); c.stroke(); } c.restore(); },
+    tetto_pietra(c) { c.beginPath(); c.moveTo(4, 46); c.lineTo(32, 14); c.lineTo(60, 46); c.closePath(); c.fillStyle = lg(c, 0, 14, 0, 46, ['#5d6a75', '#36404a']); c.fill(); outline(c);
+      c.strokeStyle = 'rgba(10,15,20,0.6)'; c.lineWidth = 1.5; for (let i = 1; i < 4; i++) { const y = 14 + i * 8; const dx = (y - 14) * 28 / 32; c.beginPath(); c.moveTo(32 - dx, y); c.lineTo(32 + dx, y); c.stroke(); for (let x = -dx + 6; x < dx; x += 8) { c.beginPath(); c.moveTo(32 + x, y); c.lineTo(32 + x, y + 8); c.stroke(); } } },
+    scala_pietra(c) { for (let i = 0; i < 4; i++) { rr(c, 10 + i * 10, 46 - i * 10, 44 - i * 10, 8, 1); c.fillStyle = lg(c, 0, 0, 64, 0, ['#b3b7bb', '#7d8287']); c.fill(); outline(c, 1.5); } },
+    pilastro(c) { rr(c, 22, 6, 20, 52, 2); c.fillStyle = lg(c, 22, 0, 42, 0, ['#b3b7bb', '#80858a', '#6b7075']); c.fill(); outline(c); c.strokeStyle = 'rgba(30,30,30,0.45)'; c.lineWidth = 1.5; for (let y = 16; y < 58; y += 10) { c.beginPath(); c.moveTo(22, y); c.lineTo(42, y); c.stroke(); } },
+    camino(c) { stoneWall(c); rr(c, 20, 30, 24, 22, 3); c.fillStyle = '#1e1410'; c.fill(); c.beginPath(); c.moveTo(24, 52); c.quadraticCurveTo(26, 38, 32, 32); c.quadraticCurveTo(38, 38, 40, 52); c.closePath(); c.fillStyle = lg(c, 0, 32, 0, 52, ['#ffe27a', '#ff9a2e', '#e2461e']); c.fill(); },
+    fornace(c) { c.beginPath(); c.moveTo(12, 56); c.lineTo(16, 14); c.quadraticCurveTo(32, 4, 48, 14); c.lineTo(52, 56); c.closePath(); c.fillStyle = lg(c, 12, 0, 52, 0, ['#a9adb1', '#7d8287', '#62676c']); c.fill(); outline(c);
+      rr(c, 24, 34, 16, 14, 4); c.fillStyle = rg(c, 32, 42, 10, ['#fff0a0', '#ff9a2e', '#a33b12']); c.fill(); outline(c, 1.5); c.fillStyle = '#4a4f54'; c.fillRect(28, 6, 8, 8); },
+    // minerali e metalli
+    ferro_grezzo(c) { ore(c, ['#8e8a84', '#5e5b56'], '#b0613c'); }, oro_grezzo(c) { ore(c, ['#8e8a84', '#5e5b56'], '#f0c43c'); },
+    lingotto_ferro(c) { ingot(c, ['#d4d8dc', '#8a9096', '#5c6268']); }, lingotto_oro(c) { ingot(c, ['#fff2a8', '#e9b531', '#a87412']); },
+    chiodi(c) { for (const [x, a] of [[22, -0.25], [32, 0.05], [42, 0.3]]) { c.save(); c.translate(x, 34); c.rotate(a); rr(c, -2, -16, 4, 30, 1); c.fillStyle = lg(c, -2, 0, 2, 0, ['#c4c8cc', '#6c7278']); c.fill(); outline(c, 1.2); rr(c, -6, -19, 12, 4, 1); c.fillStyle = '#9aa0a6'; c.fill(); outline(c, 1.2); c.restore(); } },
+    piccone_ferro(c) { stick(c, 16, 56, 42, 16, 5); c.beginPath(); c.moveTo(14, 18); c.quadraticCurveTo(36, 2, 58, 22); c.lineTo(54, 26); c.quadraticCurveTo(38, 12, 18, 24); c.closePath(); c.fillStyle = lg(c, 0, 6, 0, 26, ['#e2e6ea', '#8a9096']); c.fill(); outline(c); },
+    ascia_ferro(c) { stick(c, 18, 56, 44, 10, 5); c.beginPath(); c.moveTo(36, 10); c.lineTo(54, 4); c.quadraticCurveTo(62, 16, 54, 32); c.lineTo(40, 22); c.closePath(); c.fillStyle = lg(c, 36, 0, 60, 30, ['#e2e6ea', '#8a9096']); c.fill(); outline(c); },
+    pala_ferro(c) { stick(c, 20, 58, 38, 22, 5); c.beginPath(); c.moveTo(34, 26); c.lineTo(48, 6); c.quadraticCurveTo(58, 8, 56, 18); c.lineTo(42, 32); c.closePath(); c.fillStyle = lg(c, 34, 0, 58, 30, ['#e2e6ea', '#8a9096']); c.fill(); outline(c); },
+    spada_ferro(c) { c.beginPath(); c.moveTo(20, 44); c.lineTo(50, 8); c.lineTo(56, 8); c.lineTo(56, 14); c.lineTo(24, 48); c.closePath(); c.fillStyle = lg(c, 20, 44, 56, 8, ['#8a9096', '#eef2f6']); c.fill(); outline(c);
+      stick(c, 14, 40, 30, 54, 4, '#5a5f64'); stick(c, 10, 58, 20, 48, 5, '#6b4524'); },
+    fasciame(c) { for (let i = 0; i < 3; i++) { rr(c, 8, 16 + i * 12, 48, 10, 2); c.fillStyle = lg(c, 8, 0, 56, 0, ['#b98a55', '#8a5c30']); c.fill(); outline(c, 1.5); } c.fillStyle = '#5a5f64'; for (const y of [21, 33, 45]) for (const x of [14, 50]) { c.beginPath(); c.arc(x, y, 1.8, 0, 7); c.fill(); } },
+    ponte_barca(c) { c.save(); c.translate(32, 36); c.scale(1, 0.55); c.rotate(Math.PI / 4); rr(c, -20, -20, 40, 40, 2); c.fillStyle = lg(c, -20, 0, 20, 0, ['#d6a46a', '#b08050']); c.fill(); outline(c, 3); c.strokeStyle = 'rgba(60,30,10,0.55)'; c.lineWidth = 2; for (let i = -10; i < 20; i += 10) { c.beginPath(); c.moveTo(i, -20); c.lineTo(i, 20); c.stroke(); } c.restore(); },
+    zavorra(c) { rr(c, 10, 22, 44, 30, 6); c.fillStyle = lg(c, 0, 22, 0, 52, ['#9a9ea3', '#5f6368']); c.fill(); outline(c); c.fillStyle = 'rgba(255,255,255,0.25)'; c.font = 'bold 13px sans-serif'; c.fillText('280', 20, 42); },
+    panca(c) { rr(c, 8, 26, 48, 8, 2); c.fillStyle = '#b08050'; c.fill(); outline(c, 1.5); for (const x of [12, 46]) { rr(c, x, 34, 6, 18, 1); c.fillStyle = '#7a4e26'; c.fill(); outline(c, 1.2); } },
   });
   G.icon = function (id) {
     if (G.iconCache[id]) return G.iconCache[id];

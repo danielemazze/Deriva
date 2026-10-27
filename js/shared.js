@@ -292,7 +292,9 @@
       for (const [lx, lz] of [[lx0, lz0], [lx1, lz0], [lx0, lz1], [lx1, lz1]]) { const wx = p.x + lx * c + lz * s, wz = p.z - lx * s + lz * c; x0 = Math.min(x0, wx); x1 = Math.max(x1, wx); z0 = Math.min(z0, wz); z1 = Math.max(z1, wz); }
       return { x0, x1, y0: p.y + ly0, y1: p.y + ly1, z0, z1 };
     };
-    switch (p.t) {
+    switch (G.pieceKind ? G.pieceKind(p.t) : p.t) {
+      case 'pilastro': return [rb(-0.28, 0, -0.28, 0.28, 3, 0.28)];
+      case 'fornace': return [rb(-0.72, 0, -0.72, 0.72, 1.55, 0.72)];
       case 'muro': case 'muro_finestra': return [rb(-1.5, 0, -0.12, 1.5, 3, 0.12)];
       case 'muro_porta': return [rb(-1.5, 0, -0.12, -0.45, 3, 0.12), rb(0.45, 0, -0.12, 1.5, 3, 0.12)];
       case 'porta': return p.open ? [] : [rb(-0.45, 0, -0.06, 0.45, 2.2, 0.06)];

@@ -19,7 +19,7 @@
   const ACTIONS = [
     ['t-jump', 'Salta', '␣', 'hold', 'Space'],
     ['t-hit', 'Colpisci', '', 'hit'],
-    ['t-use', 'Usa', 'E', 'tap', 'KeyE'],
+    ['t-use', 'Usa', '', 'use'],
     ['t-alt', 'Oggetto', '', 'alt'],
     ['t-down', 'Giù', 'C', 'hold', 'KeyC'],
   ];
@@ -36,6 +36,7 @@
     ['t-hold', 'Stiva', 'KeyG', () => P().boat && P().boat.inv],
     ['t-view', 'Vista', 'KeyV', () => P().boat],
     ['t-sprint', 'Corri', 'sprint', () => !P().boat && !P().fly],
+    ['t-talk', 'Parla', 'talk', () => !!(G.Net && G.Net.on && G.Voice && G.Voice.settings().mode === 'ptt')],
   ];
 
   function build() {
@@ -113,6 +114,7 @@
         else if (kind === 'tap') tap(code);
         else if (kind === 'hit') startHit();
         else if (kind === 'alt') startAlt();
+        else if (kind === 'use') { if (G.started && !G.UI.open && !G.UI.menu) P().interact(); }
       }, { passive: false });
       const up = (e) => {
         e.preventDefault(); b.classList.remove('on');
@@ -128,8 +130,10 @@
         e.preventDefault();
         if (code === 'menu') { P().keys = {}; P().ax.f = P().ax.r = 0; G.UI.showMenu('main'); G.save(); return; }
         if (code === 'sprint') { T.sprint = !T.sprint; P().keys.ShiftLeft = T.sprint; b.classList.toggle('on', T.sprint); return; }
+        if (code === 'talk') { G.Voice.setPTT(true); b.classList.add('on'); return; }
         tap(code);
       }, { passive: false });
+      if (code === 'talk') { const up = (e) => { e.preventDefault(); G.Voice.setPTT(false); b.classList.remove('on'); }; b.addEventListener('touchend', up); b.addEventListener('touchcancel', up); }
     }
     // barra rapida: tocca uno slot per sceglierlo
     $('hotbar').addEventListener('touchstart', (e) => {

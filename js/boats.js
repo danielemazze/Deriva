@@ -253,6 +253,7 @@
   function matFor(p) { return G.MAT[p.mat + 'B'] || G.MAT[p.mat] || G.MAT.planks; }
   BT.matFor = matFor;
   BT.create = function (data) {
+    if (data.tpl === 'libera') return createFree(data);
     const T = TPL[data.tpl], parts = BT.parts(data.tpl);
     const b = Object.assign({ yaw: 0, speed: 0, rudder: 0, yawRate: 0, filled: parts.map(() => false), y: 0, pitch: 0, roll: 0, vy: 0, oarL: { ph: 0, on: false }, oarR: { ph: 0, on: false } }, data);
     if (!b.id) b.id = Math.random().toString(36).slice(2, 10);
@@ -272,6 +273,21 @@
     BT.list.push(b);
     return b;
   };
+  // barca libera: niente progetto, i pezzi li mette il giocatore (vedi freeboat.js)
+  function createFree(data) {
+    const T = { n: 'Barca libera', free: true, L: 2, W: 1, D: 1, draft: 0.4, lift: 0, speed: 0, turn: 0.9, sail: false, deck: 0.5, helm: [1e6, 1e6], helmTxt: 'Timone', seat: [0, 1.6, -3], cam3: 9 };
+    const b = Object.assign({ yaw: 0, speed: 0, rudder: 0, yawRate: 0, y: G.SEA - 0.2, pitch: 0, roll: 0, vy: 0, vroll: 0, vpitch: 0, flood: 0, flip: 0, sunk: false, oarL: { ph: 0, on: false }, oarR: { ph: 0, on: false } }, data);
+    if (!b.id) b.id = Math.random().toString(36).slice(2, 10);
+    b.free = true; b.T = T; b.parts = []; b.filled = []; b.meshes = []; b.pcs = (b.pcs || []).map((c) => ({ t: c.t, x: c.x, y: c.y, z: c.z }));
+    b.root = new THREE.Group(); b.inner = new THREE.Group(); b.root.add(b.inner);
+    b.root.position.set(b.x, b.y, b.z); b.root.rotation.y = b.yaw;
+    G.FreeBoat.rebuild(b);
+    if (b.pcs.some((c) => c.t === 'baule') && !b.inv) b.inv = new Array(27).fill(null);
+    G.scene.add(b.root);
+    BT.list.push(b);
+    return b;
+  }
+  BT.remove = function (b) { G.scene.remove(b.root); const i = BT.list.indexOf(b); if (i >= 0) BT.list.splice(i, 1); if (G.Player.boat === b) G.Player.leaveBoat(true); };
   let helmTex = null;
   function helmMarker(T) {
     if (!helmTex) {
@@ -292,11 +308,12 @@
     return g;
   }
   // il segno si vede quando sei a bordo e non stai guidando, o quando ti avvicini alla barca
+  BT.helmMarker = (T) => helmMarker(T);
   BT.updateHelmMarks = function (t) {
     const P = G.Player;
     for (const b of BT.list) {
       const m = b.helmMark; if (!m) continue;
-      const near = Math.hypot(P.pos.x - b.x, P.pos.z - b.z) < 14;
+      const near = Math.hypot(P.pos.x - b.x, P.pos.z - b.z) < 14 && !(b.free && (b.flip || b.sunk || b.T.helm[0] > 1e5));
       const on = BT.isComplete(b) && ((P.boat === b && !P.helm) || (!P.boat && near));
       m.visible = on; if (!on) continue;
       const k = 0.5 + 0.5 * Math.sin(t * 3.2);
@@ -308,7 +325,8 @@
   };
   BT.isComplete = (b) => b.filled.every(Boolean);
   BT.byId = (id) => BT.list.find((b) => b.id === id);
-  BT.serializeOne = (b) => ({ id: b.id, tpl: b.tpl, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), filled: b.filled, inv: b.inv || undefined });
+  BT.serializeOne = (b) => Object.assign({ id: b.id, tpl: b.tpl, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), filled: b.filled, inv: b.inv || undefined },
+    b.free ? { pcs: b.pcs.map(({ t, x, y, z }) => ({ t, x, y, z })), flip: b.flip || 0, sunk: b.sunk ? 1 : 0, flood: Math.round(b.flood || 0), y: +b.y.toFixed(2) } : {});
   BT.fillPart = function (b, i, remote) {
     const p = b.parts[i];
     if (b.filled[i]) return false;
@@ -323,7 +341,7 @@
     G.FX.burst(wp.x, wp.y, wp.z, [0.8, 0.6, 0.35], 16, 2.5);
     if (G.Audio) G.Audio.place();
     if (!remote) {
-      if (BT.isComplete(b)) G.UI.toast(`${b.T.n} completata! Avvicinati e premi E per salire.`, 'good');
+      if (BT.isComplete(b)) G.UI.toast(`${b.T.n} completata! Avvicinati e ${G.useHow()} per salire.`, 'good');
       else G.UI.toast(`${p.name} montato`, 'good');
     }
     G.saveSoon && G.saveSoon();
@@ -421,6 +439,7 @@
       const T = b.T;
       const driving = G.Player.boat === b && G.Player.helm;
       const remoteDrive = b.net && performance.now() - b.net.t < 1500 && !driving;
+      if (b.free) { freeStep(b, dt, t, input, driving, remoteDrive); continue; }
       if (driving && BT.isComplete(b) && T.oars) {
         row(b, dt, input);
       } else if (driving && BT.isComplete(b)) {
@@ -483,6 +502,33 @@
       b.inner.rotation.set(b.pitch, 0, b.roll);
     }
   };
+  // barca libera: fisica pezzo per pezzo (freeboat.js), poi movimento, fondale e gorghi come le altre
+  function freeStep(b, dt, t, input, driving, remoteDrive) {
+    const T = b.T;
+    if (remoteDrive) {
+      const k = Math.min(1, dt * 6); b.speed = b.net.speed;
+      const el = (performance.now() - b.net.t) / 1000, px = b.net.x + Math.sin(b.net.yaw) * b.net.speed * el, pz = b.net.z + Math.cos(b.net.yaw) * b.net.speed * el;
+      b.x += (px - b.x) * k; b.z += (pz - b.z) * k; b.yaw += G.angleDiff(b.yaw, b.net.yaw) * k;
+    }
+    G.FreeBoat.step(b, dt, t, input, driving && !remoteDrive);
+    if (b.sunk) { b.root.rotation.set(0, b.yaw, 0); b.inner.rotation.set(b.pitch, 0, b.roll); return; }
+    const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw);
+    if (Math.abs(b.speed) > 0.01 && !remoteDrive) {
+      const nx = b.x + fx * b.speed * dt, nz = b.z + fz * b.speed * dt, bow = Math.sign(b.speed) * T.L * 0.5;
+      const g1 = G.heightAt(nx + fx * bow, nz + fz * bow), g2 = G.heightAt(nx, nz);
+      const iced = G.iceAt && G.coldAt(nx, nz) > 0.55 && G.iceAt(nx + fx * bow, nz + fz * bow);
+      if (g1 > -T.draft * 0.8 || g2 > -T.draft * 0.8 || iced) { if (Math.abs(b.speed) > 2.5 && driving) { G.UI.toast(iced ? 'Il mare è ghiacciato' : 'Incagliato! Fai retromarcia (S)', 'warn'); if (G.Audio) G.Audio.hit('wood'); } b.speed = -b.speed * 0.25; }
+      else { b.x = nx; b.z = nz; }
+      if (Math.abs(b.speed) > 2 && Math.random() < dt * Math.abs(b.speed) * 1.2) { const px = b.x + fx * T.L * 0.5, pz = b.z + fz * T.L * 0.5; G.FX.splash(px, G.waveHeight(px, pz, t), pz, 3); }
+    }
+    if (G.Climate && !remoteDrive) {
+      const [cx, cz, k] = G.Climate.current(b.x, b.z);
+      if (k > 0.02) { b.x += cx * dt; b.z += cz * dt; b.speed *= Math.pow(1 - Math.min(0.95, k * 0.9), dt * 2.2); }
+    }
+    b.root.position.set(b.x, b.y, b.z);
+    b.root.rotation.set(0, b.yaw, 0);
+    b.inner.rotation.set(b.pitch, 0, b.roll);
+  }
   /* ---------- voga: A = remo sinistro, D = remo destro ----------
      Ogni remo compie un ciclo: passata in acqua (spinta) e ritorno in aria.
      Due remi a tempo = dritto; uno solo = la barca gira dall'altra parte.
