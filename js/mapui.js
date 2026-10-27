@@ -137,7 +137,7 @@
   /* ---------------- diario ---------------- */
   MU.jtab = 'missioni';
   MU.openJournal = function () { G.UI.openCustom('diario'); };
-  const RARE_HINT = { bussola_oro: 'nei forzieri dei covi e dei tesori, o dal mercante di montagna', cannocchiale: 'nei relitti o dai mercanti delle cittadine coloniali', vela_leggendaria: 'nei tesori sepolti', pinne: 'nei relitti, o dal mercante della giungla', lanterna: 'in cima ai fari', pistola_capitano: 'la porta il capitano dei pirati' };
+  const RARE_HINT = { bussola_oro: 'nei forzieri dei covi e dei tesori, o dal mercante di montagna', cannocchiale: 'nei relitti, dai mercanti delle cittadine coloniali, o si costruisce al banco (ferro, ossidiana e pelle)', vela_leggendaria: 'nei tesori sepolti', pinne: 'nei relitti, o dal mercante della giungla', lanterna: 'in cima ai fari', pistola_capitano: 'la porta il capitano dei pirati' };
   MU.renderJournal = function () {
     const p = P(), tabs = [['missioni', 'Missioni'], ['scoperte', 'Scoperte'], ['collezione', 'Collezione'], ['imprese', 'Imprese']];
     let body = '';

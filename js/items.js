@@ -79,7 +79,7 @@
     pacco: { n: 'Pacco da consegnare', d: 'Portalo nel villaggio indicato.', cat: 'quest', stack: 1 },
     // oggetti rari (uno per tipo)
     bussola_oro: { n: 'Bussola d’oro', d: 'Rara. Nella bussola in alto compare una stella verso il luogo inesplorato più vicino.', cat: 'rare', stack: 1 },
-    cannocchiale: { n: 'Cannocchiale', d: 'Raro. Tieni premuto il tasto destro per guardare lontano.', cat: 'rare', stack: 1 },
+    cannocchiale: { n: 'Cannocchiale', d: 'Tieni premuto il tasto destro per guardare lontano; con la rotella ingrandisci da ×2 a ×8. Mostra la distanza di quello che guardi.', cat: 'tool', stack: 1 },
     vela_leggendaria: { n: 'Vela leggendaria', d: 'Rara. Tenuta nell’inventario, le barche a vela vanno il 30% più veloci.', cat: 'rare', stack: 1 },
     pinne: { n: 'Pinne e maschera', d: 'Rare. Nuoti più veloce e il fiato dura molto di più.', cat: 'rare', stack: 1 },
     lanterna: { n: 'Lanterna del faro', d: 'Rara. Tenuta in mano illumina come un faro.', cat: 'rare', stack: 1 },
@@ -206,6 +206,7 @@
     // ferro
     R('chiodi', 8, ['I']),
     R('piccone_ferro', 1, ['III', '.B.', '.B.']),
+    R('cannocchiale', 1, ['IYI', '.H.'], { size: 5 }),
     R('ascia_ferro', 1, ['II', 'IB', '.B']),
     R('pala_ferro', 1, ['.I.', '.B.', '.B.']),
     R('spada_ferro', 1, ['I', 'I', 'B']),
@@ -222,7 +223,7 @@
     while (rows.every((q) => q[0] === '.')) rows = rows.map((q) => q.slice(1));
     while (rows.every((q) => q[q.length - 1] === '.')) rows = rows.map((q) => q.slice(0, -1));
     r.rows = rows; r.h = rows.length; r.w = rows[0].length;
-    r.size = Math.max(r.w, r.h) > 3 ? 5 : 3;
+    r.size = Math.max(r.size || 3, Math.max(r.w, r.h) > 3 ? 5 : 3);
     r.cells = rows.map((q) => q.split('').map((ch) => (ch === '.' ? null : K[ch])));
   }
 

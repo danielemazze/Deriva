@@ -275,7 +275,15 @@ body.creative .modebadge { display: block; }
 .cm.gold { color: #ffd84a; } .cm.quest { color: #9fe0ff; } .cm.tx { color: #ff5a40; font-weight: 700; } .cm.edge { opacity: .55; }
 /* cannocchiale */
 body.spyglass #c { filter: none; }
-body.spyglass::after { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 0 34vmin, rgba(0,0,0,.92) 36vmin); z-index: 5; }
+body.spyglass #game::after { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 0 33vmin, rgba(10,8,4,.55) 34vmin, #2a1c0c 34.6vmin, #b08a4a 35.4vmin, #6b4c22 36.6vmin, rgba(0,0,0,.96) 37.4vmin); z-index: 5; }
+#spyx { display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 66vmin; height: 66vmin; pointer-events: none; z-index: 6; font: 600 14px Georgia, serif; color: #e8d6a8; text-shadow: 0 1px 3px #000; }
+body.spyglass #spyx { display: block; }
+#spyx .h { position: absolute; left: 12%; right: 12%; top: 50%; height: 1px; background: rgba(232,214,168,.35); }
+#spyx .v { position: absolute; top: 12%; bottom: 12%; left: 50%; width: 1px; background: rgba(232,214,168,.35); }
+#spyx .z { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); white-space: nowrap; opacity: .85; }
+#spyx .d { position: absolute; left: 50%; top: 54%; transform: translateX(-50%); white-space: nowrap; }
+body.spyglass #hud > :not(.toasts), body.spyglass #touch .t-top, body.spyglass #touch .t-act { visibility: hidden; }
+body.spyglass #touch { z-index: 7; }
 /* dialoghi con gli abitanti */
 .panel.wide { width: min(1200px, 96vw); height: min(780px, 90vh); }
 .npcpanel, .journal { width: min(720px, 86vw); display: grid; gap: 10px; }

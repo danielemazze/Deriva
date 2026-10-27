@@ -215,7 +215,7 @@
     else if (id === 'pistola' || id === 'pistola_capitano') k.push(['Clic sinistro', 'spara (servono munizioni)']);
     else if (G.FreeBoat && G.FreeBoat.isPiece(id) && id !== 'torcia' && id !== 'baule') k.push(['Tasto destro', id === 'fasciame' || id === 'ponte_barca' ? 'sul mare: inizia una barca libera · su una barca: monta' : 'su una barca libera: monta']);
     else if (['pala', 'piccone'].includes(G.toolClass(id))) k.push(['Clic sinistro sul terreno', G.toolClass(id) === 'pala' ? 'scava (o scava sulla X)' : 'scava nella roccia']);
-    else if (id === 'cannocchiale') k.push(['Tieni premuto tasto destro', 'guarda lontano']);
+    else if (id === 'cannocchiale') { k.push([G.isTouch ? 'Guarda' : 'Tieni premuto tasto destro', 'guarda lontano']); k.push([G.isTouch ? 'Zoom' : 'Rotella', 'ingrandimento ×2–×8']); }
     const use = id === 'mappa_tesoro' ? 'leggi la mappa' : d && d.cat === 'blueprint' ? 'impara il progetto' : id === 'libro' ? 'apri il libro' : id === 'canna' ? (p.fish ? 'tira su la lenza' : 'lancia la lenza') : id === 'ciotola' ? 'raccogli acqua' : d && G.Build.isPlaceable(id) ? 'posiziona' : d && (d.food || d.water) ? 'mangia / bevi' : null;
     if (p.fly) k.push(['W A S D', 'vola'], ['Spazio / C', 'sali / scendi'], ['Spazio ×2', 'atterra']);
     else if (p.swim) k.push(['W A S D', 'nuota'], ['Spazio', 'risali'], ['C', 'immergiti']);
@@ -688,6 +688,8 @@
       h += `<div class="mscreen"><h2>Impostazioni</h2>
         <h3 class="sub3">Grafica</h3>
         <div class="presets">${Object.entries(G.PRESETS).map(([k, p]) => `<button data-preset="${k}" class="${S.preset === k ? 'on' : ''}">${p.label}</button>`).join('')}</div>
+        <div class="opt"><label>Stile<small>Dark Fantasy: notte eterna blu-viola, nebulose e una luna gigante al posto del sole</small></label><div class="seg small">${[['normale', 'Normale'], ['dark', 'Dark Fantasy']].map(([k, n]) => `<button data-gstyle="${k}" class="${(S.style || 'normale') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+        ${S.style === 'dark' ? `<div class="opt"><label>Luna</label><div class="seg small">${[['rossa', 'Rossa'], ['argento', 'Argento']].map(([k, n]) => `<button data-gmoon="${k}" class="${(S.moon || 'rossa') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>` : ''}
         ${chk('o-shadow', 'Ombre', S.shadows)}${chk('o-ao', 'Occlusione ambientale', S.ao !== false, 'ombre di contatto più realistiche')}${chk('o-god', 'Raggi di sole', S.godrays)}${chk('o-fx', 'Foglie e particelle', S.fx)}
         ${opt('o-view', 'Distanza visiva', 2, 7, 1, S.view, (v) => `${v * 64 * 2} m`)}
         ${opt('o-grass', 'Densità dell’erba', 0, 1.6, 0.1, S.grass, (v) => `${Math.round(v * 100)}%`)}
@@ -826,7 +828,8 @@
     box.innerHTML = `<li><i style="background:${N.COLOR_CSS[N.slot % 4]}"></i>${esc(G.settings.name || 'Tu')}${G.Voice && G.Voice.talking ? spk : ''}</li>` + [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}${r.speaking ? spk : ''}${G.settings.showPing !== false && r.ping ? `<span>${r.ping} ms</span>` : ''}</li>`).join('');
   };
   function onMenuClick(e) {
-    const b = e.target.closest('[data-m],[data-preset],[data-nwmode],[data-setmode],[data-nwen],[data-seten],[data-fps],[data-voice]'); if (!b) return;
+    const b = e.target.closest('[data-m],[data-preset],[data-nwmode],[data-setmode],[data-nwen],[data-seten],[data-fps],[data-voice],[data-gstyle],[data-gmoon]'); if (!b) return;
+    if (b.dataset.gstyle || b.dataset.gmoon) { if (b.dataset.gstyle) G.settings.style = b.dataset.gstyle; else G.settings.moon = b.dataset.gmoon; G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
     if (b.dataset.voice) { const vs = G.Voice ? G.Voice.settings() : (G.settings.voice = G.settings.voice || { mode: 'open', vol: 1, range: 60, sens: 0.5 }); vs.mode = b.dataset.voice; G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); if (G.Audio) G.Audio.click(); return; }
     if (b.dataset.fps) { G.settings.fpsTarget = +b.dataset.fps; G.adaptReset(); G.store.set('deriva_settings', G.settings); UI.showMenu('settings'); return; }
     if (G.Audio) G.Audio.click();
@@ -966,7 +969,7 @@
       }
       if (UI.open) { const c = $('cursorItem'); c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; const tt = $('tooltip'); tt.style.left = e.clientX + 16 + 'px'; tt.style.top = e.clientY + 14 + 'px'; }
     });
-    canvas.addEventListener('wheel', (e) => { if (!G.started || UI.open) return; P().sel = (P().sel + (e.deltaY > 0 ? 1 : 8)) % 9; UI.refreshHotbar(); }, { passive: true });
+    canvas.addEventListener('wheel', (e) => { if (!G.started || UI.open) return; if (G.Combat && G.Combat._spyOn) { G.Combat.spyZoom(e.deltaY < 0 ? 1 : -1); return; } P().sel = (P().sel + (e.deltaY > 0 ? 1 : 8)) % 9; UI.refreshHotbar(); }, { passive: true });
     // pannelli
     const pw = $('panelWrap');
     pw.addEventListener('input', (e) => { if (e.target.id === 'recq') { UI.recQ = e.target.value; UI.refreshRecipes(); } });

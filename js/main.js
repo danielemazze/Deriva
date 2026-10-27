@@ -452,12 +452,13 @@
     sun.color.copy(S.light); sun.intensity = 1.0;
     sun.color.multiplyScalar(1.0);
     hemi.color.copy(S.zen).lerp(S.hor, 0.3).multiplyScalar(1.1 + S.day * 0.4); hemi.groundColor.setRGB(0.32, 0.27, 0.2).multiplyScalar(0.25 + S.day * 0.5); hemi.intensity = 0.55;
+    if (S.dark) { hemi.color.copy(S.zen).lerp(S.hor, 0.5).multiplyScalar(1.6); hemi.groundColor.setRGB(0.02, 0.07, 0.06); hemi.intensity = 0.6; }
     amb.intensity = 0.05 + (1 - S.day) * 0.05 * (G.Climate ? 0.5 + G.Climate.moonLight() : 1);
     if (G.Climate && G.Climate.flash > 0) { hemi.intensity += G.Climate.flash * 2.2; amb.intensity += G.Climate.flash * 0.8; }
     G.shared.uSunInt.value = S.light.r * 0.5;
     const su = sky.material.uniforms;
     su.uCloud.value = G.Climate ? G.Climate.cur.cloud : 0.45; su.uMoonPh.value = G.Climate ? G.Climate.moonPhase() : 0.5;
-    su.uSun.value.copy(S.sun); su.uMoon.value.copy(S.moon); su.uZen.value.copy(S.zen); su.uHor.value.copy(S.hor); su.uGlow.value.copy(S.glow); su.uSunCol.value.copy(S.sunCol); su.uNight.value = S.night;
+    su.uDark.value = S.dark ? 1 : 0; su.uMoonCol.value.copy(G.moonCol()); su.uSun.value.copy(S.sun); su.uMoon.value.copy(S.moon); su.uZen.value.copy(S.zen); su.uHor.value.copy(S.hor); su.uGlow.value.copy(S.glow); su.uSunCol.value.copy(S.sunCol); su.uNight.value = S.night;
 
     const P = G.Player;
     if (paused) {
@@ -510,6 +511,7 @@
     const wc = G.Climate ? G.Climate.cur : null;
     const fogDen = (G.hiQ() ? 1.3 : 1.5) / viewDist * (wc ? 1 + wc.rain * 1.4 + wc.snow * 2.2 + wc.storm * 0.8 : 1);
     G.fogDen = fogDen;
+    const spyK = G.Combat ? G.Combat.zoom || 0 : 0; // attraverso la lente la foschia quasi sparisce
 
     if (G.noRender) return; // test: solo logica
     camera.updateMatrixWorld(); _mt = performance.now();
@@ -527,7 +529,7 @@
     wu.tScene.value = rtA.texture; wu.tDepth.value = rtA.depthTexture; wu.uRes.value.set(G.rtSize[0], G.rtSize[1]);
     wu.uNear.value = camera.near; wu.uFar.value = camera.far; wu.uCam.value.copy(camera.position);
     wu.uSunDir.value.copy(S.sun); wu.uSunCol.value.copy(S.sunCol); wu.uZen.value.copy(S.zen); wu.uHor.value.copy(S.hor); wu.uAmb.value.copy(S.amb);
-    wu.uFogDen.value = fogDen * 0.85; wu.uUnder.value = P.under ? 1 : 0;
+    wu.uFogDen.value = fogDen * 0.85 * (1 - spyK * 0.45); wu.uUnder.value = P.under ? 1 : 0;
     wu.uWaveAmp.value = G.waveAmp; wu.uWindLv.value = (G.Climate ? G.Climate.windLevel() : G.WIND.level) / 10;
     if (G.Climate) G.Climate.vortexUniforms(wu.uVort.value);
     // riflessi in spazio schermo solo su Alta/Ultra (e non quando la grafica adattiva ha tolto gli effetti)
@@ -544,7 +546,7 @@
     pu.uInvProj.value.copy(camera.projectionMatrixInverse); pu.uCamWorld.value.copy(camera.matrixWorld);
     pu.uNear.value = camera.near; pu.uFar.value = camera.far; pu.uRes.value.set(G.rtSize[0], G.rtSize[1]);
     pu.uSunDir.value.copy(S.sun); pu.uSunCol.value.copy(S.sunCol); pu.uHor.value.copy(S.hor); pu.uZen.value.copy(S.zen); pu.uAmb.value.copy(S.amb);
-    pu.uFogDen.value = fogDen; pu.uUnder.value = P.under ? 1 : 0; pu.uGod.value = G.settings.godrays ? 1 : 0; pu.uAO.value = G.settings.ao === false || G.lowQ() ? 0 : 1;
+    pu.uFogDen.value = fogDen * (1 - spyK * 0.45); pu.uUnder.value = P.under ? 1 : 0; pu.uGod.value = G.settings.godrays ? 1 : 0; pu.uAO.value = G.settings.ao === false || G.lowQ() ? 0 : 1;
     {
       // foschia nelle valli: mattino presto, pioggia, foreste pluviali (Alta/Ultra)
       const hi = G.hiQ() && G.settings.godrays !== false, tday = G.time % 1;
@@ -554,7 +556,8 @@
         mist = morning * 0.6 + bw[1] * 0.45 + (wc ? wc.rain * 0.6 + wc.snow * 0.4 : 0);
         mh = G.SEA - 2 + bw[1] * 9 + morning * 4;
       }
-      pu.uMist.value = mist; pu.uMistH.value = mh;
+      if (S.dark) { mist = Math.max(mist, 0.5); mh = Math.max(mh, G.SEA + 4); }
+      pu.uMist.value = mist * (1 - spyK * 0.7); pu.uMistH.value = mh; pu.uDark.value = S.dark ? 1 : 0;
       const pre = G.settings.preset === 'custom' ? G.settings.basePreset : G.settings.preset;
       pu.uGodK.value = pre === 'ultra' ? 0.62 : pre === 'alta' ? 0.5 : 0.3;
       pu.uCamDepth.value = P.under ? Math.max(0, (G.waterLevelAt ? G.waterLevelAt(camera.position.x, camera.position.z, t, camera.position.y) : G.SEA) - camera.position.y) : 0;
@@ -567,7 +570,7 @@
     pu.uSunScreen.value.set(_proj.x * 0.5 + 0.5, _proj.y * 0.5 + 0.5);
     const edge = Math.max(Math.abs(_proj.x), Math.abs(_proj.y));
     pu.uSunVis.value = inFront ? G.clamp(1.6 - edge, 0, 1) * (P.under ? 0.8 : G.smooth(-0.02, 0.12, S.sun.y)) : 0;
-    pu.uExposure.value = 0.82 + (1 - S.day) * 0.12;
+    pu.uExposure.value = S.dark ? 1.0 : 0.82 + (1 - S.day) * 0.12;
     post.quad.material = post.post;
     const useFxaa = !G.lowQ();
     renderer.setRenderTarget(useFxaa ? rtC : null);

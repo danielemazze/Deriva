@@ -240,10 +240,10 @@
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false,
       uniforms: { uSun: { value: new THREE.Vector3(0, 1, 0) }, uMoon: { value: new THREE.Vector3(0, -1, 0) }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() },
-        uGlow: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() }, uNight: { value: 0 }, uTime: G.shared.uTime, uCloud: { value: 0.45 }, uMoonPh: { value: 0.5 } },
+        uGlow: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() }, uNight: { value: 0 }, uTime: G.shared.uTime, uCloud: { value: 0.45 }, uMoonPh: { value: 0.5 }, uDark: { value: 0 }, uMoonCol: { value: new THREE.Color(0.85, 0.9, 1.0) } },
       vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`,
       fragmentShader: `
-        varying vec3 vDir; uniform vec3 uSun, uMoon, uZen, uHor, uGlow, uSunCol; uniform float uNight, uTime, uCloud, uMoonPh;
+        varying vec3 vDir; uniform vec3 uSun, uMoon, uZen, uHor, uGlow, uSunCol; uniform float uNight, uTime, uCloud, uMoonPh, uDark; uniform vec3 uMoonCol;
         float h21(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
         float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
         float fbm(vec2 p){ float s=0., a=0.5; for(int i=0;i<5;i++){ s+=vn(p)*a; p=p*2.07+vec2(1.7,9.2); a*=0.5; } return s; }
@@ -253,16 +253,37 @@
           vec3 col = mix(uHor, uZen, pow(y, 0.42));
           float sd = max(dot(d, uSun), 0.0);
           col += uGlow * pow(sd, 5.0) * (1.0 - y*0.7) * 0.9;
-          col += uSunCol * (pow(sd, 260.0)*0.9 + pow(sd, 18.0)*0.12);
-          col += uSunCol * smoothstep(0.99955, 0.9998, sd) * 40.0;
+          if (uDark < 0.5) {
+            col += uSunCol * (pow(sd, 260.0)*0.9 + pow(sd, 18.0)*0.12);
+            col += uSunCol * smoothstep(0.99955, 0.9998, sd) * 40.0;
+          } else {
+            // Dark Fantasy: al posto del sole una grande luna piena, con alone
+            vec3 mt0 = normalize(cross(uSun, vec3(0.0, 1.0, 0.0))), mb0 = cross(mt0, uSun);
+            vec2 q0 = vec2(dot(d - uSun, mt0), dot(d - uSun, mb0)) / 0.058;
+            float r0 = length(q0);
+            float disc0 = smoothstep(1.0, 0.95, r0) * step(0.0, dot(d, uSun));
+            float mare = 0.78 + 0.22 * vn(q0 * 2.3 + 3.1) * vn(q0 * 5.1);
+            col = mix(col, uMoonCol * (1.6 * mare) * (0.9 + 0.1 * (1.0 - r0 * r0)), disc0);
+            col += uMoonCol * (pow(sd, 90.0) * 0.5 + pow(sd, 14.0) * 0.18) * (1.0 - disc0);
+          }
+          // nebulosa e via lattea (Dark Fantasy)
+          if (uDark > 0.5 && d.y > -0.05) {
+            vec3 bn = normalize(vec3(0.35, 0.25, 0.9));
+            float band = exp(-pow(dot(d, bn) / 0.32, 2.0));
+            vec2 np = vec2(atan(d.z, d.x) * 2.2, d.y * 3.0);
+            float neb = fbm(np * 1.3 + vec2(uTime * 0.002, 0.0)) * fbm(np * 3.1 + 7.0);
+            vec3 nc = mix(vec3(0.42, 0.10, 0.62), vec3(0.10, 0.32, 0.65), fbm(np * 0.8 + 3.0));
+            col += nc * neb * band * 1.1 * smoothstep(-0.05, 0.25, d.y);
+          }
           // stelle
-          if (uNight > 0.01) {
+          if (uNight > 0.01 || uDark > 0.5) {
+            float uN = max(uNight, uDark * 0.9);
             vec3 sp = d * 160.0; vec3 cell = floor(sp); vec3 fr = fract(sp) - 0.5;
             float st = fract(sin(dot(cell, vec3(12.9898,78.233,37.719)))*43758.5453);
             vec3 off = vec3(fract(st*13.7), fract(st*71.3), fract(st*37.1)) - 0.5;
             float tw = 0.6 + 0.4*sin(uTime*3.0 + st*60.0);
-            float star = smoothstep(0.993, 1.0, st) * smoothstep(0.16, 0.0, length(fr - off*0.6));
-            col += mix(vec3(1.0,0.85,0.7), vec3(0.75,0.85,1.0), fract(st*7.0)) * star * tw * uNight * 3.0 * smoothstep(0.0, 0.2, d.y);
+            float star = smoothstep(0.993 - uDark * 0.004, 1.0, st) * smoothstep(0.16, 0.0, length(fr - off*0.6));
+            col += mix(vec3(1.0,0.85,0.7), vec3(0.75,0.85,1.0), fract(st*7.0)) * star * tw * uN * 3.0 * smoothstep(0.0, 0.2, d.y);
             float md = max(dot(d, uMoon), 0.0);
             // disco lunare con la fase: si illumina la parte verso il sole
             vec3 mt = normalize(cross(uMoon, vec3(0.0, 1.0, 0.0))), mb = cross(mt, uMoon);
@@ -272,7 +293,7 @@
             float term = cos(ph) * sqrt(max(0.0, 1.0 - q.y * q.y));
             float lit = uMoonPh < 0.5 ? step(term, q.x) : step(q.x, -term);
             float cr = 0.85 + 0.15 * sin(q.x * 9.0 + q.y * 7.0) * sin(q.y * 11.0);
-            col += vec3(0.85,0.9,1.0) * disc * (lit * cr * 6.0 + 0.04) * uNight;
+            col += mix(vec3(0.85,0.9,1.0), uMoonCol, uDark) * disc * (lit * cr * 6.0 + 0.04) * uNight;
             float bright = 0.1 + 0.9 * (1.0 - cos(ph)) * 0.5;
             col += vec3(0.25,0.32,0.5) * pow(md, 60.0) * 0.4 * uNight * bright;
           }
@@ -284,6 +305,13 @@
             float lit = fbm(cp*0.7 + uSun.xz*0.06);
             vec3 cc = mix(uHor*0.9 + uSunCol*0.25, vec3(1.0)*(0.3 + 0.9*(1.0-uNight)) + uGlow*0.35, clamp(1.0 - (lit - n)*4.0, 0.0, 1.0));
             cc += uSunCol * pow(sd, 8.0) * 0.6 * (1.0 - cov);
+            if (uDark > 0.5) {
+              // nuvole blu-viola coi bordi argentati dalla luna
+              float edge = clamp(1.0 - (lit - n) * 4.0, 0.0, 1.0);
+              cc = mix(uHor * 0.5 + vec3(0.008, 0.0, 0.025), uMoonCol * 0.2 + uZen * 1.3 + vec3(0.02, 0.0, 0.04), edge);
+              cc += uMoonCol * pow(sd, 6.0) * 0.5 * (1.0 - cov * 0.5);
+              col = mix(col, cc, cov * smoothstep(0.0, 0.18, d.y) * 0.9);
+            } else
             col = mix(col, cc * (1.0 - uNight*0.85), cov * smoothstep(0.0, 0.18, d.y) * 0.92);
           } else {
             col = mix(uHor, uHor*0.5, clamp(-d.y*3.0, 0.0, 1.0));
@@ -300,6 +328,12 @@
   const cZenD = new THREE.Color(0.11, 0.30, 0.72), cHorD = new THREE.Color(0.56, 0.72, 0.92);
   const cZenS = new THREE.Color(0.16, 0.19, 0.42), cHorS = new THREE.Color(1.0, 0.50, 0.26);
   const cZenN = new THREE.Color(0.004, 0.008, 0.024), cHorN = new THREE.Color(0.018, 0.03, 0.06);
+  const dZenD = new THREE.Color(0.03, 0.018, 0.10), dHorD = new THREE.Color(0.06, 0.065, 0.21);
+  const dZenS = new THREE.Color(0.09, 0.03, 0.20), dHorS = new THREE.Color(0.22, 0.08, 0.30);
+  const dZenN = new THREE.Color(0.012, 0.007, 0.04), dHorN = new THREE.Color(0.03, 0.03, 0.095);
+  const _dAmb = new THREE.Color(0.006, 0.014, 0.022);
+  G.moonCol = () => (G.settings && G.settings.moon !== 'argento' ? _mRed : _mSil);
+  const _mSil = new THREE.Color(0.62, 0.72, 1.0), _mRed = new THREE.Color(1.0, 0.34, 0.30);
   G.sky = { sun: new THREE.Vector3(), moon: new THREE.Vector3(), zen: new THREE.Color(), hor: new THREE.Color(), glow: new THREE.Color(), sunCol: new THREE.Color(), light: new THREE.Color(), amb: new THREE.Color(), day: 1, night: 0 };
   G.updateSky = function (t) {
     const S = G.sky;
@@ -319,6 +353,18 @@
     if (sh > -0.03) { S.light.copy(S.sunCol); S.lightDir = S.sun; }
     else { S.light.setRGB(0.32, 0.42, 0.68).multiplyScalar(0.2 * G.smooth(-0.03, -0.25, sh)); S.lightDir = S.moon; }
     S.amb.copy(S.zen).lerp(S.hor, 0.5).multiplyScalar(1.1).addScalar(0.012);
+    S.dark = G.settings && G.settings.style === 'dark';
+    if (S.dark) {
+      // Dark Fantasy: notte eterna blu-viola; di giorno la luna grande prende il posto del sole
+      const mc = G.moonCol();
+      S.zen.copy(dZenN).lerp(dZenD, day).lerp(dZenS, twi * 0.5);
+      S.hor.copy(dHorN).lerp(dHorD, day).lerp(dHorS, twi * 0.5);
+      S.glow.setRGB(0.36, 0.12, 0.55).multiplyScalar(twi * 0.9 + 0.12);
+      S.sunCol.copy(mc).multiplyScalar(0.16 + 0.1 * day);
+      S.light.setRGB(0.30, 0.42, 0.80).lerp(mc, 0.3).multiplyScalar(sh > -0.03 ? 0.44 + 0.16 * day : 0.38);
+      S.lightDir = sh > -0.03 ? S.sun : S.moon;
+      S.amb.copy(S.zen).lerp(S.hor, 0.5).multiplyScalar(0.9).add(_dAmb);
+    }
     return S;
   };
 
@@ -468,11 +514,11 @@
         uSunCol: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uZen: { value: new THREE.Color() }, uFogDen: { value: 0.002 },
         uUnder: { value: 0 }, uTime: G.shared.uTime, uGod: { value: 1 }, uExposure: { value: 1 }, uAmb: { value: new THREE.Color() }, uRes: { value: new THREE.Vector2() },
         uDamage: { value: 0 }, uSleep: { value: 0 }, uAO: { value: 1 },
-        uMist: { value: 0 }, uMistH: { value: 4 }, uGodK: { value: 0.3 }, uCamDepth: { value: 0 }, uHeat: { value: 0 },
+        uMist: { value: 0 }, uMistH: { value: 4 }, uGodK: { value: 0.3 }, uCamDepth: { value: 0 }, uHeat: { value: 0 }, uDark: { value: 0 },
       },
       vertexShader: QUAD_VS,
       fragmentShader: `
-        uniform sampler2D tColor, tScene, tDepth; uniform mat4 uInvProj, uCamWorld; uniform float uNear, uFar, uSunVis, uFogDen, uUnder, uTime, uGod, uExposure, uDamage, uSleep, uAO, uMist, uMistH, uGodK, uCamDepth, uHeat;
+        uniform sampler2D tColor, tScene, tDepth; uniform mat4 uInvProj, uCamWorld; uniform float uNear, uFar, uSunVis, uFogDen, uUnder, uTime, uGod, uExposure, uDamage, uSleep, uAO, uMist, uMistH, uGodK, uCamDepth, uHeat, uDark;
         uniform vec2 uSunScreen, uRes; uniform vec3 uSunDir, uSunCol, uHor, uZen, uAmb; varying vec2 vUv;
         float lin(float d){ float z = d*2.0-1.0; return 2.0*uNear*uFar/(uFar+uNear - z*(uFar-uNear)); }
         vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
@@ -567,6 +613,22 @@
           float l = dot(col, vec3(0.299,0.587,0.114));
           col = mix(vec3(l), col, 1.08);
           vec2 q = vUv - 0.5; col *= 1.0 - dot(q,q)*0.55;
+          if (uDark > 0.5) {
+            // Dark Fantasy: ombre blu-petrolio, verdi smeraldo, fuochi caldi che risaltano
+            float warm = smoothstep(0.04, 0.22, col.r - max(col.g * 0.85, col.b)) * smoothstep(0.22, 0.5, col.r);
+            float green = smoothstep(0.0, 0.08, col.g - max(col.r, col.b * 0.9));
+            vec3 cool = col * vec3(0.86, 0.96, 1.10) + vec3(0.004, 0.004, 0.016);
+            cool = mix(cool, cool * vec3(0.34, 0.95, 0.9), green);
+            float sandy = smoothstep(0.0, 0.06, col.r - col.b) * (1.0 - warm) * smoothstep(0.1, 0.22, l) * 0.8;
+            cool = mix(cool, vec3(dot(cool, vec3(0.3, 0.55, 0.15))) * vec3(0.62, 0.78, 1.1), sandy * 0.75);
+            col = mix(cool, col * vec3(1.2, 0.98, 0.78), warm);
+            l = dot(col, vec3(0.299,0.587,0.114));
+            col = mix(vec3(l), col, 1.18);
+            col = max(col - 0.012, 0.0) * 1.03;
+            col = mix(col, col * col * (3.0 - 2.0 * col), 0.35);
+            col += vec3(0.25, 0.08, 0.02) * pow(warm * l, 2.0) * 0.6;
+            col *= 1.0 - dot(q,q) * 0.7;
+          }
           col = mix(col, vec3(0.55,0.05,0.04), uDamage * (0.25 + dot(q,q)*1.2));
           col *= 1.0 - uSleep;
           col += (h12(vUv*uRes + fract(uTime)) - 0.5) / 255.0;

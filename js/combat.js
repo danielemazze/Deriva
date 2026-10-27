@@ -68,11 +68,20 @@
     } else C.charge = 0;
     // cannocchiale: tieni premuto il tasto destro
     const lid = P.equip && P.equip[0] ? P.equip[0].id : null;
-    const zoomOn = (id === 'cannocchiale' || (lid === 'cannocchiale' && !(id && G.Build.isPlaceable(id)))) && P.mouse.r && !G.UI.open;
+    C.hasSpy = id === 'cannocchiale' || (lid === 'cannocchiale' && !(id && G.Build.isPlaceable(id)));
+    if (!C.hasSpy) C.touchSpy = false;
+    const zoomOn = C.hasSpy && (P.mouse.r || C.touchSpy) && !G.UI.open && !G.UI.menu;
     C.zoom += ((zoomOn ? 1 : 0) - C.zoom) * Math.min(1, dt * 8);
-    const fov = G.settings.fov * (1 - C.zoom * 0.78);
-    if (Math.abs(P.cam.fov - fov) > 0.05) { P.cam.fov = fov; P.cam.updateProjectionMatrix(); }
-    document.body.classList.toggle('spyglass', C.zoom > 0.6);
+    // ingrandimento da ×2 a ×8 (rotella del mouse, o il pulsante Zoom sul telefono)
+    const mag = 1 + C.zoom * (C.mag - 1);
+    const fov = 2 * Math.atan(Math.tan(G.settings.fov * Math.PI / 360) / mag) * 180 / Math.PI;
+    if (Math.abs(P.cam.fov - fov) > 0.02) { P.cam.fov = fov; P.cam.updateProjectionMatrix(); }
+    const on = C.zoom > 0.6;
+    if (on !== C._spyOn) { C._spyOn = on; document.body.classList.toggle('spyglass', on); }
+    if (on) {
+      C._spyT -= dt;
+      if (C._spyT <= 0) { C._spyT = 0.15; spyRead(P); }
+    }
     // frecce in volo
     for (let i = C.arrows.length - 1; i >= 0; i--) {
       const a = C.arrows[i];
@@ -97,6 +106,42 @@
       if (a.life > 12) { G.scene.remove(a.m); C.arrows.splice(i, 1); }
     }
   };
+  // cannocchiale: ingrandimento, mirino e distanza stimata dal punto guardato
+  C.mag = 6; C._spyT = 0; C._spyOn = false; C.touchSpy = false; C.hasSpy = false;
+  C.MAGS = [2, 4, 6, 8];
+  C.spyZoom = function (dir) {
+    const i = C.MAGS.indexOf(C.mag);
+    C.mag = dir === 0 ? C.MAGS[(i + 1) % C.MAGS.length] : C.MAGS[Math.max(0, Math.min(C.MAGS.length - 1, i + (dir > 0 ? 1 : -1)))];
+    if (G.Audio) G.Audio.click();
+    spyRead(G.Player);
+  };
+  function spyEl() {
+    let el = document.getElementById('spyx');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'spyx';
+      el.innerHTML = '<i class="h"></i><i class="v"></i><span class="d" id="spyd"></span><span class="z" id="spyz"></span>';
+      document.getElementById('game').appendChild(el);
+    }
+    return el;
+  }
+  const _sd = new THREE.Vector3();
+  function spyRead(P) {
+    spyEl();
+    P.cam.getWorldDirection(_sd);
+    const o = P.cam.position;
+    // passi crescenti lungo lo sguardo fino a terra o al mare
+    let t = 0.5, hit = -1;
+    for (let i = 0; i < 260 && t < 2400; i++) {
+      const x = o.x + _sd.x * t, y = o.y + _sd.y * t, z = o.z + _sd.z * t;
+      const g = Math.max(G.heightAt(x, z), G.SEA);
+      if (y <= g) { hit = t; break; }
+      t += Math.max(0.5, t * 0.03);
+    }
+    const d = document.getElementById('spyd'), zz = document.getElementById('spyz');
+    d.textContent = hit < 0 ? '—' : hit < 100 ? '≈ ' + Math.round(hit) + ' m' : hit < 1000 ? '≈ ' + Math.round(hit / 10) * 10 + ' m' : '≈ ' + (hit / 1000).toFixed(1) + ' km';
+    zz.textContent = '×' + C.mag + (G.isTouch ? '' : ' · rotella');
+  }
+
   // pistole: un colpo istantaneo, poi ricarica
   C.fire = function (P, id) {
     if (C.reload > 0) return;
