@@ -83,16 +83,19 @@
 
   /* ---------------- mattoncini ---------------- */
   const now = () => A.ctx.currentTime;
+  // ogni suono, ogni volta, leggermente più su o più giù (±10 cent): due suoni uguali insieme non fanno l'effetto "pettine"
+  const CENT = () => (Math.random() * 2 - 1) * 10;
+  const centRate = () => Math.pow(2, CENT() / 1200);
   function envl(g, t0, a, dcy, peak) { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + dcy); }
   function noise(dur, type, freq, q, peak, delay, dest, buf) {
     if (!A.ctx) return; const ctx = A.ctx, t0 = now() + (delay || 0);
-    const s = ctx.createBufferSource(); s.buffer = buf || noiseBuf; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const s = ctx.createBufferSource(); s.buffer = buf || noiseBuf; s.playbackRate.value = centRate(); const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = ctx.createGain(); envl(g, t0, 0.005, dur, peak); s.connect(f); f.connect(g); g.connect(dest || A.bus.sfx); s.start(t0, Math.random() * 1.5); s.stop(t0 + dur + 0.1);
     return f;
   }
   function tone(type, f0, f1, dur, peak, delay, dest) {
     if (!A.ctx) return; const ctx = A.ctx, t0 = now() + (delay || 0);
-    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    const o = ctx.createOscillator(); o.type = type; o.detune.value = CENT(); o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
     const g = ctx.createGain(); envl(g, t0, 0.01, dur, peak); o.connect(g); g.connect(dest || A.bus.sfx); o.start(t0); o.stop(t0 + dur + 0.05);
     return o;
   }
@@ -100,7 +103,7 @@
   //  pts: [[tempo 0..1, frequenza], …]  form: [[freq, q, guadagno], …]
   function voc(dest, o) {
     if (!A.ctx) return; const ctx = A.ctx, t0 = now() + (o.delay || 0), dur = o.dur;
-    const osc = ctx.createOscillator(); osc.type = o.wave || 'sawtooth';
+    const osc = ctx.createOscillator(); osc.type = o.wave || 'sawtooth'; osc.detune.value = CENT();
     const pts = o.pts || [[0, o.f0], [1, o.f1 || o.f0]];
     osc.frequency.setValueAtTime(pts[0][1], t0); for (let i = 1; i < pts.length; i++) osc.frequency.linearRampToValueAtTime(pts[i][1], t0 + pts[i][0] * dur);
     if (o.vib) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = o.vib[0]; lg.gain.value = o.vib[1]; l.connect(lg); lg.connect(osc.frequency); l.start(t0); l.stop(t0 + dur + 0.1); }
@@ -115,19 +118,34 @@
   }
   // punto nello spazio: volume per distanza, panoramica destra/sinistra, alti che si perdono lontano
   function spot(bus, pos, dist, life) {
-    const ctx = A.ctx, P = G.Player; let d = dist || 0, pan = (Math.random() - 0.5) * 0.6;
-    if (pos && P) {
-      const dx = pos.x - P.pos.x, dz = pos.z - P.pos.z; d = dist !== undefined ? dist : Math.hypot(dx, dz);
-      const rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw); pan = G.clamp((dx * rx + dz * rz) / Math.max(1, Math.hypot(dx, dz)), -1, 1) * 0.85;
-    }
+    const ctx = A.ctx, P = G.Player; let d = dist || 0;
+    if (pos && P) { const dx = pos.x - P.pos.x, dz = pos.z - P.pos.z; d = dist !== undefined ? dist : Math.hypot(dx, dz); }
     const g = ctx.createGain(); g.gain.value = (bus === 'ani' ? 1.6 : 1) / (1 + Math.pow(d / 7, 1.35));
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = Math.max(700, 16000 * Math.exp(-d / 45));
-    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    g.connect(f); if (p) { p.pan.value = pan; f.connect(p); p.connect(A.bus[bus]); } else f.connect(A.bus[bus]);
+    g.connect(f);
+    let p = null;
+    if (pos && ctx.createPanner) {
+      // la sorgente sta ferma nel mondo: girandoti il suono passa da un orecchio all'altro
+      p = ctx.createPanner(); p.panningModel = G.isTouch ? 'equalpower' : 'HRTF'; p.distanceModel = 'linear'; p.rolloffFactor = 0; p.refDistance = 1; p.maxDistance = 10000;
+      const y = pos.y !== undefined ? pos.y + 0.6 : (P ? P.pos.y + 1.2 : 0);
+      if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = y; p.positionZ.value = pos.z; } else p.setPosition(pos.x, y, pos.z);
+      f.connect(p); p.connect(A.bus[bus]);
+    } else if (ctx.createStereoPanner) { p = ctx.createStereoPanner(); p.pan.value = (Math.random() - 0.5) * 0.6; f.connect(p); p.connect(A.bus[bus]); }
+    else f.connect(A.bus[bus]);
     setTimeout(() => { try { g.disconnect(); f.disconnect(); if (p) p.disconnect(); } catch (e) {} }, (life || 4) * 1000 + 500);
     return g;
   }
-  const far = (bus, d) => spot(bus, null, d); // suono lontano senza posizione precisa
+  // l'ascoltatore è la testa del giocatore (posizione e direzione della camera)
+  const _lf = new THREE.Vector3(), _lu = new THREE.Vector3();
+  function updateListener(P) {
+    const L = A.ctx.listener, c = P.cam; if (!c) return;
+    const p = c.getWorldPosition ? c.getWorldPosition(_lu.set(0, 0, 0)) : c.position;
+    const px = p.x, py = p.y, pz = p.z;
+    c.getWorldDirection(_lf); _lu.set(0, 1, 0).applyQuaternion(c.quaternion);
+    if (L.positionX) { const t = A.ctx.currentTime; L.positionX.setTargetAtTime(px, t, 0.02); L.positionY.setTargetAtTime(py, t, 0.02); L.positionZ.setTargetAtTime(pz, t, 0.02); L.forwardX.setTargetAtTime(_lf.x, t, 0.02); L.forwardY.setTargetAtTime(_lf.y, t, 0.02); L.forwardZ.setTargetAtTime(_lf.z, t, 0.02); L.upX.setTargetAtTime(_lu.x, t, 0.02); L.upY.setTargetAtTime(_lu.y, t, 0.02); L.upZ.setTargetAtTime(_lu.z, t, 0.02); }
+    else { L.setPosition(px, py, pz); L.setOrientation(_lf.x, _lf.y, _lf.z, _lu.x, _lu.y, _lu.z); }
+  }
+  const far = (bus, d) => { const P = G.Player; if (!P) return spot(bus, null, d); const a = Math.random() * 6.283; return spot(bus, { x: P.pos.x + Math.cos(a) * d, y: P.pos.y + 2, z: P.pos.z + Math.sin(a) * d }, d); }; // suono lontano senza posizione precisa
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   /* ---------------- ambiente vivo ---------------- */
@@ -140,6 +158,7 @@
   A.update = function (dt, t, P) {
     if (!A.ctx) return;
     if (smRaw) decodeAll();
+    if (P) updateListener(P);
     musicUpdate(dt, P);
     const n = now();
     // dove sono? (ricalcolato 4 volte al secondo)
@@ -362,23 +381,23 @@
   CALLS.capitano = CALLS.pirata;
   function howlTo(d) { voc(d, { wave: 'triangle', pts: [[0, 360], [0.2, 700], [0.75, 650], [1, 430]], dur: 3.2, peak: 0.12, att: 0.4, hold: 0.7, vib: [5, 7], form: [[650, 3, 1], [1050, 4, 0.5]], fk: 2 }); }
   // l'ululato vero solo da lontano (vicino il lupo ringhia)
-  A.howl = (dist) => { dist = Math.max(45, dist || 150); if (!playS('lupo_ulula', far('ani', dist), { life: 9, rate: [0.94, 1.04] })) howlTo(far('ani', dist)); };
+  A.howl = (dist) => { dist = Math.max(45, dist || 150); if (!playS('lupo_ulula', far('ani', dist), { life: 9 })) howlTo(far('ani', dist)); };
   // versi lontani di animali da fattoria, per non sentire la pianura vuota
   A.farAnimal = () => { const sp = ['mucca', 'pecora', 'gallina'][Math.random() * 3 | 0]; const d = far('ani', rnd(50, 120)); if (!playS(SAMPLE_CALL[sp], d, { life: 4 })) CALLS[sp](d, false, 80); };
   // registrazioni vere (assets/audio): se ci sono si usano, altrimenti il verso sintetizzato
   const SAMPLE_CALL = { mucca: 'mucca', pecora: 'pecora', maiale: 'maiale', gallina: 'gallina', orso: 'orso' };
-  const SAMPLE_HURT = { mucca: 'mucca_dolore', maiale: 'maiale_dolore' };
+  const SAMPLE_HURT = { mucca: 'mucca_dolore', maiale: 'maiale_dolore', pirata: 'pirata_dolore', capitano: 'pirata_dolore' };
   A.animal = function (sp, dist, pos, baby) {
     if (!A.ctx) return;
     // il lupo: ulula solo quando è lontano; da vicino ringhia
     if (sp === 'lupo') { if ((dist || 0) >= 45 && G.sky.night > 0.5) return A.howl(dist); if (CALLS.lupo) CALLS.lupo(spot('ani', pos, dist, 3), false, 0); return; }
     const grp = baby && sp === 'pecora' ? 'agnello' : SAMPLE_CALL[sp];
-    if (grp && hasS(grp)) { playS(grp, spot('ani', pos, dist, lenS(grp) + 0.5), { rate: baby ? [1.15, 1.3] : [0.93, 1.07] }); return; }
+    if (grp && hasS(grp)) { playS(grp, spot('ani', pos, dist, lenS(grp) + 0.5), { base: baby ? 1.22 : 1 }); return; }
     if (CALLS[sp]) CALLS[sp](spot('ani', pos, dist, 4), false, dist || 0);
   };
   A.animalHurt = function (sp, pos) {
     if (!A.ctx) return;
-    const grp = SAMPLE_HURT[sp]; if (grp && hasS(grp)) { playS(grp, spot('ani', pos, undefined, lenS(grp) + 0.5), { rate: [0.95, 1.08] }); return; }
+    const grp = SAMPLE_HURT[sp]; if (grp && hasS(grp)) { playS(grp, spot('ani', pos, undefined, lenS(grp) + 0.5), {}); return; }
     if (CALLS[sp]) CALLS[sp](spot('ani', pos, undefined, 2), true, 0);
   };
   /* ---------------- registrazioni ---------------- */
@@ -404,7 +423,7 @@
     if (!A.ctx || !hasS(g)) return false; o = o || {};
     const L = SM[g], b = L.length > 1 ? L[(Math.random() * L.length) | 0] : L[0];
     const s = A.ctx.createBufferSource(); s.buffer = b;
-    if (o.rate) s.playbackRate.value = o.rate[0] + Math.random() * (o.rate[1] - o.rate[0]);
+    s.playbackRate.value = (o.base || 1) * centRate();
     const g2 = A.ctx.createGain(); g2.gain.value = o.vol || 1; s.connect(g2); g2.connect(dest || A.bus.sfx);
     s.start(); return b.duration;
   }
@@ -431,6 +450,14 @@
     }
     A.music(want);
   }
-  A.grunt = (dist, pos) => { if (A.ctx) CALLS.pirata(spot('ani', pos, dist, 2), false); };
+  A.grunt = (dist, pos) => { if (!A.ctx) return; if (!playS('pirata', spot('ani', pos, dist, lenS('pirata') + 0.5))) CALLS.pirata(spot('ani', pos, dist, 2), false); };
+  // un suono registrato in un punto del mondo (gruppo, posizione, opzioni: bus, vol); restituisce false se non c'è
+  A.at = function (grp, pos, o) { if (!A.ctx || !hasS(grp)) return false; o = o || {}; return playS(grp, spot(o.bus || 'sfx', pos, o.dist, lenS(grp) + 0.5), o); };
+  A.pirateAttack = (pos) => { if (A.ctx && !A.at('pirata_attacco', pos, { bus: 'ani' })) CALLS.pirata(spot('ani', pos, undefined, 2), false); };
+  A.kraken = function (kind, pos) {
+    if (!A.ctx) return;
+    const grp = { voce: 'kraken', breve: 'kraken_breve', ferito: 'kraken_ferito', morte: 'kraken_morte', tonfo: 'splash' }[kind] || 'kraken';
+    if (!A.at(grp, pos, { bus: kind === 'tonfo' ? 'sfx' : 'ani', vol: kind === 'tonfo' ? 1.1 : 1.4 })) { if (kind === 'tonfo') A.splash(); else A.roar(); }
+  };
   A.growl = (dist, pos) => { if (A.ctx) CALLS.lupo(spot('ani', pos, dist, 3), false, 0); };
 })();

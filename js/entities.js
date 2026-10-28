@@ -209,6 +209,8 @@
       a.pos.set(st.x, gh + (st.hurt > 0 ? Math.sin(st.hurt * 40) * 0.02 : 0), st.z);
       a.root.rotation.y = st.yaw;
       if (dP < 22 && Math.random() < dt * 0.05 && G.Audio && G.Audio.grunt) G.Audio.grunt(dP, a.pos);
+      // il fendente di spada: grido d'attacco quando parte il colpo
+      if (st.atkT > 0 && !a._atkS) { a._atkS = true; if (G.Audio && G.Audio.pirateAttack && dP < 40) G.Audio.pirateAttack(a.pos); } else if (!(st.atkT > 0)) a._atkS = false;
       return;
     }
     if (st.scale !== a.scale) { a.scale = st.scale; a.root.scale.setScalar(st.scale); }

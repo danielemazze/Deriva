@@ -194,13 +194,18 @@
     const e = { type: 'kraken', root, head, tents, pos, hp: 420, max: 420, t: 0, rise: 0, yaw: 0, dead: false, deadT: 0, name: 'Kraken' };
     S.enc.push(e);
     G.UI.toast('Il mare si gonfia… IL KRAKEN! Difendi la barca: frecce, pistole, cannoni, spada sui tentacoli', 'warn');
-    if (G.Audio && G.Audio.roar) G.Audio.roar(); S.shake = 1;
+    if (G.Audio && G.Audio.kraken) { G.Audio.kraken('tonfo', pos); setTimeout(() => G.Audio.kraken('voce', e.head.position), 900); } S.shake = 1;
     return e;
   };
   function krakenTarget(e) { const P = G.Player; return P.boat ? S.boatPos(P.boat, new V3()) : new V3(P.pos.x, P.pos.y + 0.5, P.pos.z); }
   function updateKraken(e, dt) {
     const P = G.Player, tgt = krakenTarget(e);
     e.t += dt;
+    // versi: ogni tanto ruggisce; ferito geme più spesso
+    if (!e.dead && e.rise > 0.6 && G.Audio && G.Audio.kraken && (e.voiceT = (e.voiceT === undefined ? 4 : e.voiceT) - dt) <= 0) {
+      const low = e.hp < e.max * 0.35; e.voiceT = low ? 4 + Math.random() * 4 : 6 + Math.random() * 7;
+      G.Audio.kraken(low ? 'ferito' : Math.random() < 0.55 ? 'voce' : 'breve', e.head.position);
+    }
     // si avvicina al bersaglio e resta di fianco, mezzo sommerso
     const want = _a.set(tgt.x - e.pos.x, 0, tgt.z - e.pos.z); const dist = want.length();
     if (!e.dead) { if (dist > 11) e.pos.addScaledVector(want.normalize(), Math.min(dist - 11, dt * 5)); e.rise = Math.min(1, e.rise + dt * 0.25); }
@@ -233,7 +238,7 @@
           // colpo: barca o giocatore in acqua
           if (P.boat && Math.hypot(T.target.x - tgt.x, T.target.z - tgt.z) < P.boat.T.L) { S.damageBoat(P.boat, 6 + Math.random() * 5, T.target.x, T.target.y, T.target.z); P.boat.speed *= 0.4; P.boat.yawRate = (P.boat.yawRate || 0) + (Math.random() - 0.5) * 1.2; if (P.boat.free) { P.boat.vroll = (P.boat.vroll || 0) + (Math.random() - 0.5) * 2; } }
           else if (!P.boat && Math.hypot(T.target.x - P.pos.x, T.target.z - P.pos.z) < 2.2) P.hurt(18);
-          G.FX.burst(T.target.x, T.target.y + 0.3, T.target.z, [0.85, 0.93, 0.97], 22, 5, { size: 1.5 }); if (G.Audio) G.Audio.splash();
+          G.FX.burst(T.target.x, T.target.y + 0.3, T.target.z, [0.85, 0.93, 0.97], 22, 5, { size: 1.5 }); if (G.Audio) { if (G.Audio.kraken) G.Audio.kraken('tonfo', T.target); else G.Audio.splash(); } // il tentacolo si abbatte nell'acqua
           S.shake = Math.max(S.shake || 0, 0.7);
         }
       } else if (T.state === 'back') {
@@ -340,6 +345,7 @@
         if (G.heightAt(nx, nz) < -0.6) { s.pos.x = nx; s.pos.z = nz; } else s.yaw += dt * 1.5;
       }
       s.pos.y = G.waveHeight(s.pos.x, s.pos.z, G.clock) - 0.15;
+      if (G.Audio && G.Audio.at && s.t < 25 && Math.random() < dt * 0.12 && s.pos.distanceTo(G.Player.pos) < 60) G.Audio.at(Math.random() < 0.6 ? 'pirata_dolore' : 'pirata', s.pos, { bus: 'ani' });
       s.p.root.position.copy(s.pos); s.p.root.rotation.set(0, s.yaw, 0);
       G.People.animate(s.p, dt, 0, s.delay > 0 ? 'idle' : 'swim', 0);
       if (s.t > 70 || s.pos.distanceTo(G.Player.pos) > 220) { G.scene.remove(s.p.root); S.swimmers.splice(i, 1); }
@@ -349,6 +355,7 @@
     const b = e.boat; e.t += dt; e.yaw = b.yaw;
     if (!e.dead) {
       for (const pp of e.crew) G.People.animate(pp, dt, 0, 'idle', 0);
+      if (G.Audio && G.Audio.grunt && (e.shoutT = (e.shoutT === undefined ? 3 : e.shoutT) - dt) <= 0) { e.shoutT = 4 + Math.random() * 6; const dd = Math.hypot(G.Player.pos.x - b.x, G.Player.pos.z - b.z); if (dd < 80) G.Audio.grunt(dd, { x: b.x + (Math.random() - 0.5) * 6, y: b.root.position.y + 3, z: b.z + (Math.random() - 0.5) * 10 }); }
       const P = G.Player, d = Math.hypot(P.pos.x - b.x, P.pos.z - b.z);
       if (d > 340) { e.gone = (e.gone || 0) + dt; if (e.gone > 5) { G.Boats.remove(b); return false; } } else e.gone = 0;
       return true;
@@ -376,9 +383,11 @@
     e.hp -= dmg;
     if (at) G.FX.burst(at.x, at.y, at.z, e.type === 'kraken' ? [0.3, 0.08, 0.35] : [0.55, 0.4, 0.25], 12, 3);
     if (G.Audio) G.Audio.hit(e.type === 'kraken' ? 'soft' : 'wood');
+    if (e.type === 'kraken' && e.hp > 0 && G.Audio && G.Audio.kraken && performance.now() - (e._hurtS || 0) > 1600) { e._hurtS = performance.now(); G.Audio.kraken(e.hp < e.max * 0.35 ? 'ferito' : 'breve', e.head.position); }
     S.hpShow = { e, t: 4 };
     if (e.hp <= 0) {
       e.dead = true;
+      if (e.type === 'kraken' && G.Audio && G.Audio.kraken) { const hp = e.head.position.clone(); G.Audio.kraken('morte', hp); setTimeout(() => G.Audio.kraken('tonfo', hp), 1800); }
       const c = e.type === 'kraken' ? e.head.position : e.pos;
       // bottino che galleggia
       const loot = e.type === 'kraken'
