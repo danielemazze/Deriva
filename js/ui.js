@@ -868,7 +868,7 @@
     clearTimeout(UI._hmT); UI._hmT = setTimeout(() => c.classList.remove('hitm', 'hitk'), 220);
   };
   UI.toggleMode = function () {
-    if (G.Net && G.Net.on && !G.Net.isHost) { UI.toast('La modalità la decide chi ospita', 'warn'); return; }
+    if (G.Net && G.Net.on && !G.Net.isHost) { UI.toast('La modalità creativa la può mettere solo chi ospita', 'warn'); return; }
     G.setMode(G.creative() ? 'sopravvivenza' : 'creativa'); G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0;
   };
   UI.hideMenu = function () { $('menu').hidden = true; $('hud').hidden = false; UI.menu = null; };

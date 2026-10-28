@@ -15,7 +15,8 @@
 
   Cmd.allowed = () => !(G.Net && G.Net.on && !G.Net.isHost && !G.Net.op);
   // comandi che cambiano il mondo di tutti: per gli operatori li esegue chi ospita
-  const WORLD_CMD = new Set(['ora', 'tempo', 'meteo', 'vento', 'luna', 'modalita', 'modo', 'nemici']);
+  const WORLD_CMD = new Set(['ora', 'tempo', 'meteo', 'vento', 'luna', 'nemici']);
+  const guest = () => !!(G.Net && G.Net.on && !G.Net.isHost);
   const say = (msg, kind) => { G.UI.toast(msg, kind); Cmd.log(msg); };
   Cmd.lines = [];
   Cmd.log = function (msg) { Cmd.lines.push(msg); if (Cmd.lines.length > 8) Cmd.lines.shift(); const l = $('conlog'); if (l) l.innerHTML = Cmd.lines.map((x) => `<div>${esc(x)}</div>`).join(''); };
@@ -216,7 +217,7 @@
       case 'tpda': case 'tpa': r = Cmd.tpTo(rest); break;
       case 'tp': { const [x, z] = parts.map(Number); r = isFinite(x) && isFinite(z) ? Cmd.teleport(x, z) : 'Uso: /tp x z'; break; }
       case 'spawn': case 'evoca': { const n = parts.find((x) => /^\d+$/.test(x)); r = Cmd.spawn(parts.filter((x) => !/^\d+$/.test(x)).join(' '), n ? +n : 1); break; }
-      case 'modalita': case 'modo': { const m = norm(rest).startsWith('c') ? 'creativa' : norm(rest).startsWith('s') ? 'sopravvivenza' : null; if (!m) r = 'Uso: /modalita creativa oppure sopravvivenza'; else { if (G.mode !== m) G.UI.toggleMode(); r = 'Modalità: ' + m; } break; }
+      case 'modalita': case 'modo': if (guest() || remoteFrom) { r = 'La modalità creativa la può mettere solo chi ospita'; break; } { const m = norm(rest).startsWith('c') ? 'creativa' : norm(rest).startsWith('s') ? 'sopravvivenza' : null; if (!m) r = 'Uso: /modalita creativa oppure sopravvivenza'; else { if (G.mode !== m) G.UI.toggleMode(); r = 'Modalità: ' + m; } break; }
       case 'nemici': { const on = /^(si|on|1|sì)/.test(norm(rest)); G.setEnemies(on); G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; r = on ? 'Nemici attivi' : 'Nemici disattivati'; break; }
       case 'dai': case 'oggetto': { const n = parts.find((x) => /^\d+$/.test(x)); r = Cmd.give(parts.filter((x) => !/^\d+$/.test(x)).join(' '), n ? +n : 0); break; }
       case 'cura': { const p = P(); p.health = p.hunger = p.thirst = p.oxygen = 100; p.temp = 50; r = 'Salute, fame e sete al massimo'; break; }
@@ -295,7 +296,7 @@
     const items = ['assi', 'tronco', 'pietra', 'corda', 'chiodi', 'ferro', 'munizioni', 'freccia', 'torcia', 'terra', 'doblone', 'cibo'].filter((i) => G.ITEMS[i]);
     S.giocatore = `
       <section><h4>Modalità <span class="tval">F4 per cambiare</span></h4>
-        <div class="tbtns">${btn('mode:sopravvivenza', 'Sopravvivenza', !G.creative())}${btn('mode:creativa', 'Creativa', G.creative())}</div><small class="cmdh">/modalita creativa</small></section>
+        <div class="tbtns">${guest() ? `<small class="cmdh">La decide chi ospita · ora: ${G.creative() ? 'creativa' : 'sopravvivenza'}</small></div>` : `${btn('mode:sopravvivenza', 'Sopravvivenza', !G.creative())}${btn('mode:creativa', 'Creativa', G.creative())}</div><small class="cmdh">/modalita creativa</small>`}</section>
       <section><h4>Salute</h4><div class="tbtns">${btn('cura', '❤ Salute, fame e sete al massimo')}</div><small class="cmdh">/cura</small></section>
       <section class="wide2"><h4>Dai oggetti <span class="tval">Maiusc+clic: 64</span></h4>
         <div class="tbtns">${items.map((i) => btn('dai:' + i, esc(G.ITEMS[i].n))).join('')}</div>
@@ -344,7 +345,7 @@
     else if (k === 'vill') { const vv = G.POI.byId(b.dataset.tool.slice(5)); if (vv) { Cmd.reveal(vv); const p = P().pos, a = Math.atan2(vv.z - p.z, vv.x - p.x); r = Cmd.teleport(vv.x - Math.cos(a) * 26, vv.z - Math.sin(a) * 26, vv.name); G.UI.close(); } }
     else if (k === 'villaggi') r = Cmd.listVillages();
     else if (k === 'spawn') { r = Cmd.spawn(v, e.shiftKey ? 3 : 1); }
-    else if (k === 'mode') { if (G.mode !== v) G.UI.toggleMode(); }
+    else if (k === 'mode') { if (G.mode !== v && !guest()) G.UI.toggleMode(); }
     else if (k === 'nemici') { Cmd.run('/nemici ' + v); }
     else if (k === 'cura') r = (Cmd.run('/cura'), null);
     if (r) say(r);

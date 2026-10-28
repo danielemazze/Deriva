@@ -435,6 +435,7 @@
   }
   A.playS = playS; A.hasS = hasS;
   /* ---------------- musica dei luoghi ---------------- */
+  A.MUSIC_DB = 6; // musica +6 dB
   let mus = null;
   A.music = function (name) {
     if (!A.ctx || !A.bus.mus) return;
@@ -443,7 +444,7 @@
     if (mus) { const old = mus; old.g.gain.cancelScheduledValues(t); old.g.gain.setTargetAtTime(0, t, 1.2); setTimeout(() => { try { old.s.stop(); } catch (e) { } }, 6000); mus = null; }
     if (!name || !hasS(name)) return;
     const s = A.ctx.createBufferSource(); s.buffer = SM[name][0]; s.loop = true;
-    const g = A.ctx.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(0.55, t, 1.5);
+    const g = A.ctx.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(0.55 * Math.pow(10, A.MUSIC_DB / 20), t, 1.5);
     s.connect(g); g.connect(A.bus.mus); s.start(); mus = { name, s, g };
   };
   let musT = 0;

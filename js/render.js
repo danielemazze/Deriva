@@ -104,9 +104,13 @@
           float h = max(transformed.y, 0.0);
           float gust = 0.6 + 0.4*sin(uTime*0.35 + _wp0.x*0.02);
           float sway = (sin(uTime*${w.freq.toFixed(2)} + ph) * 0.6 + sin(uTime*${(w.freq * 2.3).toFixed(2)} + ph*1.7)*0.25) * gust * uWind;
+          ${w.mode === 'anchor' ? `
+          // stoffe ancorate: increspano sul posto (pochi centimetri), non si spostano mai
+          float _r = position.x*2.3 + position.z*1.9 + position.y*1.3 + ph;
+          transformed += vec3(sin(uTime*${w.freq.toFixed(2)} + _r), sin(uTime*${(w.freq * 1.3).toFixed(2)} + _r*1.4)*0.5, cos(uTime*${(w.freq * 0.9).toFixed(2)} + _r*0.8)) * ${w.amp.toFixed(3)} * gust * min(uWind, 2.0);` : `
           float k = ${w.amp.toFixed(3)} * ${w.mode === 'tip' ? 'h*h' : w.mode === 'kelp' ? 'h' : 'h'};
           transformed.x += sway * k;
-          transformed.z += cos(uTime*${(w.freq * 0.8).toFixed(2)} + ph*1.3) * k * 0.6 * gust * uWind;
+          transformed.z += cos(uTime*${(w.freq * 0.8).toFixed(2)} + ph*1.3) * k * 0.6 * gust * uWind;`}
           ${w.flutter ? `transformed.y += sin(uTime*7.0 + position.x*4.0 + position.z*3.0 + ph) * ${w.flutter.toFixed(3)} * h * uWind;` : ''}
           ${opt.fadeDist ? `float _cd = distance(_wp0.xyz, uCamPos); transformed *= 1.0 - smoothstep(uGrassDist*0.75, uGrassDist, _cd);` : ''}
         }`;

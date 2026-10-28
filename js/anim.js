@@ -27,7 +27,10 @@
       const own = clipsOf(d.file), lend = d.clips ? clipsOf(d.clips) : {};
       // le animazioni prese in prestito tengono solo le rotazioni (le proporzioni sono diverse)
       const clips = Object.assign({}, own);
-      for (const [k, c] of Object.entries(lend)) if (!clips[k]) clips[k] = new THREE.AnimationClip(k, c.duration, c.tracks.filter((t) => t.name.endsWith('.quaternion')));
+      // ...e solo per le ossa che questo animale ha davvero: una traccia per un osso che manca (es. la coda
+      // della mucca sulla pecora) finirebbe sul modello intero e lo farebbe girare al contrario
+      const has = new Set(); sc.traverse((o) => { if (o.name) has.add(o.name); });
+      for (const [k, c] of Object.entries(lend)) if (!clips[k]) clips[k] = new THREE.AnimationClip(k, c.duration, c.tracks.filter((t) => t.name.endsWith('.quaternion') && has.has(t.name.slice(0, -11))));
       sc.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; if (o.material) { o.material.roughness = 0.85; o.material.metalness = 0; o.material.flatShading = true; o.material.needsUpdate = true; } } });
       A.models[sp] = { scene: sc, clips, scale: d.len / Math.max(size.z, size.x), minY: box.min.y, height: size.y };
     }
@@ -40,9 +43,8 @@
     const obj = THREE.SkeletonUtils.clone(m.scene);
     const root = new THREE.Group(), inner = new THREE.Group(); root.add(inner); inner.add(obj);
     inner.scale.setScalar(m.scale); inner.position.y = -m.minY * m.scale;
-    // i modelli guardano dalla parte opposta rispetto al gioco: si gira il gruppo esterno di 180°
-    // (non il modello, perché le animazioni ne riscrivono la rotazione), così camminano col muso in avanti
-    inner.rotation.y = Math.PI;
+    // i modelli guardano già verso +Z, la direzione in cui il gioco li fa camminare: nessuna rotazione
+    inner.rotation.y = 0;
     const mixer = new THREE.AnimationMixer(obj), acts = {};
     for (const [k, c] of Object.entries(m.clips)) acts[k] = mixer.clipAction(c);
     let cur = null;

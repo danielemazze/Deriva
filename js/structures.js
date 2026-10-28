@@ -29,7 +29,8 @@
       wood: P('wood', { map: T.planksT.map, normalMap: T.planksT.normal, vertexColors: true, roughness: 0.85 }),
       logs: G.MAT.logs,
       bark: G.MAT.bark,
-      cloth: P('cloth', { map: T.clothT.map, normalMap: T.clothT.normal, vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }, { wind: { amp: 0.004, freq: 2.0, mode: 'tip' } }),
+      cloth: P('cloth', { map: T.clothT.map, normalMap: T.clothT.normal, vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }, { wind: { amp: 0.025, freq: 2.6, mode: 'anchor' } }),
+      fruit: P('fruit', { vertexColors: true, roughness: 0.6 }),
       iron: P('iron', { color: 0x2c2e31, roughness: 0.5, metalness: 0.75, vertexColors: true }),
       dark: new THREE.MeshBasicMaterial({ color: 0x0b0806 }),
       glow: new THREE.MeshStandardMaterial({ color: 0x2a1e12, emissive: 0xffa040, emissiveIntensity: 0, roughness: 0.6 }),
@@ -191,7 +192,7 @@
       put(bk, v.inhabited ? 'glow' : 'dark', BOX(0.8, 0.95, 0.06, wx, winY + 0.47, fz + sg * 0.13), mtx, [1, 1, 1], false);
       for (const ox of [-0.62, 0.62]) put(bk, 'wood', BOX(0.45, 1.05, 0.05, wx + ox, winY + 0.47, fz + sg * 0.16), mtx, shut);
       put(bk, 'wood', BOX(1.0, 0.08, 0.2, wx, winY - 0.04, fz + sg * 0.16), mtx, [0.55, 0.42, 0.3]);
-      if (st === 'coloniale' && rnd() < 0.5) for (let i = 0; i < 3; i++) put(bk, 'cloth', new THREE.SphereGeometry(0.12, 6, 5).translate(wx - 0.3 + i * 0.3, winY + 0.05, fz + sg * 0.3), mtx, [[0.85, 0.2, 0.25], [0.95, 0.7, 0.2], [0.3, 0.6, 0.25]][i], false);
+      if (st === 'coloniale' && rnd() < 0.5) for (let i = 0; i < 3; i++) put(bk, 'fruit', new THREE.SphereGeometry(0.12, 6, 5).translate(wx - 0.3 + i * 0.3, winY + 0.05, fz + sg * 0.3), mtx, [[0.85, 0.2, 0.25], [0.95, 0.7, 0.2], [0.3, 0.6, 0.25]][i], false);
     }
     // case coloniali alte: balcone di legno sul fronte
     if (!ruin && st === 'coloniale' && H > 5) {
@@ -396,7 +397,7 @@
       for (const [px, pz] of [[-1.1, -0.6], [1.1, -0.6], [-1.1, 0.6], [1.1, 0.6]]) put(bk, 'wood', BOX(0.1, 2.3, 0.1, px, 1.15, pz), mtx, [0.5, 0.38, 0.26]);
       put(bk, 'wood', BOX(2.3, 0.1, 1.2, 0, 0.9, 0), mtx, [0.62, 0.46, 0.3]);
       const aw = BOX(2.7, 0.04, 1.7, 0, 2.35, 0.1); aw.rotateX(0.18); put(bk, 'cloth', aw, mtx, [[0.85, 0.3, 0.22], [0.25, 0.55, 0.45], [0.9, 0.75, 0.3], [0.3, 0.45, 0.7], [0.6, 0.3, 0.55], [0.9, 0.9, 0.85]][p.col || 0]);
-      for (let i = 0; i < 7; i++) put(bk, 'cloth', new THREE.SphereGeometry(0.1, 8, 6).translate(-0.9 + i * 0.3, 1.02, (rnd() - 0.5) * 0.6), mtx, [[0.95, 0.6, 0.15], [0.8, 0.15, 0.1], [0.35, 0.6, 0.2]][i % 3], false);
+      for (let i = 0; i < 7; i++) put(bk, 'fruit', new THREE.SphereGeometry(0.1, 8, 6).translate(-0.9 + i * 0.3, 1.02, (rnd() - 0.5) * 0.6), mtx, [[0.95, 0.6, 0.15], [0.8, 0.15, 0.1], [0.35, 0.6, 0.2]][i % 3], false);
       cols.push({ ...wbox({ x: p.x, z: p.z, rot: p.rot || 0 }, p.y, -1.15, 0, -0.65, 1.15, 1.0, 0.65), walk: true });
     } else if (p.k === 'fieno') {
       // carro di fieno ai piedi del campanile: cadere qui dentro non fa male
