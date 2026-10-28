@@ -223,7 +223,7 @@
       a.root.rotation.y = st.yaw;
       const n = G.normalAt(st.x, st.z);
       rg.inner.rotation.x = G.lerp(rg.inner.rotation.x, -Math.atan2(n[2] * Math.cos(st.yaw) + n[0] * Math.sin(st.yaw), n[1]) * 0.8, 0.1);
-      if (dP < 40 && Math.random() < dt * 0.05 && G.Audio) G.Audio.animal(a.sp, dP, a.pos);
+      if (dP < 40 && Math.random() < dt * 0.05 && G.Audio) G.Audio.animal(a.sp, dP, a.pos, st.age !== undefined && st.age < 1);
       return;
     }
     a.phase += st.speed * dt * (def.hop ? 9 : 7) / Math.max(a.scale, 0.5);
@@ -240,7 +240,7 @@
     else a.body.position.z *= 0.8;
     if (st.speed < 0.15 && !def.hostile) { const t = performance.now() / 1000 + a.scale * 10; const graze = Math.max(0, Math.sin(t * (a.sp === 'gallina' ? 3 : 0.5))); a.head.rotation.x = graze * (a.sp === 'gallina' ? 0.9 : 0.6); }
     else a.head.rotation.x *= 0.9;
-    if (dP < 40 && Math.random() < dt * (def.hostile ? 0.07 : 0.05) && G.Audio) G.Audio.animal(a.sp, dP, a.pos);
+    if (dP < 40 && Math.random() < dt * (def.hostile ? 0.07 : 0.05) && G.Audio) G.Audio.animal(a.sp, dP, a.pos, st.age !== undefined && st.age < 1);
   }
   // un predatore o un pirata ti colpisce (in giocatore singolo; in multigiocatore arriva dal server come 'hurt')
   E.onAttack = function (a, atk) {

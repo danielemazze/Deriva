@@ -16,6 +16,7 @@
     ['wx', 'Meteo', 'pioggia, tuoni, gorghi, cascate'],
     ['sfx', 'Effetti', 'passi, colpi, armi, attrezzi, barca'],
     ['ui', 'Interfaccia', 'clic, oggetti raccolti, monete'],
+    ['mus', 'Musica', 'colonna sonora dei luoghi (per ora: i castelli)'],
   ];
   let noiseBuf = null;
   const env = { indoor: 0, cave: 0, under: 0, fire: 0, boat: 0 }; // 0..1, ammorbiditi
@@ -138,6 +139,8 @@
   }
   A.update = function (dt, t, P) {
     if (!A.ctx) return;
+    if (smRaw) decodeAll();
+    musicUpdate(dt, P);
     const n = now();
     // dove sono? (ricalcolato 4 volte al secondo)
     envT -= dt;
@@ -346,7 +349,7 @@
     tartaruga: (d) => noise(0.5, 'highpass', 2500, 0.5, 0.03, 0, d),
     lupo: (d, hurt, dist) => {
       if (hurt) { voc(d, { pts: [[0, 900], [0.3, 1200], [1, 700]], dur: 0.35, peak: 0.14, att: 0.01, form: [[1200, 4, 1], [2400, 5, 0.5]] }); return; }
-      if (dist > 14 && G.sky.night > 0.5) return howlTo(d);
+      if (dist >= 45 && G.sky.night > 0.5) return howlTo(d); // l'ululato solo da lontano
       voc(d, { pts: [[0, 90], [1, 75]], dur: 1.0, peak: 0.2, att: 0.08, trem: [24, 0.7], form: [[350, 3, 1], [800, 4, 0.5]], breath: [400, 1, 0.5] });
     },
     orso: (d, hurt) => voc(d, { pts: hurt ? [[0, 220], [1, 150]] : [[0, 120], [0.3, 140], [1, 70]], dur: hurt ? 0.6 : 1.3, peak: 0.17, att: 0.06, trem: [18, 0.4], form: [[420, 3, 1], [950, 4, 0.6]], breath: [500, 1, 0.8] }),
@@ -358,14 +361,76 @@
   };
   CALLS.capitano = CALLS.pirata;
   function howlTo(d) { voc(d, { wave: 'triangle', pts: [[0, 360], [0.2, 700], [0.75, 650], [1, 430]], dur: 3.2, peak: 0.12, att: 0.4, hold: 0.7, vib: [5, 7], form: [[650, 3, 1], [1050, 4, 0.5]], fk: 2 }); }
-  A.howl = (dist) => howlTo(far('ani', dist || 150));
+  // l'ululato vero solo da lontano (vicino il lupo ringhia)
+  A.howl = (dist) => { dist = Math.max(45, dist || 150); if (!playS('lupo_ulula', far('ani', dist), { life: 9, rate: [0.94, 1.04] })) howlTo(far('ani', dist)); };
   // versi lontani di animali da fattoria, per non sentire la pianura vuota
-  A.farAnimal = () => { const sp = ['mucca', 'pecora', 'gallina'][Math.random() * 3 | 0]; CALLS[sp](far('ani', rnd(50, 120)), false, 80); };
-  A.animal = function (sp, dist, pos) {
-    if (!A.ctx || !CALLS[sp]) return;
-    CALLS[sp](spot('ani', pos, dist, 4), false, dist || 0);
+  A.farAnimal = () => { const sp = ['mucca', 'pecora', 'gallina'][Math.random() * 3 | 0]; const d = far('ani', rnd(50, 120)); if (!playS(SAMPLE_CALL[sp], d, { life: 4 })) CALLS[sp](d, false, 80); };
+  // registrazioni vere (assets/audio): se ci sono si usano, altrimenti il verso sintetizzato
+  const SAMPLE_CALL = { mucca: 'mucca', pecora: 'pecora', maiale: 'maiale', gallina: 'gallina', orso: 'orso' };
+  const SAMPLE_HURT = { mucca: 'mucca_dolore', maiale: 'maiale_dolore' };
+  A.animal = function (sp, dist, pos, baby) {
+    if (!A.ctx) return;
+    // il lupo: ulula solo quando è lontano; da vicino ringhia
+    if (sp === 'lupo') { if ((dist || 0) >= 45 && G.sky.night > 0.5) return A.howl(dist); if (CALLS.lupo) CALLS.lupo(spot('ani', pos, dist, 3), false, 0); return; }
+    const grp = baby && sp === 'pecora' ? 'agnello' : SAMPLE_CALL[sp];
+    if (grp && hasS(grp)) { playS(grp, spot('ani', pos, dist, lenS(grp) + 0.5), { rate: baby ? [1.15, 1.3] : [0.93, 1.07] }); return; }
+    if (CALLS[sp]) CALLS[sp](spot('ani', pos, dist, 4), false, dist || 0);
   };
-  A.animalHurt = function (sp, pos) { if (!A.ctx || !CALLS[sp]) return; CALLS[sp](spot('ani', pos, undefined, 2), true, 0); };
+  A.animalHurt = function (sp, pos) {
+    if (!A.ctx) return;
+    const grp = SAMPLE_HURT[sp]; if (grp && hasS(grp)) { playS(grp, spot('ani', pos, undefined, lenS(grp) + 0.5), { rate: [0.95, 1.08] }); return; }
+    if (CALLS[sp]) CALLS[sp](spot('ani', pos, undefined, 2), true, 0);
+  };
+  /* ---------------- registrazioni ---------------- */
+  const SM = (A.samples = {}); let smRaw = null;
+  A.loadSamples = async function (base) {
+    try {
+      const list = await (await fetch(base + 'suoni.json')).json(); smRaw = [];
+      for (const [dir, names] of Object.entries(list)) for (const n of names) smRaw.push({ n, url: base + dir + '/' + n + '.mp3', dir });
+      await Promise.all(smRaw.map(async (r) => { try { r.buf = await (await fetch(r.url)).arrayBuffer(); } catch (e) { } }));
+      if (A.ctx) decodeAll();
+    } catch (e) { console.warn('suoni registrati non disponibili', e); }
+  };
+  async function decodeAll() {
+    if (!smRaw || !A.ctx) return; const raw = smRaw; smRaw = null;
+    for (const r of raw) {
+      if (!r.buf) continue;
+      try { const b = await A.ctx.decodeAudioData(r.buf); const g = r.n.replace(/_\d+$/, ''); (SM[g] = SM[g] || []).push(b); } catch (e) { }
+    }
+  }
+  const hasS = (g) => !!(SM[g] && SM[g].length);
+  const lenS = (g) => hasS(g) ? Math.max(...SM[g].map((b) => b.duration)) : 2;
+  function playS(g, dest, o) {
+    if (!A.ctx || !hasS(g)) return false; o = o || {};
+    const L = SM[g], b = L.length > 1 ? L[(Math.random() * L.length) | 0] : L[0];
+    const s = A.ctx.createBufferSource(); s.buffer = b;
+    if (o.rate) s.playbackRate.value = o.rate[0] + Math.random() * (o.rate[1] - o.rate[0]);
+    const g2 = A.ctx.createGain(); g2.gain.value = o.vol || 1; s.connect(g2); g2.connect(dest || A.bus.sfx);
+    s.start(); return b.duration;
+  }
+  A.playS = playS; A.hasS = hasS;
+  /* ---------------- musica dei luoghi ---------------- */
+  let mus = null;
+  A.music = function (name) {
+    if (!A.ctx || !A.bus.mus) return;
+    if (mus && mus.name === name) return;
+    const t = A.ctx.currentTime;
+    if (mus) { const old = mus; old.g.gain.cancelScheduledValues(t); old.g.gain.setTargetAtTime(0, t, 1.2); setTimeout(() => { try { old.s.stop(); } catch (e) { } }, 6000); mus = null; }
+    if (!name || !hasS(name)) return;
+    const s = A.ctx.createBufferSource(); s.buffer = SM[name][0]; s.loop = true;
+    const g = A.ctx.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(0.55, t, 1.5);
+    s.connect(g); g.connect(A.bus.mus); s.start(); mus = { name, s, g };
+  };
+  let musT = 0;
+  function musicUpdate(dt, P) {
+    if ((musT -= dt) > 0) return; musT = 1.5;
+    let want = null;
+    if (G.POI && G.started && !(G.UI && G.UI.menu === 'main')) {
+      const c = G.POI.near(P.pos.x, P.pos.z, 140, 'castello')[0];
+      if (c && Math.hypot(c.x - P.pos.x, c.z - P.pos.z) < 120) want = 'castello';
+    }
+    A.music(want);
+  }
   A.grunt = (dist, pos) => { if (A.ctx) CALLS.pirata(spot('ani', pos, dist, 2), false); };
   A.growl = (dist, pos) => { if (A.ctx) CALLS.lupo(spot('ani', pos, dist, 3), false, 0); };
 })();

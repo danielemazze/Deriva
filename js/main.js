@@ -373,6 +373,7 @@
     try { G.SCAN = await G.TEX.loadScans('assets/models/'); } catch (e) { G.SCAN = null; console.warn('modelli scansionati non disponibili', e); }
     try { if (G.AnimLib) await G.AnimLib.load('assets/models/animali/'); } catch (e) { console.warn('animali animati non disponibili', e); }
     try { if (G.Humans) await G.Humans.load('assets/models/persone/'); } catch (e) { console.warn('persone non disponibili', e); }
+    if (G.Audio && G.Audio.loadSamples) G.Audio.loadSamples('assets/audio/'); // registrazioni: in sottofondo, senza far aspettare
     $('loadText').textContent = 'Faccio crescere le foreste…';
     await new Promise((r) => setTimeout(r, 0));
     G.createMaterials(G.TEX, S);
