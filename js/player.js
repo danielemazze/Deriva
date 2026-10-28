@@ -432,7 +432,7 @@
     if (fromLeft) { it.n--; if (it.n <= 0) P.equip[0] = null; G.UI.refreshHotbar(); } else P.take(it.id, 1);
     if (d.ret) P.give(d.ret, 1, true);
     P.swingT = 0.6;
-    if (G.Audio) G.Audio.eat();
+    if (G.Audio) G.Audio.eat(!d.food && d.water);
     return true;
   };
 

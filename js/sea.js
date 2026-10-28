@@ -222,7 +222,7 @@
       const base = new V3(e.pos.x + ox * 2.6, e.pos.y - 2.6, e.pos.z + oz * 2.6);
       T.t -= dt;
       // stati: in attesa (onde), alzata sopra la barca, schianto, ritorno
-      if (!e.dead && T.state === 'idle' && T.t <= 0 && e.rise > 0.85 && e.tents.filter((q) => q.state !== 'idle').length < 2) { T.state = 'lift'; T.t = 1.6; T.target.set(tgt.x + (Math.random() - 0.5) * (P.boat ? P.boat.T.L * 0.6 : 1.5), tgt.y, tgt.z + (Math.random() - 0.5) * (P.boat ? P.boat.T.L * 0.6 : 1.5)); }
+      if (!e.dead && T.state === 'idle' && T.t <= 0 && e.rise > 0.85 && e.tents.filter((q) => q.state !== 'idle').length < 2) { T.state = 'lift'; T.t = 1.6; if (G.Audio && G.Audio.kraken && (e._movT || 0) < e.t) { e._movT = e.t + 1.2; G.Audio.kraken('movimento', T.base || e.pos); } T.target.set(tgt.x + (Math.random() - 0.5) * (P.boat ? P.boat.T.L * 0.6 : 1.5), tgt.y, tgt.z + (Math.random() - 0.5) * (P.boat ? P.boat.T.L * 0.6 : 1.5)); }
       let tip, ctrl;
       const sway = Math.sin(e.t * 1.3 + T.phase), sway2 = Math.cos(e.t * 0.9 + T.phase * 1.7);
       const idleTip = new V3(base.x + ox * (8 + sway * 2) + fwd.x * 3, wy + 1.5 + sway2 * 1.8, base.z + oz * (8 + sway * 2) + fwd.z * 3);

@@ -1343,6 +1343,8 @@
       const wantSh = Math.hypot(P.pos.x - n.x, P.pos.z - n.z) < 22;
       if (n._sh !== wantSh) { n._sh = wantSh; n.p.root.traverse((o) => { if (o.isMesh) o.castShadow = wantSh; }); }
       const dn = Math.hypot(P.pos.x - n.x, P.pos.z - n.z); n.tag.visible = dn < 10 && dn > 2.2;
+      // ti saluta quando gli passi vicino (non sempre, e non tutti insieme)
+      if (dn < 4.5 && n.p.root.visible && G.Audio && G.Audio.greet && G.clock > (n._salT || 0) && G.clock > (S._salT || 0)) { n._salT = G.clock + 90; if (Math.random() < 0.75) { S._salT = G.clock + 6; G.Audio.greet(new THREE.Vector3(n.x, n.y + 1.6, n.z)); } }
     }
   };
   S.raycastNPC = function (o, d, max) {

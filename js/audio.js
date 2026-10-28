@@ -162,6 +162,7 @@
     if (smRaw) decodeAll();
     if (P) updateListener(P);
     musicUpdate(dt, P);
+    if (A.body) A.body(dt, P);
     const n = now();
     // dove sono? (ricalcolato 4 volte al secondo)
     envT -= dt;
@@ -282,7 +283,8 @@
   A.creak = () => { const f = rnd(120, 180); tone('sawtooth', f, f * 0.75, rnd(0.5, 0.8), 0.03); tone('sawtooth', f * 1.5, f * 1.2, 0.4, 0.012, rnd(0.15, 0.3)); };
   A.place = () => { modal('wood', 0.4, 0, undefined, 0.8); noise(0.06, 'lowpass', 700, 1, 0.3); noise(0.12, 'bandpass', 1600, 0.6, 0.06, 0.04, undefined, A.white); };
   A.door = () => { const f = rnd(260, 340); tone('sawtooth', f, f * 0.6, 0.45, 0.035); tone('sawtooth', f * 1.33, f * 0.9, 0.3, 0.012, 0.08); modal('wood', 0.35, 0.42, undefined, 0.7); };
-  A.eat = () => { for (let i = 0; i < 4; i++) { const t = i * rnd(0.11, 0.16); noise(0.05, 'bandpass', rnd(1400, 2600), 1.6, 0.28, t, undefined, A.white); noise(0.07, 'lowpass', 500, 1, 0.12, t + 0.01); } tone('sine', 300, 180, 0.12, 0.04, 0.6); };
+  A.eat = (drink) => { if (A.ctx && playS(drink ? 'beve' : 'mangia', A.bus.sfx, { vol: 0.8 })) return; A.eat0(); };
+  A.eat0 = () => { for (let i = 0; i < 4; i++) { const t = i * rnd(0.11, 0.16); noise(0.05, 'bandpass', rnd(1400, 2600), 1.6, 0.28, t, undefined, A.white); noise(0.07, 'lowpass', 500, 1, 0.12, t + 0.01); } tone('sine', 300, 180, 0.12, 0.04, 0.6); };
   A.splash = () => {
     noise(0.5, 'lowpass', rnd(1300, 1900), 0.6, 0.5); noise(0.3, 'highpass', 4000, 0.5, 0.15, 0.05, undefined, A.white); tone('sine', 220, 70, 0.25, 0.12);
     // bollicine e gocce che ricadono
@@ -318,8 +320,10 @@
   A.craft = () => { modal('wood', 0.3, 0, undefined, 1.2); modal('wood', 0.25, 0.14, undefined, 1.4); tone('triangle', 523, 523, 0.12, 0.08, 0.22, U()); tone('triangle', 784, 784, 0.18, 0.07, 0.3, U()); };
   A.click = () => tone('sine', 900, 700, 0.04, 0.05, 0, U());
   A.coins = () => { for (let i = 0; i < 5; i++) tone('triangle', 1800 + Math.random() * 900, 1500, 0.08, 0.05, i * 0.06, U()); };
-  A.bow = () => { const f = rnd(180, 230); tone('triangle', f, f * 0.98, 0.35, 0.14); tone('sine', f * 2.01, f * 2, 0.25, 0.05); noise(0.04, 'bandpass', 900, 2, 0.2); noise(0.35, 'bandpass', 2400, 0.8, 0.05, 0.03, undefined, A.white); };
-  A.draw = () => { tone('sawtooth', 120, 180, 0.4, 0.015); };
+  A.bow = () => { if (A.ctx && playS('arco_scocca', A.bus.sfx, { vol: 0.9 })) return; A.bow0(); };
+  A.bow0 = () => { const f = rnd(180, 230); tone('triangle', f, f * 0.98, 0.35, 0.14); tone('sine', f * 2.01, f * 2, 0.25, 0.05); noise(0.04, 'bandpass', 900, 2, 0.2); noise(0.35, 'bandpass', 2400, 0.8, 0.05, 0.03, undefined, A.white); };
+  A.draw = () => { if (A.ctx && playS('arco_tende', A.bus.sfx, { vol: 0.8 })) return; A.draw0(); };
+  A.draw0 = () => { tone('sawtooth', 120, 180, 0.4, 0.015); };
   A.gun = () => { noise(0.6, 'lowpass', 900, 0.7, 1.0); noise(0.1, 'highpass', 2500, 0.6, 0.6, 0, undefined, A.white); tone('sine', 120, 40, 0.4, 0.6); noise(1.6, 'lowpass', 300, 0.5, 0.18, 0.08); modal('metal', 0.05, 0.6, undefined, 1.6); };
   A.dig = () => { noise(0.18, 'lowpass', rnd(550, 800), 0.8, 0.45); for (let i = 0; i < 4; i++) noise(0.03, 'bandpass', rnd(1500, 3000), 1.5, 0.08, 0.06 + i * rnd(0.03, 0.07), undefined, A.white); noise(0.25, 'lowpass', 300, 0.7, 0.12, 0.12); };
   A.chest = () => { modal('metal', 0.12, 0, undefined, 1.3); const f = rnd(140, 180); tone('sawtooth', f, f * 0.7, 0.5, 0.03, 0.06); modal('wood', 0.35, 0.5, undefined, 0.65); };
@@ -459,10 +463,40 @@
   A.KRAKEN_DB = 11;
   A.kraken = function (kind, pos) {
     if (!A.ctx) return;
-    const grp = { voce: 'kraken', breve: 'kraken_breve', ferito: 'kraken_ferito', morte: 'kraken_morte', tonfo: 'splash' }[kind] || 'kraken';
+    const grp = { voce: 'kraken', breve: 'kraken_breve', ferito: 'kraken_ferito', morte: 'kraken_morte', tonfo: 'splash', movimento: 'kraken_movimento' }[kind] || 'kraken';
     // il Kraken si sente forte: +10 dB rispetto agli altri versi (×3,16)
     const k = Math.pow(10, A.KRAKEN_DB / 20);
-    if (!A.at(grp, pos, { bus: kind === 'tonfo' ? 'sfx' : 'ani', vol: (kind === 'tonfo' ? 1.1 : 1.4) * k })) { if (kind === 'tonfo') A.splash(); else A.roar(); }
+    if (!A.at(grp, pos, { bus: kind === 'tonfo' || kind === 'movimento' ? 'sfx' : 'ani', vol: (kind === 'tonfo' || kind === 'movimento' ? 1.1 : 1.4) * k })) { if (kind === 'movimento') return; if (kind === 'tonfo') A.splash(); else A.roar(); }
+  };
+  // saluto di un abitante (dalla sua posizione)
+  A.greet = (pos) => A.at('abitante_saluto', pos, { bus: 'ani', vol: 0.9 });
+  /* battito e respiro: due anelli continui che salgono e scendono col bisogno */
+  const loops = {};
+  function loopTo(name, grp, v) {
+    if (!A.ctx || !hasS(grp)) return;
+    let L = loops[name];
+    if (!L) {
+      if (v < 0.01) return;
+      const s = A.ctx.createBufferSource(); s.buffer = SM[grp][0]; s.loop = true;
+      const g = A.ctx.createGain(); g.gain.value = 0; s.connect(g); g.connect(A.bus.sfx); s.start(); L = loops[name] = { s, g, v: 0 };
+    }
+    L.g.gain.setTargetAtTime(v, A.ctx.currentTime, 0.6);
+    if (v < 0.005) { L.off = (L.off || 0) + 1; if (L.off > 20) { const o = L; setTimeout(() => { try { o.s.stop(); } catch (e) { } }, 3000); delete loops[name]; } } else L.off = 0;
+  }
+  let fat = 0, lastOx = 100, gasp = 0;
+  A.body = function (dt, P) {
+    if (!A.ctx || !P) return;
+    const dead = P.dead || !G.started;
+    // battito: sotto il 35% di vita, più forte quanto più sei grave
+    const hp = P.health === undefined ? 100 : P.health;
+    loopTo('cuore', 'battito_loop', dead ? 0 : G.clamp((35 - hp) / 25, 0, 1) * 0.75);
+    // respiro affannato: dopo una lunga corsa o tornando a galla senz'aria
+    const moving = P.vel && P.vel.lengthSq() > 9, run = P.keys && (P.keys.ShiftLeft || P.keys.ShiftRight) && moving && !P.swim;
+    fat = G.clamp(fat + (run ? dt / 10 : -dt / 7), 0, 1.6);
+    if (!P.under && lastOx < 45 && (P.oxygen === undefined || P.oxygen >= lastOx)) gasp = 1;
+    lastOx = P.under ? (P.oxygen === undefined ? 100 : P.oxygen) : 100;
+    gasp = Math.max(0, gasp - dt / 6);
+    loopTo('fiato', 'respiro_affannato', dead ? 0 : Math.max(G.clamp(fat - 0.6, 0, 1), gasp) * 0.55);
   };
   A.growl = (dist, pos) => { if (A.ctx) CALLS.lupo(spot('ani', pos, dist, 3), false, 0); };
 })();
