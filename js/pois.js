@@ -129,6 +129,30 @@
         break;
       }
     }
+    // grotta naturale: imbocco su un fianco di collina o montagna, gallerie e caverne dentro (generatore a parte: non sposta gli altri luoghi)
+    {
+      const gr = G.mulberry32(hashR(rx, rz, 29));
+      if (!home && gr() < 0.58) {
+        let best = null, bs = -1;
+        for (let i = 0; i < 70; i++) {
+          const x = x0 + 30 + gr() * (REG - 60), z = z0 + 30 + gr() * (REG - 60), h = G.heightAt(x, z);
+          if (h < 7 || h > 75 || Math.hypot(x, z) < 200) continue;
+          if (r.some((q) => Math.hypot(q.x - x, q.z - z) < 80)) continue;
+          if (G.biomeAt(x, z) === G.BIOME.VULCANO || (G.lakeLevelAt && G.lakeLevelAt(x, z) !== null)) continue;
+          const n = G.normalAt(x, z); if (n[1] > 0.9 || n[1] < 0.4) continue;
+          const dir = Math.atan2(n[0], n[2]);
+          let inside = 0; for (let d = 6; d <= 36; d += 6) if (G.heightAt(x - Math.sin(dir) * d, z - Math.cos(dir) * d) > h + 3 + d * 0.12) inside++;
+          if (inside < 4) continue;
+          const front = G.heightAt(x + Math.sin(dir) * 5, z + Math.cos(dir) * 5); if (front < 2) continue;
+          const sc = inside + (1 - n[1]) + h * 0.01;
+          if (sc > bs) { bs = sc; best = { x, z, h, dir }; }
+        }
+        if (best) {
+          const NM = ['Grotta del Pipistrello', 'Grotta delle Stalattiti', 'Antro del Gigante', 'Grotta Azzurra', 'Caverna del Vento', 'Buco del Diavolo', 'Grotta dei Funghi', 'Grotta della Goccia', 'Abisso Nero', 'Grotta del Muschio'];
+          r.push(Object.assign({ id: `g:${rx}:${rz}`, type: 'grotta', name: NM[(gr() * NM.length) | 0], seed: (gr() * 1e9) | 0 }, best));
+        }
+      }
+    }
     // castello: solo in cima alle montagne alte (il sito e l'altopiano li decide il generatore del terreno)
     if (G.castleSites) for (const C of G.castleSites(x0, z0, REG)) {
       const cr = G.mulberry32(hashR(rx, rz, 13));
@@ -335,6 +359,7 @@
       else if (p.type === 'covo' && d < 14) res = Math.max(res, d < 9 ? 2 : 1);
       else if ((p.type === 'rovina' || p.type === 'accampamento') && d < 16) res = Math.max(res, d < 11 ? 2 : 1);
       else if (p.type === 'miniera' && d < 9) return 2;
+      else if (p.type === 'grotta' && d < 8) return 2;
       else if (p.type === 'castello' && d < 95) {
         const q = Math.floor(p.rotR * 4) & 3, lx = q & 1 ? (q === 1 ? -(z - p.z) : z - p.z) : (q === 0 ? x - p.x : -(x - p.x)), lz = q & 1 ? (q === 1 ? x - p.x : -(x - p.x)) : (q === 0 ? z - p.z : -(z - p.z));
         if (Math.abs(lx) < 60 && lz > -60 && lz < 80) return 2;

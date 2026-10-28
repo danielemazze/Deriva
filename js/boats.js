@@ -323,9 +323,17 @@
       m.userData.disc.material.opacity = inZone ? 0.42 : 0.14;
     }
   };
+  BT.toggleAnchor = function (b) {
+    if (!b) return;
+    b.anchored = !b.anchored;
+    G.UI.toast(b.anchored ? '⚓ Ancora gettata: la barca resta qui' : 'Ancora salpata: senza nessuno al timone la barca va dove la porta il vento', b.anchored ? 'good' : '');
+    if (G.Audio) { G.Audio.splash(); if (G.Audio.chest) setTimeout(() => G.Audio.chest(), 150); }
+    if (G.Net && G.Net.on) G.Net.send({ t: 'banchor', id: b.id, on: b.anchored ? 1 : 0 });
+    G.saveSoon && G.saveSoon();
+  };
   BT.isComplete = (b) => b.filled.every(Boolean);
   BT.byId = (id) => BT.list.find((b) => b.id === id);
-  BT.serializeOne = (b) => Object.assign({ id: b.id, tpl: b.tpl, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), filled: b.filled, inv: b.inv || undefined, hull: b.hull !== undefined ? Math.round(b.hull) : undefined },
+  BT.serializeOne = (b) => Object.assign({ id: b.id, tpl: b.tpl, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), filled: b.filled, inv: b.inv || undefined, hull: b.hull !== undefined ? Math.round(b.hull) : undefined, anchored: b.anchored ? 1 : 0 },
     b.free ? { pcs: b.pcs.map(({ t, x, y, z }) => ({ t, x, y, z })), flip: b.flip || 0, sunk: b.sunk ? 1 : 0, flood: Math.round(b.flood || 0), y: +b.y.toFixed(2) } : {});
   BT.fillPart = function (b, i, remote) {
     const p = b.parts[i];
@@ -348,7 +356,12 @@
     return true;
   };
   BT.serialize = () => BT.list.filter((b) => !b.pirate).map((b) => BT.serializeOne(b));
-  BT.load = function (arr) { for (const b of BT.list) G.scene.remove(b.root); BT.list = []; for (const d of arr || []) BT.create(d); };
+  BT.load = function (arr) {
+    for (const b of BT.list) G.scene.remove(b.root); BT.list = [];
+    // salvataggi di prima della deriva: le barche che c'erano restano ancorate dove le avevi lasciate
+    const old = (arr || []).length && !(arr || []).some((d) => 'anchored' in d || d.v2);
+    for (const d of arr || []) { const b = BT.create(d); if (old) b.anchored = true; }
+  };
   BT.init = function () {
     BT.holo = G.holoMaterial(0x6fd8ff);
     BT.holoHi = G.holoMaterial(0xffe28a); BT.holoHi.uniforms.uAlpha.value = 0.6;
@@ -458,7 +471,7 @@
         b.speed = b.net.speed;
         const px = b.net.x + Math.sin(b.net.yaw) * b.net.speed * (performance.now() - b.net.t) / 1000, pz = b.net.z + Math.cos(b.net.yaw) * b.net.speed * (performance.now() - b.net.t) / 1000;
         b.x += (px - b.x) * k; b.z += (pz - b.z) * k; b.yaw += G.angleDiff(b.yaw, b.net.yaw) * k;
-      } else { b.speed *= Math.pow(0.4, dt); b.rudder *= 0.9; b.yawRate *= Math.pow(0.1, dt); b.yaw += b.yawRate * dt; if (!b.net || performance.now() - b.net.t > 1500) { b.oarL.on = b.oarR.on = false; b.oarL.ph = b.oarR.ph = 0; } }
+      } else { b.speed *= Math.pow(0.4, dt); b.rudder *= 0.9; b.yawRate *= Math.pow(0.1, dt); b.yaw += b.yawRate * dt; drift(b, dt); if (!b.net || performance.now() - b.net.t > 1500) { b.oarL.on = b.oarR.on = false; b.oarL.ph = b.oarR.ph = 0; } }
       if (T.oars) animOars(b, dt, t);
       // movimento + collisione col fondale
       const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw);
@@ -505,6 +518,27 @@
     }
   };
   // barca libera: fisica pezzo per pezzo (freeboat.js), poi movimento, fondale e gorghi come le altre
+  // deriva: una barca senza ancora (e senza nessuno al timone) si lascia portare dal vento, piano.
+  // Più vento = più deriva; le barche a vela (tela esposta) vanno un po' di più. Si ferma sulla riva.
+  function drift(b, dt) {
+    if (b.anchored || b.sunk || b.ai || b.pirate) return;
+    if (G.Net && G.Net.on && !G.Net.isHost) return; // la muove chi ospita
+    if (b.free ? !(b.pcs && b.pcs.length) : !BT.isComplete(b)) return;
+    const wd = G.Climate ? G.Climate.windDirAt(b.x, b.z) : BT.wind.dir, str = BT.wind.str || 0;
+    if (str < 0.02) return;
+    const v = (0.04 + str * 0.3) * (b.T.sail ? 1.35 : 1) * (G.Player.boat === b ? 0.8 : 1);
+    const nx = b.x + Math.sin(wd) * v * dt, nz = b.z + Math.cos(wd) * v * dt;
+    const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw), L = b.T.L * 0.5, lim = -b.T.draft * 0.8;
+    if (G.heightAt(nx, nz) > lim || G.heightAt(nx + fx * L, nz + fz * L) > lim || G.heightAt(nx - fx * L, nz - fz * L) > lim) return; // incagliata: resta lì
+    b.x = nx; b.z = nz;
+    // la barca si gira lentamente di fianco al vento, come fanno le barche alla deriva
+    const side = wd + Math.PI / 2 * (G.angleDiff(b.yaw, wd + Math.PI / 2) > Math.PI / 2 || G.angleDiff(b.yaw, wd + Math.PI / 2) < -Math.PI / 2 ? -1 : 1);
+    b.yaw += G.clamp(G.angleDiff(b.yaw, side), -1, 1) * dt * 0.03 * (0.4 + str);
+    // ogni tanto chi ospita manda la posizione agli altri
+    if (G.Net && G.Net.on && (b._dsend = (b._dsend || 0) - dt) <= 0) { b._dsend = 2; G.Net.send({ t: 'bst', id: b.id, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), speed: 0 }); }
+    if ((b._dsave = (b._dsave || 0) - dt) <= 0) { b._dsave = 20; G.saveSoon && G.saveSoon(); }
+  }
+  BT.drift = drift;
   function freeStep(b, dt, t, input, driving, remoteDrive) {
     const T = b.T;
     if (remoteDrive) {
@@ -513,6 +547,7 @@
       b.x += (px - b.x) * k; b.z += (pz - b.z) * k; b.yaw += G.angleDiff(b.yaw, b.net.yaw) * k;
     }
     G.FreeBoat.step(b, dt, t, input, driving && !remoteDrive);
+    if (!driving && !remoteDrive) drift(b, dt);
     if (b.sunk) { b.root.rotation.set(0, b.yaw, 0); b.inner.rotation.set(b.pitch, 0, b.roll); return; }
     const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw);
     if (Math.abs(b.speed) > 0.01 && !remoteDrive) {

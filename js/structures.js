@@ -444,13 +444,27 @@
       if (i % 2 === 0) cols.push({ x0: x - 1.1, x1: x + 1.1, y0: d.y - 0.3, y1: d.y + 0.04, z0: z - 1.1, z1: z + 1.1, walk: true });
       if (i % 5 === 0) for (const sd of [-1.1, 1.1]) { const px = x + Math.cos(ang) * sd, pz = z - Math.sin(ang) * sd, gy = G.heightAt(px, pz); bk.add('logs', CYL(0.12, 0.12, d.y - gy + 0.9, px, gy - 0.3, pz, 7), [0.75, 0.7, 0.65], false); }
     }
-    // barca a remi ormeggiata (solo decorazione)
+    // barche ormeggiate: vere (si sale, si guida, si porta via); compaiono quando ti avvicini
     const ex = d.x1 - Math.sin(ang) * 2.5 + Math.cos(ang) * 2.4, ez = d.z1 - Math.cos(ang) * 2.5 - Math.sin(ang) * 2.4;
-    if (G.heightAt(ex, ez) < -1.2) {
-      const m = new THREE.Matrix4().compose(new V3(ex, G.SEA + 0.25, ez), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ang, 0.04)), new V3(1, 1, 1));
-      for (const p of G.Boats.parts('barca_remi')) bk.add(p.mat === 'logs' ? 'logs' : 'wood', p.geo.clone().applyMatrix4(m), [0.9, 0.85, 0.8], false);
-    }
+    const rb = G.mulberry32((v.seed || 7) + 991);
+    bk.boats = bk.boats || [];
+    if (G.heightAt(ex, ez) < -1.2) bk.boats.push({ id: `d:${v.id}:0`, tpl: rb() < 0.7 ? 'barca_remi' : 'canoa', x: ex, z: ez, yaw: ang });
+    const ex2 = d.x1 - Math.sin(ang) * 6 - Math.cos(ang) * 2.8, ez2 = d.z1 - Math.cos(ang) * 6 + Math.sin(ang) * 2.8;
+    if (v.inhabited && rb() < 0.55 && G.heightAt(ex2, ez2) < -1.8) bk.boats.push({ id: `d:${v.id}:1`, tpl: rb() < 0.75 ? 'barca_vela' : 'zattera', x: ex2, z: ez2, yaw: ang + Math.PI });
   }
+  // le barche del porticciolo: se non esistono già (o non sono state distrutte) si creano vere
+  S.spawnDockBoats = function (a) {
+    if (!a.boats || !a.boats.length || !G.Boats) return;
+    if (G.Net && G.Net.on && !G.Net.isHost) return; // le crea chi ospita, poi arrivano a tutti
+    for (const d of a.boats) {
+      if (G.Boats.byId(d.id) || G.state.removed.has(d.id)) continue;
+      const parts = G.Boats.parts(d.tpl);
+      const b = G.Boats.create({ id: d.id, tpl: d.tpl, x: d.x, z: d.z, yaw: d.yaw, filled: parts.map(() => true), anchored: true });
+      b.meshes.forEach((m, i) => { m.material = G.Boats.matFor(parts[i]); m.castShadow = true; });
+      if (G.Net && G.Net.on) G.Net.send({ t: 'bnew', b: G.Boats.serializeOne(b) });
+    }
+    G.saveSoon && G.saveSoon();
+  };
   function buildFaro(f) {
     const rnd = G.mulberry32(f.seed);
     const bk = new Bucket(), cols = [], gen = [];
@@ -605,7 +619,30 @@
     for (let d = -1.5; d <= L; d += 1.1) sph.push([m.x - fx * d, y0 + 1.35 + Math.sin(d * 0.3) * 0.15, m.z - fz * d, 1.75]);
     const ex = m.x - fx * (L + 2), ez = m.z - fz * (L + 2);
     sph.push([ex, y0 + 1.6, ez, 3.2]); sph.push([ex + fz * 2.5, y0 + 1.4, ez - fx * 2.5, 2.4]);
-    if (G.Dig) G.Dig.addGen('mine:' + m.id, sph);
+    // gallerie laterali che seguono le vene, e un livello più in basso raggiunto da una rampa
+    const veins = [], side = [], vt = () => { const k = rnd(); return k < 0.12 ? 3 : k < 0.55 ? 2 : 1; };
+    const wallVein = (x, y, z, yaw, r) => { const sd = rnd() < 0.5 ? -1 : 1; veins.push({ x: x + Math.cos(yaw) * sd * (r + 0.5), y: y + (rnd() - 0.2) * 0.8, z: z - Math.sin(yaw) * sd * (r + 0.5), r: 0.9 + rnd() * 0.6, type: vt() }); };
+    for (let d = 3; d <= L; d += 4) if (rnd() < 0.5) wallVein(m.x - fx * d, y0 + 1.35, m.z - fz * d, dir, 1.75);
+    const gallery = (sx, sy, sz, yaw, len, dy, r) => {
+      const pts = []; let x = sx, y = sy, z = sz;
+      for (let d = 0; d < len; d += 1.1) {
+        x += Math.sin(yaw) * 1.1; z += Math.cos(yaw) * 1.1; y += dy * 1.1; yaw += (rnd() - 0.5) * 0.12;
+        if (G.heightAt(x, z) - y < r + 1.2) break; // non si esce dal monte
+        sph.push([x, y, z, r]); pts.push([x, y, z, yaw]);
+        if (rnd() < 0.3) wallVein(x, y, z, yaw, r);
+      }
+      return pts;
+    };
+    for (const [t, sd] of [[0.35 + rnd() * 0.1, 1], [0.65 + rnd() * 0.1, -1]]) {
+      const d = L * t, g = gallery(m.x - fx * d, y0 + 1.35, m.z - fz * d, dir + Math.PI + sd * (Math.PI / 2 + (rnd() - 0.5) * 0.5), 10 + rnd() * 8, 0, 1.5);
+      if (g.length > 3) { const e = g[g.length - 1]; sph.push([e[0], e[1] + 0.3, e[2], 2.4]); for (let k = 0; k < 3; k++) wallVein(e[0], e[1], e[2], e[3] + k * 2, 2.2); side.push(g); }
+    }
+    // rampa verso il livello di sotto, con una galleria e una camera ricca di vene
+    { const g = gallery(ex, y0 + 1.4, ez, dir + Math.PI + (rnd() - 0.5) * 1.2, 14, -0.42, 1.6);
+      if (g.length > 6) { const e = g[g.length - 1], g2 = gallery(e[0], e[1], e[2], e[3] + (rnd() - 0.5) * 1.4, 16, -0.05, 1.7);
+        const f = g2.length ? g2[g2.length - 1] : e; sph.push([f[0], f[1] + 0.6, f[2], 3.2]); for (let k = 0; k < 5; k++) wallVein(f[0], f[1] + 0.4, f[2], k * 1.26, 3.0);
+        side.push(g, g2); m.lower = { x: f[0], y: f[1], z: f[2] }; } }
+    if (G.Dig) { G.Dig.addGen('mine:' + m.id, sph); G.Dig.addVeins('mine:' + m.id, veins); }
     const rot = dir;
     const mtxAt = (d, side) => { const x = m.x - fx * d + Math.cos(dir) * side, z = m.z - fz * d - Math.sin(dir) * side; return placer({ x, z, rot }, y0 - 0.1); };
     // armature di legno ogni 5 m
@@ -624,10 +661,43 @@
     bk.lights = [];
     for (let d = 4; d < L; d += 10) { const x = m.x - fx * d + Math.cos(dir) * 1.15, z = m.z - fz * d - Math.sin(dir) * 1.15; bk.add('glow', BOX(0.18, 0.26, 0.18, x, y0 + 2.0, z), [1, 1, 1]); bk.lights.push(new V3(x, y0 + 2.0, z)); }
     bk.always = true; // le lanterne della miniera sono accese anche di giorno
+    // armature anche nelle gallerie laterali e nel livello di sotto
+    for (const g of side) for (let i = 2; i < g.length; i += 5) {
+      const [x, y, z, yaw] = g[i], mt = placer({ x, z, rot: yaw }, G.Dig ? G.Dig.ground(x, z, y) - 0.05 : y - 1.5);
+      for (const sd of [-1.05, 1.05]) put(bk, 'logs', CYL(0.11, 0.1, 2.2, sd, 0, 0, 7), mt, [0.72, 0.65, 0.58], false);
+      put(bk, 'logs', BOX(2.4, 0.2, 0.22, 0, 2.2, 0), mt, [0.68, 0.6, 0.52]);
+    }
+    if (m.lower) { const gy2 = G.Dig ? G.Dig.ground(m.lower.x, m.lower.z, m.lower.y + 1) : m.lower.y - 1.5; gen.push({ t: 'forziere', id: `c:${m.id}:2`, x: m.lower.x, y: gy2, z: m.lower.z, rot: dir, tier: 3 }); }
     // forziere in fondo, sul pavimento della camera
     const gy = G.Dig ? G.Dig.ground(ex, ez, y0 + 1.5) : y0;
     gen.push({ t: 'forziere', id: `c:${m.id}:0`, x: ex, y: gy, z: ez, rot: dir, tier: 3 });
     gen.push({ t: 'baule', id: `c:${m.id}:1`, x: ex + fz * 2.4, y: G.Dig ? G.Dig.ground(ex + fz * 2.4, ez - fx * 2.4, y0 + 1.5) : y0, z: ez - fx * 2.4, rot: dir, tier: 2 });
+    return { bk, cols, gen };
+  }
+  // grotta naturale: gallerie e caverne generate (caves.js), decorazioni al buio, un forziere nella caverna in fondo
+  function buildGrotta(c) {
+    const bk = new Bucket(), cols = [], gen = [];
+    const sys = G.Caves.generate(c);
+    if (G.Dig) { G.Dig.addGen('cave:' + c.id, sys.sph); G.Dig.addVeins('cave:' + c.id, sys.veins); }
+    const dec = G.Caves.decorate(sys);
+    bk.extra = dec.meshes; bk.cave = { dec };
+    // massi ai lati dell'imbocco, così da fuori si capisce che è una grotta
+    { const rnd = G.mulberry32(c.seed + 5), fx = Math.sin(c.dir), fz = Math.cos(c.dir), sx = Math.cos(c.dir), sz = -Math.sin(c.dir);
+      for (let k = 0; k < 7; k++) {
+        const sd = k % 2 ? 1 : -1, off = 2.2 + rnd() * 2.2, fwd = 0.5 + rnd() * 2.5, x = c.x + sx * sd * off + fx * fwd, z = c.z + sz * sd * off + fz * fwd, y = G.heightAt(x, z);
+        const r = 0.6 + rnd() * 1.1, g = new THREE.DodecahedronGeometry(r, 1); const pp = g.attributes.position; for (let i = 0; i < pp.count; i++) { const n = 0.8 + Math.abs(Math.sin(pp.getX(i) * 5 + k) * Math.cos(pp.getZ(i) * 4)) * 0.35; pp.setXYZ(i, pp.getX(i) * n, pp.getY(i) * n * 0.75, pp.getZ(i) * n); }
+        g.rotateY(rnd() * 6); g.translate(x, y + r * 0.3, z); (bk._rocks = bk._rocks || []).push(M().colorize(g, 0.8, 0.78, 0.74, 0.15, rnd));
+        cols.push({ x0: x - r * 0.7, x1: x + r * 0.7, y0: y - 0.5, y1: y + r * 0.9, z0: z - r * 0.7, z1: z + r * 0.7, walk: true });
+      } }
+    if (bk._rocks) { const m = new THREE.Mesh(M().merge(bk._rocks), G.MAT.rock); m.castShadow = true; m.receiveShadow = true; bk.extra.push(m); }
+    // tesoro dimenticato nella caverna più profonda (a volte con le ossa di chi ci è rimasto)
+    const last = sys.caverns[sys.caverns.length - 1];
+    if (last) {
+      const rnd = G.mulberry32(c.seed + 77), a = rnd() * 6.28, x = last.x + Math.cos(a) * last.R * 0.5, z = last.z + Math.sin(a) * last.R * 0.5;
+      const y = G.Dig ? G.Dig.ground(x, z, last.y) : last.y - last.R;
+      if (!sys.pools.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + 0.6)) gen.push({ t: 'forziere', id: `c:${c.id}:0`, x, y, z, rot: rnd() * 6, tier: 3 });
+    }
+    c.cave = sys;
     return { bk, cols, gen };
   }
   // accampamento abbandonato: tende strappate, casse, un falò spento
@@ -1043,7 +1113,7 @@
     bk.always = true;
     return { bk, cols, gen };
   }
-  const BUILD = { village: buildVillage, faro: buildFaro, relitto: buildRelitto, covo: buildCovo, tesoro: buildTesoro, rovina: buildRovina, miniera: buildMiniera, accampamento: buildAccampamento, castello: buildCastello };
+  const BUILD = { village: buildVillage, faro: buildFaro, relitto: buildRelitto, covo: buildCovo, tesoro: buildTesoro, rovina: buildRovina, miniera: buildMiniera, grotta: buildGrotta, accampamento: buildAccampamento, castello: buildCastello };
   S.previewBuild = (p) => { const r = BUILD[p.type](p); S.lastBase = p.base; const g = new THREE.Group(); r.bk.build(g); S.group.add(g); return { group: g, r }; };
   S.extraMats = function () {
     const m = S.mats();
@@ -1086,8 +1156,9 @@
         const group = new THREE.Group();
         r.bk.build(group);
         for (const e of r.bk.extra || []) group.add(e);
+        if (r.bk.cave && G.Caves) G.Caves.attach(p.id, group, r.bk.cave.dec);
         S.group.add(group);
-        S.active.set(p.id, { poi: p, group, cols: r.cols, gen: r.gen, traps: r.bk.traps || null, lights: r.bk.lights || [], always: !!r.bk.always, spin: r.bk.spin || [], beamAt: r.bk.beamAt, flag: r.bk.flag, near: false });
+        S.active.set(p.id, { poi: p, group, cols: r.cols, gen: r.gen, boats: r.bk.boats || null, traps: r.bk.traps || null, lights: r.bk.lights || [], always: !!r.bk.always, spin: r.bk.spin || [], beamAt: r.bk.beamAt, flag: r.bk.flag, near: false });
       }
       // collisioni, casse, letti e abitanti solo per i luoghi vicini
       let changed = false;
@@ -1132,6 +1203,7 @@
   };
   S.enterNear = function (a) {
     a.near = true;
+    try { S.spawnDockBoats(a); } catch (e) { console.warn(e); }
     a.pieces = [];
     for (const g of a.gen) {
       if (G.Build.byId(g.id)) continue;

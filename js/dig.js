@@ -20,14 +20,17 @@
       const k = ck(ix, iz); let l = D.cells.get(k); if (!l) D.cells.set(k, (l = [])); l.push(i); D.dirty.add(k);
     }
   }
-  D.reset = function () { for (const m of D.meshes.values()) { G.scene.remove(m); m.geometry.dispose(); } D.list = []; D.cells.clear(); D.meshes.clear(); D.dirty.clear(); D.uniformDirty = true; if (D.genKeys) D.genKeys.clear(); };
+  D.reset = function () { for (const m of D.meshes.values()) { G.scene.remove(m); m.geometry.dispose(); } D.list = []; D.cells.clear(); D.meshes.clear(); D.dirty.clear(); D.uniformDirty = true; if (D.genKeys) D.genKeys.clear(); D.extraVeins = []; };
   D.load = function (arr) { D.reset(); for (const s of arr || []) D.add(s, true); };
   // le gallerie delle miniere (gen) nascono dal mondo stesso: non si salvano
   D.serialize = () => D.list.filter((s) => !s[4]).map((s) => s.slice(0, 4).map((v) => +v.toFixed(2)));
   D.genKeys = new Set();
   D.addGen = function (key, spheres) { if (D.genKeys.has(key)) return; D.genKeys.add(key); for (const s of spheres) D.add([s[0], s[1], s[2], s[3], 1], true); };
   D.add = function (s, silent) {
-    s = [s[0], s[1], s[2], Math.sign(s[3] || 1) * Math.min(3.5, Math.max(0.3, Math.abs(s[3])))].concat(s[4] ? [1] : []);
+    // gli scavi del giocatore al massimo 3,5 m; caverne e gallerie generate dal mondo possono essere più grandi
+    s = [s[0], s[1], s[2], Math.sign(s[3] || 1) * Math.min(s[4] ? 8 : 3.5, Math.max(0.3, Math.abs(s[3])))].concat(s[4] ? [1] : []);
+    // tocca la superficie? (solo queste bucano il terreno disegnato: ingressi e scavi a cielo aperto)
+    s.surf = s[3] > 0 && G.heightAt(s[0], s[2]) - s[1] < s[3] + 0.4;
     D.list.push(s); index(s, D.list.length - 1); D.uniformDirty = true;
     if (!silent && G.Net && G.Net.on) G.Net.send({ t: 'dig', s });
   };
@@ -131,10 +134,18 @@
     else if (r0 > 0.34) return null;
     return { x, y, z, r, type, ore: ORE_IDS[type] };
   }
-  G.oreAt = function (x, y, z) { const v = veinIn(Math.floor(x / VC), Math.floor(y / VC), Math.floor(z / VC)); if (!v) return null; const dx = x - v.x, dy = y - v.y, dz = z - v.z; return dx * dx + dy * dy + dz * dz < v.r * v.r ? v : null; };
+  // vene in più messe da grotte e miniere (affiorano sulle pareti delle gallerie)
+  D.extraVeins = [];
+  D.addVeins = function (key, list) { if (D.genKeys.has('v:' + key)) return; D.genKeys.add('v:' + key); for (const v of list) D.extraVeins.push(Object.assign({ ore: ORE_IDS[v.type] }, v)); D.uniformDirty = true; };
+  G.oreAt = function (x, y, z) {
+    for (const v of D.extraVeins) { const dx = x - v.x, dy = y - v.y, dz = z - v.z; if (dx * dx + dy * dy + dz * dz < v.r * v.r) return v; }
+    const v = veinIn(Math.floor(x / VC), Math.floor(y / VC), Math.floor(z / VC)); if (!v) return null; const dx = x - v.x, dy = y - v.y, dz = z - v.z; return dx * dx + dy * dy + dz * dz < v.r * v.r ? v : null;
+  };
   D.veinsNear = function (x, y, z, rad) {
     const out = [], n = Math.ceil(rad / VC), cx = Math.floor(x / VC), cy = Math.floor(y / VC), cz = Math.floor(z / VC);
     for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) for (let k = -n; k <= n; k++) { const v = veinIn(cx + i, cy + j, cz + k); if (v) out.push(v); }
+    for (const v of D.extraVeins) if (Math.hypot(v.x - x, v.y - y, v.z - z) < rad + v.r) out.push(v);
+    out.sort((a, b) => Math.hypot(a.x - x, a.y - y, a.z - z) - Math.hypot(b.x - x, b.y - y, b.z - z));
     return out;
   };
   // rimettere la terra in un buco scavato: una sfera "piena" dove si guarda (non oltre il terreno originale)
@@ -285,8 +296,17 @@
     const m = new THREE.Mesh(g, material()); m.receiveShadow = true; m.castShadow = true;
     G.scene.add(m); D.meshes.set(k, m);
   }
+  // si ricostruiscono prima le celle vicine, poche per fotogramma (le grotte sono grandi: niente scatti)
   D.update = function () {
-    if (D.dirty.size) { const ks = [...D.dirty]; D.dirty.clear(); for (const k of ks) buildCell(k); }
+    if (D.dirty.size) {
+      const P = G.Player, px = P.pos.x / CELL, pz = P.pos.z / CELL, t0 = performance.now();
+      const ks = [...D.dirty].map((k) => { const [a, b] = k.split(',').map(Number); return [k, Math.hypot(a + 0.5 - px, b + 0.5 - pz)]; }).sort((a, b) => a[1] - b[1]);
+      for (const [k, d] of ks) {
+        if (d * CELL > 220 && D.meshes.size) break; // lontane: aspettano
+        D.dirty.delete(k); buildCell(k);
+        if (performance.now() - t0 > (G.started ? 7 : 400)) break;
+      }
+    }
     if (D.uniformDirty || (D._ut = (D._ut || 0) + 1) % 30 === 0) updateUniforms();
   };
   // il terreno normale si "buca" dentro le sfere scavate più vicine (fino a 64)
@@ -295,11 +315,12 @@
     uDigW: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigWN: { value: 0 } };
   function updateUniforms() {
     D.uniformDirty = false;
-    const P = G.Player, carves = D.list.filter((s) => s[3] > 0), list = carves.length > 64 ? carves.slice().sort((a, b) => Math.hypot(a[0] - P.pos.x, a[2] - P.pos.z) - a[3] - Math.hypot(b[0] - P.pos.x, b[2] - P.pos.z) + b[3]).slice(0, 64) : carves;
+    const P = G.Player, carves = D.list.filter((s) => s[3] > 0 && s.surf !== false), list = carves.length > 64 ? carves.slice().sort((a, b) => Math.hypot(a[0] - P.pos.x, a[2] - P.pos.z) - a[3] - Math.hypot(b[0] - P.pos.x, b[2] - P.pos.z) + b[3]).slice(0, 64) : carves;
     for (let i = 0; i < 64; i++) { const s = list[i]; if (s && s[3] > 0) D.U.uDig.value[i].set(s[0], s[1], s[2], s[3] - 0.04); else D.U.uDig.value[i].set(0, -999, 0, 0); }
     D.U.uDigN.value = list.length;
     let n = 0;
-    for (const s of list) { if (n >= 24) break; if (s[3] > 0 && G.heightAt(s[0], s[2]) > G.SEA + 1) D.U.uDigW.value[n++].set(s[0], s[1], s[2], s[3] + 0.4); }
+    const all = D.list.filter((s) => s[3] > 0), listW = all.length > 24 ? all.slice().sort((a, b) => Math.hypot(a[0] - P.pos.x, a[1] - P.pos.y, a[2] - P.pos.z) - Math.hypot(b[0] - P.pos.x, b[1] - P.pos.y, b[2] - P.pos.z)) : all;
+    for (const s of listW) { if (n >= 24) break; if (s[3] > 0 && G.heightAt(s[0], s[2]) > G.SEA + 1) D.U.uDigW.value[n++].set(s[0], s[1], s[2], s[3] + 0.4); }
     for (let i = n; i < 24; i++) D.U.uDigW.value[i].set(0, -999, 0, 0);
     D.U.uDigWN.value = n;
     // vene vicine al giocatore (solo dove si scava si vedono)

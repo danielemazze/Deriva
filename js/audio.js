@@ -303,6 +303,8 @@
   A.cannon = (d) => { const k = Math.max(0.12, Math.min(1, 30 / Math.max(10, d || 10))); noise(1.4, 'lowpass', 420 * (0.6 + k * 0.4), 0.8, 1.1 * k); noise(0.25, 'bandpass', 1600, 0.8, 0.5 * k); tone('sine', 70, 28, 1.1, 0.9 * k); noise(2.2, 'lowpass', 260, 0.5, 0.25 * k, 0.15); };
   // il ruggito del Kraken: gorgoglio profondo che sale
   A.roar = () => { tone('sawtooth', 55, 38, 2.6, 0.35); tone('sawtooth', 82, 50, 2.4, 0.22, 0.1); noise(2.8, 'lowpass', 380, 3, 0.5); noise(2.2, 'bandpass', 160, 6, 0.4, 0.3); };
+  // pipistrello: squittii acuti e brevi, più deboli da lontano
+  A.bat = (d) => { const k = Math.max(0.15, Math.min(1, 6 / Math.max(2, d || 4))); for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) { const f = rnd(6500, 9500); tone('sine', f, f * 0.82, 0.025, 0.02 * k, i * rnd(0.04, 0.09)); } noise(0.06, 'highpass', 6000, 0.6, 0.012 * k, 0, undefined, A.white); };
   A.bell = () => { for (const [f, d] of [[660, 0], [880, 0.02], [1320, 0.04]]) tone('sine', f, f * 0.995, 2.2, 0.06, d); };
 
   /* ---------------- stanze, grotte, fuoco, acqua ---------------- */

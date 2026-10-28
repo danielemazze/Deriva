@@ -125,13 +125,13 @@
     }
     return out;
   };
-  const ICON = { village: '⌂', faro: '♜', relitto: '⚓', covo: '☠', tesoro: '✕', rovina: '⛫', miniera: '⛏', accampamento: '⛺', castello: '♚' };
+  const ICON = { village: '⌂', faro: '♜', relitto: '⚓', covo: '☠', tesoro: '✕', rovina: '⛫', miniera: '⛏', grotta: '◓', accampamento: '⛺', castello: '♚' };
 
   /* ---------------- pannello mappa ---------------- */
   MU.open = function () { const p = P().pos; MU.view.x = p.x; MU.view.z = p.z; G.UI.openCustom('map'); };
   MU.render = function () {
     return `<div class="mapwrap"><canvas id="mapc"></canvas>
-      <div class="maplegend"><b>Mappa</b><span><i class="lg you"></i>tu</span><span>⌂ villaggio</span><span>♜ faro</span><span>⚓ relitto</span><span>☠ covo dei pirati</span><span>⛫ rovine</span><span>⛏ miniera</span><span>⛺ accampamento</span><span>♚ castello</span><span class="x">✕ tesoro</span><span class="qq">◆ missione</span><small>Rotella: zoom · Trascina: sposta · ${(P().explored || new Set()).size} zone esplorate</small><button class="mini-btn" data-act="center">Centra su di me</button></div></div>`;
+      <div class="maplegend"><b>Mappa</b><span><i class="lg you"></i>tu</span><span>⌂ villaggio</span><span>♜ faro</span><span>⚓ relitto</span><span>☠ covo dei pirati</span><span>⛫ rovine</span><span>⛏ miniera</span><span>◓ grotta</span><span>⛺ accampamento</span><span>♚ castello</span><span class="x">✕ tesoro</span><span class="qq">◆ missione</span><small>Rotella: zoom · Trascina: sposta · ${(P().explored || new Set()).size} zone esplorate</small><button class="mini-btn" data-act="center">Centra su di me</button></div></div>`;
   };
   MU.mount = function () {
     const c = document.getElementById('mapc'); if (!c) return;

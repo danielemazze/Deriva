@@ -77,6 +77,7 @@
   N.handle = function (m) {
     switch (m.t) {
       case 'bpcs': if (G.FreeBoat) G.FreeBoat.onRemote(m); break;
+      case 'banchor': { const b = G.Boats.byId(m.id); if (b) b.anchored = !!m.on; break; }
       case 'bhull': { const b = G.Boats.byId(m.id); if (b) b.hull = m.h; break; }
       case 'bdelboat': { const b = G.Boats.byId(m.id); if (b) G.Boats.remove(b); break; }
       case 'vsig': if (G.Voice) G.Voice.onSignal(m); break;

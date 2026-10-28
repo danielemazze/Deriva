@@ -238,9 +238,10 @@
     if (p.placing) return ['Costruzione', [['Tasto destro', 'posa'], ['R', 'ruota'], ['Esc', 'annulla']]];
     if (p.boat) {
       const T = p.boat.T;
-      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], ...(G.Sea && G.Sea.nearCannon && G.Sea.nearCannon(p) ? [['Clic sinistro (mano vuota)', 'spara col cannone · guarda in alto per tirare lontano']] : []), ...(p.boat.hull !== undefined && G.Sea && p.boat.hull < G.Sea.hullMax(p.boat) ? [['Assi in mano + tasto destro', 'ripara lo scafo']] : []), ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
-      if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], [G.useKey(), 'lascia i remi']]];
-      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], ...(p.boat.inv ? [['G', 'stiva']] : []), ...(G.Sea && G.Sea.hasCannons(p.boat) ? [['Clic sinistro', 'bordata di cannoni']] : []), [G.useKey(), 'lascia il timone']]];
+      const anc = ['X', p.boat.anchored ? 'salpa l’ancora' : 'getta l’ancora (senza, la barca va col vento)'];
+      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], anc, ...(G.Sea && G.Sea.nearCannon && G.Sea.nearCannon(p) ? [['Clic sinistro (mano vuota)', 'spara col cannone · guarda in alto per tirare lontano']] : []), ...(p.boat.hull !== undefined && G.Sea && p.boat.hull < G.Sea.hullMax(p.boat) ? [['Assi in mano + tasto destro', 'ripara lo scafo']] : []), ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
+      if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], anc, [G.useKey(), 'lascia i remi']]];
+      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], anc, ...(p.boat.inv ? [['G', 'stiva']] : []), ...(G.Sea && G.Sea.hasCannons(p.boat) ? [['Clic sinistro', 'bordata di cannoni']] : []), [G.useKey(), 'lascia il timone']]];
     }
     const held = p.held(), id = held && held.id, d = id && G.ITEMS[id];
     if (id === 'arco') k.push(['Tieni premuto clic sinistro', 'tendi e scocca']);
@@ -371,8 +372,25 @@
       <div class="hint" style="margin-top:20px">${T ? `Calore dei vestiti: <b>${T.warm}</b> · riparo dal sole: <b>${T.cool}</b> · ` : ''}F scambia l’oggetto in mano con la mano sinistra · Maiusc+clic su un vestito: lo indossi</div>
       <div class="hint">Clic: prendi/posa · Tasto destro: metà / uno · Maiusc+clic: sposta rapido · Clic su una ricetta per riempire la griglia</div></div>`;
   }
+  // ridisegnare il pannello non deve far tornare in cima le liste (catalogo, elenchi): si ricorda dov'erano
+  function keepScroll(pn) {
+    const saved = [], key = (el) => el.className + '|' + [...pn.querySelectorAll(el.tagName + (el.className ? '.' + String(el.className).trim().split(/\s+/).join('.') : ''))].indexOf(el);
+    if (pn.scrollTop) saved.push(['', pn.scrollTop]);
+    for (const el of pn.querySelectorAll('*')) if (el.scrollTop > 0 && el.className) saved.push([el.tagName + '.' + String(el.className).trim().split(/\s+/).join('.'), el.scrollTop, key(el)]);
+    return () => {
+      for (const [sel, top, k] of saved) {
+        if (!sel) { pn.scrollTop = top; continue; }
+        let list; try { list = pn.querySelectorAll(sel); } catch (e) { continue; }
+        const i = +String(k).split('|').pop(); const el = list[i] || list[0]; if (el) el.scrollTop = top;
+      }
+    };
+  }
   UI.renderPanel = function () {
     const pn = $('panel'); if (!UI.open || UI.open === 'book') return;
+    const restore = UI._lastOpen === UI.open ? keepScroll(pn) : null; UI._lastOpen = UI.open;
+    try { renderPanel0(pn); } finally { if (restore) restore(); }
+  };
+  function renderPanel0(pn) {
     let html = '<button class="close-x" data-act="close" aria-label="Chiudi">×</button>';
     const cu = UI.custom[UI.open];
     pn.classList.toggle('wide', !!(cu && cu.wide));
@@ -1037,6 +1055,7 @@
       else if (k === 'KeyQ' && !e.repeat && G.Drops) G.Drops.throwHeld(e.ctrlKey || e.metaKey);
       else if (k === 'KeyR') G.Build.rotStep = (G.Build.rotStep + 1) % 4;
       else if (k === 'KeyV' && P_.boat) P_.cam3 = !P_.cam3;
+      else if (k === 'KeyX' && P_.boat) G.Boats.toggleAnchor(P_.boat);
       else if (k === 'KeyH') { G.settings.hints = G.settings.hints === false; G.store.set('deriva_settings', G.settings); }
       else if (k === 'F11' && window.deriva) { e.preventDefault(); G.settings.fullscreen = !G.settings.fullscreen; G.applySettings('fullscreen'); }
       else if (k === 'Escape') { if (P_.placing) UI.cancelPlace(); else if (UI.boatPlacing) { UI.boatPlacing = null; G.Boats.updateGhost(null); } }

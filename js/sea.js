@@ -43,6 +43,7 @@
     return true;
   };
   S.sinkBoat = function (b) {
+    if (String(b.id || '').startsWith('d:')) G.state.removed.add(b.id); // barca di un porticciolo: non torna più
     const P = G.Player, p = b.root.position;
     // il carico della stiva galleggia: si può recuperare
     if (b.inv) for (const st of b.inv) if (st && G.Drops) G.Drops.spawn(st, p.x + (Math.random() - 0.5) * 4, p.y + 1, p.z + (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 2, 2, (Math.random() - 0.5) * 2, { delay: 1 });

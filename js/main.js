@@ -481,6 +481,7 @@
       G.Build.update(dt, P, t);
       if (G.Drops) G.Drops.update(dt, P);
       if (G.Sea) G.Sea.update(dt);
+      if (G.Caves) G.Caves.update(dt, P);
       if (G.Features) G.Features.update(dt, P, t);
       if (G.Dig) G.Dig.update();
       G.FX.update(dt, P, t);

@@ -719,6 +719,7 @@
   };
   P.leaveBoat = function (silent) {
     const b = P.boat; if (!b) return;
+    if (!silent && !b.anchored && !b.ai && !b.pirate && (!P._anchorTip || performance.now() - P._anchorTip > 90000)) { P._anchorTip = performance.now(); setTimeout(() => G.UI.toast('Senza ancora la barca va lentamente dove la porta il vento · torna a bordo e premi X per gettarla', ''), 400); }
     P.boat = null; P.helm = false; P._boatYaw = undefined; G.UI.setBoatHud(false);
     // cerca terra vicino ai fianchi, altrimenti in acqua
     const c = Math.cos(b.yaw), s = Math.sin(b.yaw);

@@ -81,7 +81,7 @@ G.PRESETS = {
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.12';
+G.VERSION = '1.13';
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';
 // pagina aperta dal PC che ospita (http://ip:porta): il campo "entra" si riempie da solo

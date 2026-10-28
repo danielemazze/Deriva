@@ -194,6 +194,12 @@
     const F = (C.factors = []); // cosa ti scalda e cosa ti raffredda (si vede a schermo)
     { const L = C.localAt(x, z, _loc); if (L.snow > 0.2) F.push(['❄', 'neve', -1]); else if (L.rain > 0.2) F.push(['🌧', 'pioggia', -1]); if (C.windLevel() > 5) F.push(['🌬', 'vento forte', -1]); if (L.heat > 0.3) F.push(['☀', 'caldo torrido', 1]); if (G.sky && G.sky.day < 0.3 && T < 14) F.push(['🌙', 'notte fredda', -1]); }
     if (P.swim || P.under) { const w = 12 + G.climate(x, z).t * 18 - (G.coldAt ? G.coldAt(x, z) * 14 : 0); if (w < T) { T = w; F.push(['💧', 'acqua fredda', -1]); } }
+    // sottoterra: aria fresca e umida, quasi la stessa tutto l'anno (più fredda nelle terre gelate)
+    if (P.underground) {
+      const depth = Math.max(0, G.heightAt(x, z) - P.pos.y), cl = G.climate(x, z), Tc = Math.max(1, 7 + cl.t * 9 - (G.coldAt ? G.coldAt(x, z) * 7 : 0));
+      const k = Math.min(1, depth / 6); const T0 = T; T = G.lerp(T, Tc, k);
+      if (Math.abs(T - T0) > 0.8 || k > 0.5) F.push(['🕳', T < T0 ? 'grotta: aria fresca e umida' : 'grotta: riparo dal gelo', T < T0 ? -1 : 1]);
+    }
     // falò vicini
     let fire = 0;
     for (const p of G.Build.pieces) if (p.t === 'falo' || p.t === 'camino' || (p.t === 'fornace' && p.glow > 0.3)) { const d = Math.hypot(p.x - x, p.z - z); if (d < 7) fire = Math.max(fire, 1 - d / 7); }
