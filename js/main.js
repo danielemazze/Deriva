@@ -245,7 +245,7 @@
     for (const ch of [...G.World.chunks.values()]) G.World.unload(ch);
     G.World.rebuild();
     G.initWorldGen(seed);
-    G.state = { removed: new Set(), chests: {}, ops: [] }; G.voiceGlobal = false; G.keepInv = false; if (G.Drops) G.Drops.clear(); if (G.Sea) G.Sea.clear();
+    G.state = { removed: new Set(), chests: {}, ops: [] }; G.voiceGlobal = false; G.keepInv = false; if (G.Drops) G.Drops.clear(); if (G.Sea) G.Sea.clear(); if (G.Caves && G.Caves.resetHidden) G.Caves.resetHidden();
     if (G.POI) G.POI.reset();
     if (G.Structures && G.Structures.group) G.Structures.clear();
     if (G.MapUI) G.MapUI.reset();
@@ -481,7 +481,7 @@
       G.Build.update(dt, P, t);
       if (G.Drops) G.Drops.update(dt, P);
       if (G.Sea) G.Sea.update(dt);
-      if (G.Caves) G.Caves.update(dt, P);
+      if (G.Caves) { G.Caves.updateHidden(dt, P); G.Caves.update(dt, P); }
       if (G.Features) G.Features.update(dt, P, t);
       if (G.Dig) G.Dig.update();
       G.FX.update(dt, P, t);

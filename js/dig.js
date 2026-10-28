@@ -25,7 +25,8 @@
   // le gallerie delle miniere (gen) nascono dal mondo stesso: non si salvano
   D.serialize = () => D.list.filter((s) => !s[4]).map((s) => s.slice(0, 4).map((v) => +v.toFixed(2)));
   D.genKeys = new Set();
-  D.addGen = function (key, spheres) { if (D.genKeys.has(key)) return; D.genKeys.add(key); for (const s of spheres) D.add([s[0], s[1], s[2], s[3], 1], true); };
+  // hidden: caverne chiuse sotto terra; le loro pareti si disegnano solo quando ci si avvicina
+  D.addGen = function (key, spheres, hidden) { if (D.genKeys.has(key)) return; D.genKeys.add(key); for (const s of spheres) { D.add([s[0], s[1], s[2], s[3], 1], true); if (hidden) D.list[D.list.length - 1].hid = true; } };
   D.add = function (s, silent) {
     // gli scavi del giocatore al massimo 3,5 m; caverne e gallerie generate dal mondo possono essere più grandi
     s = [s[0], s[1], s[2], Math.sign(s[3] || 1) * Math.min(s[4] ? 8 : 3.5, Math.max(0.3, Math.abs(s[3])))].concat(s[4] ? [1] : []);
@@ -175,6 +176,7 @@
     for (const b of G.Build.boxes) if (hx > b.x0 - 1 && hx < b.x1 + 1 && hz > b.z0 - 1 && hz < b.z1 + 1 && hy > b.y0 - 1.5 && hy < b.y1 + 0.5) { G.UI.toast('Qui sopra c’è una costruzione', 'warn'); return true; }
     // un colpo non fa una sfera perfetta: un grappolo di cavità più piccole, diverso ogni volta
     D.add([c[0], c[1], c[2], r * 0.78]);
+    if (G.Caves && G.Caves.onDig) G.Caves.onDig(c[0], c[1], c[2]);
     const nSat = 2 + ((Math.random() * 3) | 0);
     for (let k = 0; k < nSat; k++) {
       const a = Math.random() * 6.283, e = (Math.random() - 0.5) * 1.6, rr = r * (0.38 + Math.random() * 0.3), off = r * (0.35 + Math.random() * 0.35);
@@ -303,6 +305,7 @@
       const ks = [...D.dirty].map((k) => { const [a, b] = k.split(',').map(Number); return [k, Math.hypot(a + 0.5 - px, b + 0.5 - pz)]; }).sort((a, b) => a[1] - b[1]);
       for (const [k, d] of ks) {
         if (d * CELL > 220 && D.meshes.size) break; // lontane: aspettano
+        if (d * CELL > 52) { const l = D.cells.get(k); if (l && l.every((i) => D.list[i].hid)) continue; } // caverne chiuse lontane: non si vedono
         D.dirty.delete(k); buildCell(k);
         if (performance.now() - t0 > (G.started ? 7 : 400)) break;
       }

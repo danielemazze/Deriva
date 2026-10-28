@@ -86,6 +86,89 @@
     return { sph, path, caverns, pools, veins, tunnels, cold, mouth: { x: c.x, y: c.h, z: c.z }, rnd };
   };
 
+  /* ---------------- caverne nascoste sotto terra ----------------
+     Ovunque sotto la terraferma, a 7–30 m di profondità: caverne chiuse (nessun imbocco)
+     collegate da gallerie. Scavando verso il basso o di lato è facile sbucarci dentro.
+     Si generano man mano che il giocatore si muove (celle di 44 m, deterministiche). */
+  const HC = 44;
+  CV.hidden = new Map(); // chiave cella -> sistema (o null)
+  const hh = (a, b, k) => { let h = (a * 73856093) ^ (b * 19349663) ^ (k * 83492791) ^ ((G.seed | 0) * 2654435761); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  function landAround(x, z, R) { for (let k = 0; k < 8; k++) { const a = k * 0.785; if (G.heightAt(x + Math.cos(a) * R, z + Math.sin(a) * R) < G.SEA + 1.5) return false; } return true; }
+  function genHidden(ix, iz) {
+    if (hh(ix, iz, 1) > 0.92) return null;
+    const rnd = G.mulberry32((hh(ix, iz, 2) * 4294967296) | 0);
+    const x = (ix + 0.15 + rnd() * 0.7) * HC, z = (iz + 0.15 + rnd() * 0.7) * HC, h = G.heightAt(x, z);
+    if (h < G.SEA + 2 || Math.hypot(x, z) < 50) return null;
+    const R = 3.4 + rnd() * 3.6;
+    if (!landAround(x, z, R + 4)) return null;
+    let y = h - (4 + rnd() * 13) - R; // la volta da 4 a 17 m sotto i piedi y = Math.max(y, G.SEA - 30 + R); if (y + R > h - 3) y = h - 3 - R;
+    if (y - R < G.SEA - 34) return null;
+    const sph = [], caverns = [], pools = [], veins = [], tunnels = [];
+    const vein = (vx, vy, vz) => { const deep = G.heightAt(vx, vz) - vy, k = rnd(); veins.push({ x: vx, y: vy, z: vz, r: 0.9 + rnd() * 0.7, type: deep > 14 && k < 0.2 ? 3 : (deep > 6 && k < 0.62) || k < 0.3 ? 2 : 1 }); };
+    // la caverna: sfere sovrapposte, irregolare
+    sph.push([x, y, z, R]); const parts = [{ x, y, z, r: R }];
+    for (let k = 0, n = 5 + ((rnd() * 6) | 0); k < n; k++) {
+      const a = rnd() * 6.283, d = R * (0.45 + rnd() * 0.6), rr = R * (0.4 + rnd() * 0.4), px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, py = y - R * 0.1 + (rnd() - 0.5) * R * 0.4;
+      if (py + rr > G.heightAt(px, pz) - 2.5) continue;
+      sph.push([px, py, pz, rr]); parts.push({ x: px, y: py, z: pz, r: rr });
+    }
+    caverns.push({ x, y, z, R, parts });
+    if (rnd() < 0.6) pools.push({ x: x + (rnd() - 0.5) * R * 0.3, z: z + (rnd() - 0.5) * R * 0.3, y: y - R + 0.5, r: R * 0.5 });
+    for (let k = 0; k < 2 + ((rnd() * 4) | 0); k++) { const a = rnd() * 6.283, e = (rnd() - 0.3) * 1.1; vein(x + Math.cos(a) * Math.cos(e) * (R + 0.5), y + Math.sin(e) * (R + 0.5), z + Math.sin(a) * Math.cos(e) * (R + 0.5)); }
+    // gallerie che partono dalla caverna (verso le celle vicine: spesso si incontrano)
+    for (let t = 0, nt = 2 + ((rnd() * 2) | 0); t < nt; t++) {
+      let yaw = rnd() * 6.283, tx = x, ty = y - R * 0.4, tz = z; const pts = [], base = 1.3 + rnd() * 0.7;
+      for (let i = 0, n = 14 + ((rnd() * 26) | 0); i < n; i++) {
+        tx += Math.sin(yaw) * 1.25; tz += Math.cos(yaw) * 1.25; yaw += (rnd() - 0.5) * 0.4;
+        const surf = G.heightAt(tx, tz), r = Math.max(1.15, base + (rnd() - 0.5) * 0.5);
+        if (surf < G.SEA + 2) break;
+        ty += (rnd() - 0.5) * 0.7; ty = Math.min(ty, surf - r - 3); ty = Math.max(ty, G.SEA - 32);
+        sph.push([tx, ty, tz, r]); pts.push({ x: tx, y: ty, z: tz, r, yaw, deep: surf - ty });
+        if (i % 7 === 3 && rnd() < 0.5) { const sd = rnd() < 0.5 ? -1 : 1; vein(tx + Math.cos(yaw) * sd * (r + 0.5), ty + (rnd() - 0.4) * r, tz - Math.sin(yaw) * sd * (r + 0.5)); }
+      }
+      if (pts.length) tunnels.push(pts);
+    }
+    return { key: ix + ',' + iz, sph, caverns, pools, veins, tunnels, cold: G.coldAt ? G.coldAt(x, z) : 0, mouth: { x, z }, hidden: true, found: false, decorated: false, x, y, z, R };
+  }
+  CV.hiddenAt = function (x, y, z, pad) {
+    for (const sys of CV.hidden.values()) { if (!sys || Math.hypot(sys.x - x, sys.z - z) > 70) continue; for (const q of sys.sph) if (Math.hypot(q[0] - x, q[1] - y, q[2] - z) < q[3] + (pad || 0.6)) return sys; }
+    return null;
+  };
+  CV._ht = 0;
+  CV.updateHidden = function (dt, P) {
+    if (!G.Dig || !G.started) return;
+    if ((CV._ht -= dt) > 0) return; CV._ht = 0.7;
+    const cx = Math.floor(P.pos.x / HC), cz = Math.floor(P.pos.z / HC);
+    let made = 0;
+    for (let r = 0; r <= 3 && made < 2; r++) for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) {
+      if (Math.max(Math.abs(i), Math.abs(j)) !== r || made >= 2) continue;
+      const k = (cx + i) + ',' + (cz + j); if (CV.hidden.has(k)) continue;
+      const sys = genHidden(cx + i, cz + j); CV.hidden.set(k, sys); made++;
+      if (sys) { G.Dig.addGen('hid:' + k, sys.sph, true); G.Dig.addVeins('hid:' + k, sys.veins); }
+    }
+    // se gli scavi sono stati ricaricati (nuova partita, ingresso in una partita in rete) si rimettono le caverne
+    for (const [k, sys] of CV.hidden) if (sys && !G.Dig.genKeys.has('hid:' + k)) { G.Dig.addGen('hid:' + k, sys.sph, true); G.Dig.addVeins('hid:' + k, sys.veins); }
+    // decorazioni (stalattiti, funghi, pozze, pipistrelli) solo quando ci si avvicina davvero
+    for (const sys of CV.hidden.values()) {
+      if (!sys || sys.decorated || Math.hypot(sys.x - P.pos.x, sys.z - P.pos.z) > 45) continue;
+      sys.decorated = true;
+      const dec = CV.decorate(sys);
+      if (!CV.hgroup) { CV.hgroup = new THREE.Group(); G.scene.add(CV.hgroup); }
+      const g = new THREE.Group(); for (const m of dec.meshes) g.add(m); CV.hgroup.add(g);
+      CV.attach('hid:' + sys.key, g, dec); CV.active.get('hid:' + sys.key).own = true;
+      break;
+    }
+  };
+  CV.resetHidden = function () { CV.hidden.clear(); if (CV.hgroup) { G.scene.remove(CV.hgroup); CV.hgroup = null; } for (const [k, c] of CV.active) if (c.own) CV.active.delete(k); };
+  // una vena o un colpo di piccone che sbuca in una caverna nascosta
+  CV.onDig = function (x, y, z) {
+    const sys = CV.hiddenAt(x, y, z);
+    if (sys && !sys.found) { sys.found = true; G.UI.toast('Hai aperto una caverna sotterranea! Fai luce con la torcia', 'good'); if (G.Audio && G.Audio.drip) G.Audio.drip(); return; }
+    // vicino a un vuoto la roccia suona diversa: un indizio per chi scava
+    const near = !sys && CV.hiddenAt(x, y, z, 4);
+    if (near && !near.found && !near.echo) { near.echo = true; G.UI.toast('Il piccone rimbomba: qui vicino c’è un vuoto nella roccia…', ''); if (G.Audio && G.Audio.drip) { G.Audio.drip(); setTimeout(() => G.Audio.drip(), 300); } }
+  };
+
   /* ---------------- materiali al buio ----------------
      Come le pareti delle gallerie: il sole e il cielo non arrivano sottoterra, le torce sì. */
   function caveify(mat, key) {
@@ -113,7 +196,7 @@
     const T = G.TEX || {}, PH = G.PHOTO || {};
     MT = {
       rock: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0, map: PH.gravel || (T.rockT && T.rockT.map) || null }), 'rock'),
-      wet: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, metalness: 0.05 }), 'wet'),
+      wet: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.03 }), 'wet'),
       moss: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }), 'moss'),
       plant: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }), 'plant'),
       glow: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.9, emissiveMap: null }),
@@ -139,11 +222,18 @@
     const cold = sys.cold > 0.5;
     const drip = [], roosts = [];
     const stal = (x, z, top, down, len, r) => {
-      const g = new THREE.ConeGeometry(r, len, 7, 2); if (down) g.rotateX(Math.PI);
-      const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 1 + (Math.sin(p.getY(i) * 9 + x) * 0.12); p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); }
+      const g = new THREE.ConeGeometry(r, len, 10, 8); if (down) g.rotateX(Math.PI);
+      const p = g.attributes.position, cc = new Float32Array(p.count * 3), t0 = 0.4 + rnd() * 0.15, ph = rnd() * 6;
+      for (let i = 0; i < p.count; i++) {
+        const yy = p.getY(i) / len + 0.5, a = Math.atan2(p.getZ(i), p.getX(i));
+        const k = 1 + Math.sin(yy * 22 + ph) * 0.1 + Math.sin(a * 3 + ph) * 0.12 + Math.sin(a * 7 + yy * 5) * 0.05;
+        p.setX(i, p.getX(i) * k + Math.sin(yy * 4 + ph) * r * 0.25); p.setZ(i, p.getZ(i) * k);
+        const tip = down ? 1 - yy : yy, t = t0 * (0.85 + tip * 0.35) * (0.92 + 0.08 * Math.sin(yy * 40 + a));
+        cc[i * 3] = t * 1.06; cc[i * 3 + 1] = t * 0.96; cc[i * 3 + 2] = t * 0.82;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(cc, 3)); g.computeVertexNormals();
       g.translate(x, top + (down ? -len / 2 : len / 2), z);
-      if (cold && down) L.ice.push(g);
-      else { const t = 0.55 + rnd() * 0.2; L.wet.push(col(g, t * 1.05, t * 0.95, t * 0.82)); }
+      if (cold && down) L.ice.push(g); else L.wet.push(g);
     };
     const patch = (x, y, z, R, c) => {
       const n = 14, g = new THREE.CircleGeometry(R, n); g.rotateX(-Math.PI / 2);
@@ -196,8 +286,8 @@
     // gallerie: muschio e radici vicino all'imbocco, qualche stalattite, funghi
     for (const T of sys.tunnels) for (let i = 0; i < T.length; i++) {
       const s = T[i];
-      if (i < 22 && s === T[i] && T === sys.tunnels[0] && rnd() < 0.55) patch(s.x + (rnd() - 0.5) * s.r, s.y, s.z + (rnd() - 0.5) * s.r, 0.4 + rnd() * 0.7, cold ? [0.75, 0.8, 0.82] : [0.2 + rnd() * 0.1, 0.4 + rnd() * 0.12, 0.12]);
-      if (i < 10 && T === sys.tunnels[0] && rnd() < 0.5) { const ceil = probe(s.x, s.y, s.z, true); if (ceil !== null) for (let k = 0; k < 3; k++) { const x = s.x + (rnd() - 0.5) * s.r, z = s.z + (rnd() - 0.5) * s.r, len = 0.4 + rnd() * 1.1; const g = new THREE.CylinderGeometry(0.012, 0.025, len, 4); g.translate(x, ceil - len / 2 + 0.05, z); L.plant.push(col(g, 0.32, 0.22, 0.14)); } }
+      if (!sys.hidden && i < 22 && T === sys.tunnels[0] && rnd() < 0.55) patch(s.x + (rnd() - 0.5) * s.r, s.y, s.z + (rnd() - 0.5) * s.r, 0.4 + rnd() * 0.7, cold ? [0.75, 0.8, 0.82] : [0.2 + rnd() * 0.1, 0.4 + rnd() * 0.12, 0.12]);
+      if (!sys.hidden && i < 10 && T === sys.tunnels[0] && rnd() < 0.5) { const ceil = probe(s.x, s.y, s.z, true); if (ceil !== null) for (let k = 0; k < 3; k++) { const x = s.x + (rnd() - 0.5) * s.r, z = s.z + (rnd() - 0.5) * s.r, len = 0.4 + rnd() * 1.1; const g = new THREE.CylinderGeometry(0.012, 0.025, len, 4); g.translate(x, ceil - len / 2 + 0.05, z); L.plant.push(col(g, 0.32, 0.22, 0.14)); } }
       if (i > 8 && rnd() < 0.18) { const ceil = probe(s.x, s.y, s.z, true); if (ceil !== null) { const len = 0.25 + rnd() * 0.8; stal(s.x + (rnd() - 0.5) * s.r * 0.8, s.z + (rnd() - 0.5) * s.r * 0.8, ceil + 0.08, true, len, 0.05 + len * 0.1); } }
       if (i > 12 && rnd() < 0.07) mush(s.x, s.y, s.z, s.deep > 9 && rnd() < 0.5 ? 1 : 0);
       if (i > 15 && rnd() < 0.05 && roosts.length < 20) { const ceil = probe(s.x, s.y, s.z, true); if (ceil !== null) roosts.push({ x: s.x, y: ceil - 0.18, z: s.z, cv: { x: s.x, y: s.y, z: s.z, R: 3 } }); }
@@ -234,7 +324,7 @@
   const _v = new V3();
   CV.update = function (dt, P) {
     for (const [id, c] of CV.active) {
-      if (!G.Structures.active.has(id)) { CV.active.delete(id); continue; }
+      if (!c.own && !G.Structures.active.has(id)) { CV.active.delete(id); continue; }
       const near = c.bats.length && Math.hypot(c.bats[0].r.x - P.pos.x, c.bats[0].r.z - P.pos.z) < 160;
       if (!near) continue;
       const light = P.heldTorch ? 14 : 7;
