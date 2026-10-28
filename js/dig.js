@@ -15,7 +15,7 @@
   /* ---------------- dati ---------------- */
   const ck = (ix, iz) => ix + ',' + iz;
   function index(s, i) {
-    const [x, , z, r] = s;
+    const [x, , z] = s, r = Math.abs(s[3]);
     for (let iz = Math.floor((z - r - 1) / CELL); iz <= Math.floor((z + r + 1) / CELL); iz++) for (let ix = Math.floor((x - r - 1) / CELL); ix <= Math.floor((x + r + 1) / CELL); ix++) {
       const k = ck(ix, iz); let l = D.cells.get(k); if (!l) D.cells.set(k, (l = [])); l.push(i); D.dirty.add(k);
     }
@@ -27,23 +27,35 @@
   D.genKeys = new Set();
   D.addGen = function (key, spheres) { if (D.genKeys.has(key)) return; D.genKeys.add(key); for (const s of spheres) D.add([s[0], s[1], s[2], s[3], 1], true); };
   D.add = function (s, silent) {
-    s = [s[0], s[1], s[2], Math.min(3.5, Math.max(0.3, s[3]))].concat(s[4] ? [1] : []);
+    s = [s[0], s[1], s[2], Math.sign(s[3] || 1) * Math.min(3.5, Math.max(0.3, Math.abs(s[3])))].concat(s[4] ? [1] : []);
     D.list.push(s); index(s, D.list.length - 1); D.uniformDirty = true;
     if (!silent && G.Net && G.Net.on) G.Net.send({ t: 'dig', s });
   };
   const near = (x, z) => D.cells.get(ck(Math.floor(x / CELL), Math.floor(z / CELL)));
   D.activeAt = (x, z) => !!near(x, z);
   // densità: > 0 dentro la roccia, < 0 nell'aria
+  // ogni scavo ha il bordo bitorzoluto; i "riempimenti" (raggio negativo: terra rimessa a posto) richiudono, nell'ordine in cui sono fatti
+  function carveVal(s, x, y, z) {
+    const dx = x - s[0], dy = y - s[1], dz = z - s[2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const ph = s[0] * 1.7 + s[1] * 2.3 + s[2] * 3.1, id = 1 / (d + 1e-4), nx = dx * id, ny = dy * id, nz = dz * id;
+    const n = Math.sin(nx * 3.1 + ph) * Math.sin(ny * 2.7 + ph * 1.3) * Math.sin(nz * 3.4 + ph * 0.7) + 0.5 * Math.sin((nx + nz) * 6.3 + ph * 2.1) * Math.sin(ny * 5.7 - ph);
+    return s[3] * (1 + 0.3 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n)))) - d;
+  }
   function carveDist(x, y, z, l) {
     let m = -Infinity;
     for (const i of l) {
-      const s = D.list[i]; const dx = x - s[0], dy = y - s[1], dz = z - s[2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (s[3] * 1.3 - d < m) continue;
-      // buchi irregolari: il bordo di ogni scavo è bitorzoluto (sempre verso l'esterno, così il terreno non resta mai sospeso)
-      const ph = s[0] * 1.7 + s[1] * 2.3 + s[2] * 3.1, id = 1 / (d + 1e-4), nx = dx * id, ny = dy * id, nz = dz * id;
-      const n = Math.sin(nx * 3.1 + ph) * Math.sin(ny * 2.7 + ph * 1.3) * Math.sin(nz * 3.4 + ph * 0.7) + 0.5 * Math.sin((nx + nz) * 6.3 + ph * 2.1) * Math.sin(ny * 5.7 - ph);
-      const v = s[3] * (1 + 0.3 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n)))) - d; if (v > m) m = v;
+      const s = D.list[i];
+      if (s[3] < 0) { const d = Math.hypot(x - s[0], y - s[1], z - s[2]); m = Math.min(m, d + s[3]); continue; }
+      const dx = x - s[0], dy = y - s[1], dz = z - s[2];
+      if (s[3] * 1.3 - Math.sqrt(dx * dx + dy * dy + dz * dz) < m) continue;
+      const v = carveVal(s, x, y, z); if (v > m) m = v;
     }
+    return m;
+  }
+  // solo gli scavi, senza i riempimenti: decide quali facce disegna la galleria
+  function carveRaw(x, y, z, l) {
+    let m = -Infinity;
+    for (const i of l) { const s = D.list[i]; if (s[3] < 0) continue; const v = carveVal(s, x, y, z); if (v > m) m = v; }
     return m;
   }
   D.density = function (x, y, z, hCache) {
@@ -125,6 +137,21 @@
     for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) for (let k = -n; k <= n; k++) { const v = veinIn(cx + i, cy + j, cz + k); if (v) out.push(v); }
     return out;
   };
+  // rimettere la terra in un buco scavato: una sfera "piena" dove si guarda (non oltre il terreno originale)
+  D.fill = function (P) {
+    const o = P.cam.position, d = P.lookDir(new V3());
+    const t = D.raycast(o, d, 6.5); if (t < 0) return false;
+    const hx = o.x + d.x * t, hy = o.y + d.y * t, hz = o.z + d.z * t;
+    if (!near(hx, hz) || carveRaw(hx - d.x * 0.5, hy - d.y * 0.5, hz - d.z * 0.5, near(hx, hz)) < -0.2) { G.UI.toast('La terra si rimette solo nei buchi scavati', 'warn'); return true; }
+    // il centro sta nell'aria davanti al punto colpito: il buco si riempie verso di te
+    for (const b of G.Build.boxes) if (hx > b.x0 - 0.6 && hx < b.x1 + 0.6 && hz > b.z0 - 0.6 && hz < b.z1 + 0.6 && hy > b.y0 - 1 && hy < b.y1 + 0.3) { G.UI.toast('Qui c’è una costruzione', 'warn'); return true; }
+    const pp = P.pos; const c = [hx - d.x * 0.45, hy - d.y * 0.45, hz - d.z * 0.45, -0.85];
+    if (Math.hypot(c[0] - pp.x, c[2] - pp.z) < 0.9 && c[1] > pp.y - 0.6 && c[1] < pp.y + 2) { G.UI.toast('Sei troppo vicino: spostati un po’', 'warn'); return true; }
+    D.add(c);
+    if (G.Audio) G.Audio.dig();
+    G.FX.burst(hx, hy, hz, [0.45, 0.33, 0.22], 10, 2);
+    return 'ok';
+  };
   D.dig = function (P, tool, pow) {
     pow = pow || 1;
     const o = P.cam.position, d = P.lookDir(new V3());
@@ -205,7 +232,7 @@
     const [ix, iz] = k.split(',').map(Number);
     // limiti verticali dalle sfere
     let y0 = Infinity, y1 = -Infinity;
-    for (const i of l) { const s = D.list[i]; y0 = Math.min(y0, s[1] - s[3] - 1); y1 = Math.max(y1, s[1] + s[3] + 1); }
+    for (const i of l) { const s = D.list[i], r = Math.abs(s[3]); y0 = Math.min(y0, s[1] - r - 1); y1 = Math.max(y1, s[1] + r + 1); }
     const X0 = ix * CELL - VOX, Z0 = iz * CELL - VOX, Y0 = Math.floor(y0 / VOX) * VOX;
     const NX = Math.ceil((CELL + 2 * VOX) / VOX) + 1, NZ = NX, NY = Math.ceil((y1 - Y0) / VOX) + 1;
     const hh = new Float32Array(NX * NZ); for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) hh[j * NX + i] = G.heightAt(X0 + i * VOX, Z0 + j * VOX);
@@ -240,7 +267,7 @@
     const keep = (a, b, c) => {
       // tieni solo le facce delle gallerie: quelle sulla superficie originale le disegna già il terreno
       const x = (pos[a * 3] + pos[b * 3] + pos[c * 3]) / 3, y = (pos[a * 3 + 1] + pos[b * 3 + 1] + pos[c * 3 + 1]) / 3, z = (pos[a * 3 + 2] + pos[b * 3 + 2] + pos[c * 3 + 2]) / 3;
-      return carveDist(x, y, z, l) > -0.32;
+      return carveRaw(x, y, z, l) > -0.32;
     };
     const quad = (a, b, c, d2, flip) => { if (a < 0 || b < 0 || c < 0 || d2 < 0) return; if (flip) { if (keep(a, c, b)) idx.push(a, c, b); if (keep(a, d2, c)) idx.push(a, d2, c); } else { if (keep(a, b, c)) idx.push(a, b, c); if (keep(a, c, d2)) idx.push(a, c, d2); } };
     for (let kk = 1; kk < NZ - 1; kk++) for (let j = 1; j < NY - 1; j++) for (let i = 1; i < NX - 1; i++) {
@@ -262,17 +289,17 @@
     if (D.dirty.size) { const ks = [...D.dirty]; D.dirty.clear(); for (const k of ks) buildCell(k); }
     if (D.uniformDirty || (D._ut = (D._ut || 0) + 1) % 30 === 0) updateUniforms();
   };
-  // il terreno normale si "buca" dentro le sfere scavate più vicine (fino a 48)
-  D.U = { uVein: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, -999, 0, 1)) }, uVeinN: { value: 0 }, uDig: { value: Array.from({ length: 48 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigN: { value: 0 },
+  // il terreno normale si "buca" dentro le sfere scavate più vicine (fino a 64)
+  D.U = { uVein: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, -999, 0, 1)) }, uVeinN: { value: 0 }, uDig: { value: Array.from({ length: 64 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigN: { value: 0 },
     // per l'acqua: solo gli scavi sotto terra ferma (montagne, colline): lì il mare non deve comparire
     uDigW: { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigWN: { value: 0 } };
   function updateUniforms() {
     D.uniformDirty = false;
-    const P = G.Player, list = D.list.length > 48 ? D.list.slice().sort((a, b) => Math.hypot(a[0] - P.pos.x, a[2] - P.pos.z) - Math.hypot(b[0] - P.pos.x, b[2] - P.pos.z)).slice(0, 48) : D.list;
-    for (let i = 0; i < 48; i++) { const s = list[i]; if (s) D.U.uDig.value[i].set(s[0], s[1], s[2], s[3] - 0.04); else D.U.uDig.value[i].set(0, -999, 0, 0); }
+    const P = G.Player, carves = D.list.filter((s) => s[3] > 0), list = carves.length > 64 ? carves.slice().sort((a, b) => Math.hypot(a[0] - P.pos.x, a[2] - P.pos.z) - a[3] - Math.hypot(b[0] - P.pos.x, b[2] - P.pos.z) + b[3]).slice(0, 64) : carves;
+    for (let i = 0; i < 64; i++) { const s = list[i]; if (s && s[3] > 0) D.U.uDig.value[i].set(s[0], s[1], s[2], s[3] - 0.04); else D.U.uDig.value[i].set(0, -999, 0, 0); }
     D.U.uDigN.value = list.length;
     let n = 0;
-    for (const s of list) { if (n >= 24) break; if (G.heightAt(s[0], s[2]) > G.SEA + 1) D.U.uDigW.value[n++].set(s[0], s[1], s[2], s[3] + 0.4); }
+    for (const s of list) { if (n >= 24) break; if (s[3] > 0 && G.heightAt(s[0], s[2]) > G.SEA + 1) D.U.uDigW.value[n++].set(s[0], s[1], s[2], s[3] + 0.4); }
     for (let i = n; i < 24; i++) D.U.uDigW.value[i].set(0, -999, 0, 0);
     D.U.uDigWN.value = n;
     // vene vicine al giocatore (solo dove si scava si vedono)
@@ -283,7 +310,7 @@
   // un punto dentro uno scavo sotto terra ferma: niente mare (anche se è sotto il livello del mare)
   D.dryAt = function (x, y, z) {
     const l = near(x, z); if (!l || G.heightAt(x, z) <= G.SEA + 1) return false;
-    for (const i of l) { const s = D.list[i]; const dx = x - s[0], dy = y - s[1], dz = z - s[2]; if (dx * dx + dy * dy + dz * dz < (s[3] + 1.5) * (s[3] + 1.5)) return true; }
+    for (const i of l) { const s = D.list[i]; if (s[3] < 0) continue; const dx = x - s[0], dy = y - s[1], dz = z - s[2]; if (dx * dx + dy * dy + dz * dz < (s[3] + 1.5) * (s[3] + 1.5)) return true; }
     return false;
   };
 })();

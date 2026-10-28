@@ -80,6 +80,15 @@
       ...[-0.32, 0, 0.32].map((x) => { const b = new THREE.CylinderGeometry(0.305, 0.305, 0.06, 14, 1, false, 0, Math.PI); b.rotateZ(Math.PI / 2); b.scale(1, 0.7, 1); b.translate(x, 0.5, 0); return M.colorize(b, 0.22, 0.22, 0.24); }),
       M.colorize(new THREE.BoxGeometry(0.12, 0.14, 0.05).translate(0, 0.46, 0.3), 0.85, 0.7, 0.3)]);
     GEO.baule = M.merge([boxUV(0.9, 0.5, 0.55, 0, 0.25, 0), darker(boxUV(0.92, 0.18, 0.57, 0, 0.58, 0), 0.85), M.colorize(new THREE.BoxGeometry(0.94, 0.06, 0.59).translate(0, 0.48, 0), 0.35, 0.3, 0.25), M.colorize(new THREE.BoxGeometry(0.1, 0.12, 0.04).translate(0, 0.45, 0.29), 0.85, 0.7, 0.35)]);
+    // barile: doghe bombate con i cerchi di ferro
+    {
+      const bar = new THREE.CylinderGeometry(0.3, 0.3, 0.86, 20, 8, false); const bp = bar.attributes.position, bc = new Float32Array(bp.count * 3);
+      for (let i = 0; i < bp.count; i++) { const y = bp.getY(i), a = Math.atan2(bp.getZ(i), bp.getX(i)), r0 = Math.hypot(bp.getX(i), bp.getZ(i)); const k = r0 > 0.01 ? (1 + 0.16 * (1 - (y / 0.43) ** 2)) : 1; bp.setX(i, bp.getX(i) * k); bp.setZ(i, bp.getZ(i) * k); bp.setY(i, y + 0.43); const st = Math.floor((a + Math.PI) / (Math.PI * 2) * 20); const v = 0.78 + ((st * 37) % 9) / 40 - (Math.abs(((a + Math.PI) / (Math.PI * 2) * 20) % 1 - 0.5) > 0.45 ? 0.25 : 0); bc[i * 3] = v; bc[i * 3 + 1] = v * 0.93; bc[i * 3 + 2] = v * 0.85; }
+      bar.setAttribute('color', new THREE.BufferAttribute(bc, 3));
+      const hoops = [0.1, 0.3, 0.56, 0.76].map((y) => { const r = 0.3 * (1 + 0.16 * (1 - ((y - 0.43) / 0.43) ** 2)) + 0.012; return M.colorize(new THREE.CylinderGeometry(r, r, 0.045, 20, 1, true).translate(0, y, 0), 0.2, 0.2, 0.22); });
+      const lidG = M.colorize(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 20).translate(0, 0.86, 0), 0.62, 0.55, 0.45);
+      GEO.barile = M.merge([bar, ...hoops, lidG]);
+    }
     GEO.letto = M.merge([darker(boxUV(1.1, 0.3, 2.1, 0, 0.25, 0), 0.8), darker(boxUV(1.1, 0.7, 0.1, 0, 0.45, -1.05), 0.7), M.colorize(new THREE.BoxGeometry(1.0, 0.16, 1.6).translate(0, 0.46, 0.2), 0.72, 0.2, 0.18), M.colorize(new THREE.BoxGeometry(1.0, 0.14, 0.45).translate(0, 0.45, -0.75), 0.95, 0.93, 0.88), M.colorize(new THREE.BoxGeometry(0.7, 0.12, 0.3).translate(0, 0.56, -0.78), 0.98, 0.97, 0.94)]);
     // falò: pietre + legna
     const fp = [];
@@ -157,8 +166,8 @@
   };
 
   /* ---------- creazione pezzi ---------- */
-  const FREE = new Set(['banco', 'falo', 'baule', 'letto', 'torcia', 'trappola', 'pilastro', 'camino', 'fornace']);
-  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace'].includes(id);
+  const FREE = new Set(['banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola', 'pilastro', 'camino', 'fornace']);
+  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace'].includes(id);
 
   function makeMesh(p) {
     const MAT = G.MAT;
@@ -253,6 +262,7 @@
       case 'recinto': bx.push(rotBox(p, -1.5, 0, -0.1, 1.5, 1.3, 0.1)); break;
       case 'scala': bx.push(rotBox(p, -0.75, 0, -1.5, 0.75, 3, 1.5, { ramp: true })); break;
       case 'banco': bx.push(rotBox(p, -0.8, 0, -0.42, 0.8, 1.0, 0.42, { walk: true })); break;
+      case 'barile': bx.push(rotBox(p, -0.33, 0, -0.33, 0.33, 0.88, 0.33, { walk: true })); break;
       case 'baule': case 'forziere': bx.push(rotBox(p, -0.45, 0, -0.28, 0.45, 0.65, 0.28, { walk: true })); break;
       case 'letto': bx.push(rotBox(p, -0.55, 0, -1.05, 0.55, 0.55, 1.05, { walk: true })); break;
       case 'falo': bx.push(rotBox(p, -0.5, 0, -0.5, 0.5, 0.3, 0.5, { soft: true })); break;
@@ -278,6 +288,7 @@
     const p = Object.assign({}, data);
     if (!p.id) p.id = Math.random().toString(36).slice(2, 10);
     if ((p.t === 'baule' || p.t === 'forziere') && !p.inv) p.inv = new Array(27).fill(null);
+    if (p.t === 'barile' && !p.inv) p.inv = new Array(18).fill(null);
     if (p.t === 'falo' && !p.cook) p.cook = { in: null, out: null, prog: 0 };
     if (p.t === 'fornace' && !p.cook) p.cook = { in: null, out: null, fuel: null, prog: 0, burn: 0 };
     p.mesh = makeMesh(p);
@@ -345,6 +356,8 @@
       if (p.y + height <= b.y0 + 0.02 || p.y >= b.y1 - 0.05) continue;
       const cx = G.clamp(p.x, b.x0, b.x1), cz = G.clamp(p.z, b.z0, b.z1);
       const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;
+      // gradini bassi (soglie, fondazioni, scalini): si salgono da soli camminando, senza saltare
+      if (d2 < rad * rad && b.walk && !b.climb && b.y1 - p.y <= 0.48 && B.ceilingAt(p.x, p.z, b.y1 + height, rad * 0.8) > b.y1 + height) { p.y = b.y1; continue; }
       if (d2 < rad * rad) {
         if (d2 > 1e-8) { const d = Math.sqrt(d2); p.x = cx + (dx / d) * rad; p.z = cz + (dz / d) * rad; }
         else { // dentro il box: esci dal lato più vicino

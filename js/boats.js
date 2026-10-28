@@ -217,7 +217,7 @@
             const yards = [0.35, 0.62, 0.86].map((f) => deckY + 2 + (h - 3) * f);
             add(mn, 'albero_barca', 2, M.merge([cyl(0.2, 0.3, h, 0, deckY + h / 2, z), ...yards.map((y, i) => cyl(0.07, 0.07, sw * (1.15 - i * 0.22), 0, y, z, 0, Math.PI / 2)), cyl(0.9, 0.9, 0.15, 0, deckY + (h - 3) * 0.5 + 2, z)].map((g) => M.colorize(g, 1, 1, 1))), 'logs');
             const sails = yards.slice(0, 2).map((y, i) => { const g = new THREE.PlaneGeometry(sw * (1.1 - i * 0.25), (yards[i + 1] - y) * 0.95, 8, 6); const pp = g.attributes.position; for (let k = 0; k < pp.count; k++) { const u = pp.getX(k) / (sw * 1.1) + 0.5, v = pp.getY(k) / ((yards[i + 1] - y)) + 0.5; pp.setZ(k, Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.6); } g.computeVertexNormals(); g.translate(0, (yards[i + 1] + y) / 2, z + 0.25); return M.colorize(g, 1, 1, 1); });
-            const low = new THREE.PlaneGeometry(sw * 1.15, yards[0] - deckY - 1.2, 8, 4); low.translate(0, (yards[0] + deckY + 1.2) / 2, z + 0.25); sails.push(M.colorize(low, 1, 1, 1));
+            const low = new THREE.PlaneGeometry(sw * 1.15, yards[0] - deckY - 2.45, 8, 4); low.translate(0, (yards[0] + deckY + 2.45) / 2, z + 0.25); sails.push(M.colorize(low, 1, 1, 1)); // la vela bassa parte sopra la testa di chi cammina sul ponte
             add(vn, 'vela', 3, M.merge(sails), 'cloth');
           } else {
           add(mn, 'albero_barca', 1, M.merge([cyl(0.12, 0.17, h, 0, deckY + h / 2, z), cyl(0.06, 0.06, sw * 0.95, 0, deckY + 1.6, z - sw * 0.45, Math.PI / 2, 0), cyl(0.05, 0.05, sw * 0.8, 0, deckY + h - 0.6, z - sw * 0.38, Math.PI / 2, 0)].map((g) => M.colorize(g, 1, 1, 1))), 'logs');
@@ -227,8 +227,8 @@
         if (key === 'galeone') {
           add('Cassero di poppa', 'assi', 20, M.merge([box(W * 0.8, 2.6, L * 0.14, 0, deckY + 1.3, -L * 0.43), box(W * 0.86, 0.16, L * 0.16, 0, deckY + 2.68, -L * 0.43), box(W * 0.7, 0.9, 0.08, 0, deckY + 3.2, -L * 0.36), box(0.8, 1.8, 0.06, 0, deckY + 0.9, -L * 0.36 + 0.02)]), 'planks');
           add('Castello di prua', 'assi', 12, M.merge([box(W * 0.72, 1.8, L * 0.16, 0, deckY + 0.9, L * 0.42), box(W * 0.76, 0.14, L * 0.17, 0, deckY + 1.85, L * 0.42)]), 'planks');
-          const cannons = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const t = 0.28 + i * 0.1, z = (t - 0.5) * L, x = sd * (H.hw(t) - 0.35); const c = cyl(0.13, 0.17, 1.4, x, deckY + 0.55, z, 0, Math.PI / 2); c.translate(0, 0, 0); cannons.push(M.colorize(c, 0.25, 0.25, 0.27)); cannons.push(M.colorize(new THREE.BoxGeometry(0.5, 0.35, 0.6).translate(x - sd * 0.4, deckY + 0.2, z), 0.45, 0.32, 0.2)); }
-          add('Cannoni', 'cannone', 6, M.merge(cannons), 'rope');
+          const cannons = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const t = 0.28 + i * 0.1, z = (t - 0.5) * L, x = sd * (H.hw(t) - 0.35); const c = cyl(0.13, 0.17, 1.4, x, deckY + 0.55, z, 0, Math.PI / 2); c.translate(0, 0, 0); cannons.push(M.colorize(c, 0.07, 0.07, 0.075)); cannons.push(M.colorize(new THREE.BoxGeometry(0.5, 0.35, 0.6).translate(x - sd * 0.4, deckY + 0.2, z), 0.32, 0.2, 0.11)); }
+          add('Cannoni', 'cannone', 6, M.merge(cannons), 'cannon');
           const fl = new THREE.PlaneGeometry(2.2, 1.4); fl.translate(1.1, deckY + 15.5 + 0.6, (0.5 - 0.5) * L); add('Bandiera', 'stoffa', 2, M.colorize(fl, 0.12, 0.12, 0.12), 'cloth');
         }
         if (key === 'veliero') add('Cassero', 'assi', 12, M.merge([box(W * 0.75, 1.9, 3.2, 0, deckY + 0.95, -L * 0.33), box(W * 0.85, 0.14, 3.5, 0, deckY + 1.95, -L * 0.33), box(0.7, 1.4, 0.06, 0, deckY + 0.7, -L * 0.33 + 1.62)]), 'planks');
@@ -347,7 +347,7 @@
     G.saveSoon && G.saveSoon();
     return true;
   };
-  BT.serialize = () => BT.list.map((b) => BT.serializeOne(b));
+  BT.serialize = () => BT.list.filter((b) => !b.pirate).map((b) => BT.serializeOne(b));
   BT.load = function (arr) { for (const b of BT.list) G.scene.remove(b.root); BT.list = []; for (const d of arr || []) BT.create(d); };
   BT.init = function () {
     BT.holo = G.holoMaterial(0x6fd8ff);
@@ -450,6 +450,8 @@
         b.speed += (target - b.speed) * Math.min(1, dt * (T.sail ? 0.35 : 0.9));
         b.rudder += (turn - b.rudder) * Math.min(1, dt * 3);
         b.yaw += b.rudder * T.turn * dt * (0.25 + Math.min(Math.abs(b.speed) / T.speed, 1) * 0.9) * Math.sign(b.speed || 1);
+      } else if (b.ai && BT.isComplete(b)) {
+        b.ai(b, dt); // nave guidata dal gioco (pirati)
       } else if (remoteDrive) {
         // un altro giocatore la sta guidando: insegui lo stato ricevuto
         const k = Math.min(1, dt * 6);

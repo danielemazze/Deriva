@@ -256,36 +256,76 @@
     const btn = (act, label, on, extra) => `<button class="mini-btn ${on ? 'on' : ''}" data-tool="${act}" ${extra || ''} ${allowed ? '' : 'disabled'}>${label}</button>`;
     const vl = Cmd.villages().slice(0, 6), p = P().pos;
     const sp = ['gallina', 'pecora', 'mucca', 'maiale', 'coniglio', 'lupo', 'orso', 'giaguaro', 'serpente', 'coccodrillo', 'squalo', 'pirata', 'capitano'];
-    return `<div class="toolsp"><h3>Strumenti<small>${allowed ? 'comandi del mondo · anche dalla console con T o /' : 'li usa solo chi ospita (o un operatore)'}</small></h3>
-      <div class="tgrid">
+    const tab = Cmd.tab || 'mondo';
+    const TABS = [['mondo', '☀ Mondo'], ['viaggio', '🧭 Viaggi'], ['creature', '🐾 Creature'], ['giocatore', '🎒 Giocatore'], ['partita', '👥 Partita']];
+    const S = {};
+    S.mondo = `
       <section><h4>Orario <span class="tval">${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor((hh % 1) * 60)).padStart(2, '0')}</span></h4>
         <div class="tbtns">${Object.entries({ alba: 'Alba', mattina: 'Mattina', mezzogiorno: 'Mezzogiorno', tramonto: 'Tramonto', sera: 'Sera', notte: 'Notte' }).map(([k, n]) => btn('ora:' + k, n)).join('')}</div>
-        <input type="range" min="0" max="23.75" step="0.25" value="${hh.toFixed(2)}" data-toolr="ora" ${allowed ? '' : 'disabled'}></section>
+        <input type="range" min="0" max="23.75" step="0.25" value="${hh.toFixed(2)}" data-toolr="ora" ${allowed ? '' : 'disabled'}><small class="cmdh">/ora 18 · /ora tramonto</small></section>
       <section><h4>Meteo <span class="tval">${Cl.KINDS[Cl.state.kind].icon} ${Cl.KINDS[Cl.state.kind].n}${Cl.state.lock ? ' · fisso' : ' · variabile'}</span></h4>
-        <div class="tbtns">${Object.entries(Cl.KINDS).map(([k, v]) => btn('meteo:' + k, v.icon + ' ' + v.n, Cl.state.kind === k)).join('')}${btn('meteo:auto', '↻ Variabile', !Cl.state.lock)}</div></section>
+        <div class="tbtns">${Object.entries(Cl.KINDS).map(([k, v]) => btn('meteo:' + k, v.icon + ' ' + v.n, Cl.state.kind === k)).join('')}${btn('meteo:auto', '↻ Variabile', !Cl.state.lock)}</div><small class="cmdh">/meteo temporale</small></section>
       <section><h4>Vento <span class="tval">${G.WIND.level} · da ${Cl.dirName(G.Boats.wind.dir)}${Cl.cur.wind ? ` · col meteo ${Math.round(Cl.windLevel())}` : ''}</span></h4>
         <input type="range" min="0" max="10" step="1" value="${G.WIND.level}" data-toolr="vento" ${allowed ? '' : 'disabled'}>
         <div class="tbtns rose">${Cl.DIR_N.map((d) => btn('dir:' + d, d, Cl.dirName(G.Boats.wind.dir) === d)).join('')}</div>
-        <div class="tbtns">${btn('gorgo', '🌀 Gorgo qui davanti')}</div></section>
+        <div class="tbtns">${btn('gorgo', '🌀 Gorgo qui davanti')}</div><small class="cmdh">/vento 6 NE · /gorgo</small></section>
       <section><h4>Luna <span class="tval">${Cl.PHASE_ICON[Cl.moonIndex()]} ${Cl.moonName()}</span></h4>
-        <div class="tbtns moon">${Cl.PHASES.map((n, i) => btn('luna:' + i, Cl.PHASE_ICON[i], Cl.moonIndex() === i, `title="${n}"`)).join('')}</div></section>
+        <div class="tbtns moon">${Cl.PHASES.map((n, i) => btn('luna:' + i, Cl.PHASE_ICON[i], Cl.moonIndex() === i, `title="${n}"`)).join('')}</div><small class="cmdh">/luna piena</small></section>`;
+    const others = G.Net && G.Net.on ? [...G.Net.remotes.values()] : [];
+    S.viaggio = `
       <section><h4>Vai al bioma</h4>
-        <div class="tbtns">${[['pianura', 'Pianura'], ['foresta', 'Foresta'], ['pluviale', 'Pluviale'], ['giungla', 'Giungla'], ['deserto', 'Deserto'], ['montagna', 'Montagna'], ['neve', 'Neve'], ['vulcano', 'Vulcano']].filter(([k]) => G.BIOME[Cmd.BIOMES[k]] !== undefined).map(([k, n]) => btn('bioma:' + k, n)).join('')}</div>
-        <h4 style="margin-top:10px">Vai al luogo</h4>
-        <div class="tbtns">${[['faro', 'Faro'], ['relitto', 'Relitto'], ['covo', 'Covo'], ['rovina', 'Rovina'], ['miniera', 'Miniera'], ['accampamento', 'Accampamento'], ['castello', 'Castello']].map(([k, n]) => btn('vai:' + k, n)).join('')}</div></section>
+        <div class="tbtns">${[['pianura', 'Pianura'], ['foresta', 'Foresta'], ['pluviale', 'Pluviale'], ['giungla', 'Giungla'], ['deserto', 'Deserto'], ['montagna', 'Montagna'], ['neve', 'Neve'], ['vulcano', 'Vulcano']].filter(([k]) => G.BIOME[Cmd.BIOMES[k]] !== undefined).map(([k, n]) => btn('bioma:' + k, n)).join('')}</div><small class="cmdh">/bioma deserto</small></section>
+      <section><h4>Vai al luogo</h4>
+        <div class="tbtns">${[['faro', 'Faro'], ['relitto', 'Relitto'], ['covo', 'Covo'], ['rovina', 'Rovina'], ['miniera', 'Miniera'], ['accampamento', 'Accampamento'], ['castello', 'Castello']].map(([k, n]) => btn('vai:' + k, n)).join('')}</div><small class="cmdh">/vai castello</small></section>
       <section><h4>Villaggi vicini</h4>
         <div class="vlist">${vl.map((v) => `<div><span>${esc(v.name)} <small>${esc(v.style)} · ${Math.round(Math.hypot(v.x - p.x, v.z - p.z))} m</small></span>${btn('vill:' + v.id, 'Vai')}</div>`).join('') || '<p class="note">Nessun villaggio entro 5 km</p>'}</div>
-        ${btn('villaggi', 'Segna tutti sulla mappa')}</section>
-      <section class="wide2"><h4>Fai comparire</h4>
-        <div class="tbtns">${sp.filter((s) => G.SPECIES[s]).map((s) => btn('spawn:' + s, G.SPECIES[s].n, false, G.isHostile(s) ? 'data-hostile="1"' : '')).join('')}${btn('spawn:abitante', 'Abitante')}${btn('spawn:mercante', 'Mercante')}</div></section>
-      <section><h4>Modalità e nemici</h4>
-        <div class="tbtns">${btn('mode:sopravvivenza', 'Sopravvivenza', !G.creative())}${btn('mode:creativa', 'Creativa', G.creative())}</div>
-        <div class="tbtns">${btn('nemici:si', 'Nemici sì', !G.enemiesOff)}${btn('nemici:no', 'Nemici no', !!G.enemiesOff)}${btn('cura', 'Cura')}</div></section>
-      </div><p class="note">Console: premi <kbd>T</kbd> o <kbd>/</kbd> e scrivi /aiuto. Pannello: <kbd>K</kbd>.</p></div>`;
+        ${btn('villaggi', 'Segna tutti sulla mappa')}<small class="cmdh">/villaggio · /villaggi</small></section>
+      <section><h4>Coordinate <span class="tval">X ${Math.round(p.x)} · Z ${Math.round(p.z)}</span></h4>
+        <div class="tbtns tpbox"><input type="number" id="tpx" placeholder="X" value="${Math.round(p.x)}"><input type="number" id="tpz" placeholder="Z" value="${Math.round(p.z)}">${btn('tp', 'Teletrasporto')}</div>
+        <div class="tbtns">${btn('coord', 'Scrivi le mie coordinate in chat')}</div><small class="cmdh">/tp 120 -340 · /coord</small></section>
+      <section><h4>Vai da un amico</h4>
+        <div class="tbtns">${others.map((r) => btn('tpda:' + encodeURIComponent(r.name), esc(r.name))).join('') || '<p class="note">Nessun altro giocatore in partita</p>'}</div><small class="cmdh">/tpda Marco</small></section>`;
+    S.creature = `
+      <section class="wide2"><h4>Animali e nemici <span class="tval">Maiusc+clic: 3 alla volta</span></h4>
+        <div class="tbtns">${sp.filter((s) => G.SPECIES[s]).map((s) => btn('spawn:' + s, G.SPECIES[s].n, false, G.isHostile(s) ? 'data-hostile="1"' : '')).join('')}</div><small class="cmdh">/spawn lupo 3</small></section>
+      <section><h4>Persone</h4><div class="tbtns">${btn('spawn:abitante', 'Abitante')}${btn('spawn:mercante', 'Mercante')}</div><small class="cmdh">/spawn abitante</small></section>
+      <section><h4>Mare aperto</h4><div class="tbtns">${btn('spawn:kraken', '🐙 Kraken', false, 'data-hostile="1"')}${btn('spawn:pirati', '🏴‍☠️ Nave pirata', false, 'data-hostile="1"')}${btn('spawn:mare', 'Mare calmo')}</div><small class="cmdh">/spawn kraken · /spawn pirati · /spawn mare</small></section>
+      <section><h4>Nemici</h4><div class="tbtns">${btn('nemici:si', 'Nemici sì', !G.enemiesOff)}${btn('nemici:no', 'Nemici no', !!G.enemiesOff)}</div><small class="cmdh">/nemici si · no</small></section>`;
+    const items = ['assi', 'tronco', 'pietra', 'corda', 'chiodi', 'ferro', 'munizioni', 'freccia', 'torcia', 'terra', 'doblone', 'cibo'].filter((i) => G.ITEMS[i]);
+    S.giocatore = `
+      <section><h4>Modalità <span class="tval">F4 per cambiare</span></h4>
+        <div class="tbtns">${btn('mode:sopravvivenza', 'Sopravvivenza', !G.creative())}${btn('mode:creativa', 'Creativa', G.creative())}</div><small class="cmdh">/modalita creativa</small></section>
+      <section><h4>Salute</h4><div class="tbtns">${btn('cura', '❤ Salute, fame e sete al massimo')}</div><small class="cmdh">/cura</small></section>
+      <section class="wide2"><h4>Dai oggetti <span class="tval">Maiusc+clic: 64</span></h4>
+        <div class="tbtns">${items.map((i) => btn('dai:' + i, esc(G.ITEMS[i].n))).join('')}</div>
+        <div class="tbtns tpbox"><input id="daiid" placeholder="nome oggetto (es. lanterna)"><input type="number" id="dain" value="1" min="1" max="999">${btn('daix', 'Dai')}</div><small class="cmdh">/dai assi 64</small></section>`;
+    const isHost = !(G.Net && G.Net.on) || G.Net.isHost;
+    S.partita = `
+      <section><h4>Morte e inventario</h4><div class="tbtns">${btn('ki:1', 'Tieni l’inventario', !!G.keepInv, isHost ? '' : 'disabled')}${btn('ki:0', 'Perdi tutto', !G.keepInv, isHost ? '' : 'disabled')}</div><small class="cmdh">${isHost ? 'lo decide chi ospita' : 'solo chi ospita può cambiarlo'}</small></section>
+      <section class="wide2"><h4>Operatori <span class="tval">${isHost ? 'possono usare tutti i comandi' : 'lo decide chi ospita'}</span></h4>
+        <div class="vlist">${others.map((r) => { const op = !!r.op; return `<div><span>${esc(r.name)} <small>${op ? 'operatore' : 'giocatore'}</small></span>${isHost ? btn((op ? 'deop:' : 'op:') + encodeURIComponent(r.name), op ? 'Togli operatore' : 'Rendi operatore') : ''}</div>`; }).join('') || '<p class="note">Nessun altro giocatore in partita</p>'}</div><small class="cmdh">/op Marco · /deop Marco</small></section>`;
+    return `<div class="toolsp"><h3>Strumenti<small>${allowed ? 'tutti i comandi del mondo · anche dalla console con T o /' : 'li usa solo chi ospita (o un operatore)'}</small></h3>
+      <div class="ttabs">${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-ttab="${k}">${n}</button>`).join('')}</div>
+      <div class="tgrid">${S[tab]}</div>
+      <p class="note">Console: premi <kbd>T</kbd> o <kbd>/</kbd> e scrivi /aiuto. Pannello: <kbd>K</kbd>.</p></div>`;
   }
   function clickPanel(e) {
-    const b = e.target.closest('[data-tool]'); if (!b || b.disabled) return !!e.target.closest('input[type=range]');
-    const [k, v] = b.dataset.tool.split(':');
+    const tb = e.target.closest('[data-ttab]'); if (tb) { Cmd.tab = tb.dataset.ttab; G.UI.renderPanel(); return true; }
+    if (e.target.closest('input')) return true;
+    const b = e.target.closest('[data-tool]'); if (!b || b.disabled) return false;
+    const [k, v0] = b.dataset.tool.split(':'), v = v0 === undefined ? v0 : decodeURIComponent(v0);
+    const ext = { tp: 1, coord: 1, tpda: 1, dai: 1, daix: 1, ki: 1, op: 1, deop: 1 };
+    if (ext[k]) {
+      if (k === 'tp') { const x = +$('tpx').value, z = +$('tpz').value; if (isFinite(x) && isFinite(z)) { Cmd.run(`/tp ${x} ${z}`); G.UI.close(); } }
+      else if (k === 'coord') Cmd.run('/coord');
+      else if (k === 'tpda') { Cmd.run('/tpda ' + v); G.UI.close(); }
+      else if (k === 'dai') Cmd.run(`/dai ${v} ${e.shiftKey ? 64 : 1}`);
+      else if (k === 'daix') { const id = $('daiid').value.trim(); if (id) Cmd.run(`/dai ${id} ${Math.max(1, +$('dain').value || 1)}`); }
+      else if (k === 'ki') { G.keepInv = v === '1'; G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; say(G.keepInv ? 'Morendo si tiene l’inventario' : 'Morendo si perde tutto (gli oggetti restano dove muori)'); }
+      else if (k === 'op' || k === 'deop') Cmd.run(`/${k} ${v}`);
+      if (G.UI.open === 'strumenti') G.UI.renderPanel();
+      return true;
+    }
     let r = null;
     // operatore (non chi ospita): i comandi del mondo passano da chi ospita
     if (G.Net && G.Net.on && !G.Net.isHost) {

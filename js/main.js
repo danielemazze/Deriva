@@ -184,7 +184,7 @@
   G.creative = () => G.mode === 'creativa';
   G.serializeAll = () => ({
     v: 3, name: G.worldName, mode: G.mode, seed: G.seed, time: G.time, player: G.Player.serialize(), builds: G.Build.serialize(), boats: G.Boats.serialize(),
-    removed: [...G.state.removed], killed: [...(G.state.killed || [])], wind: G.Boats.wind.dir, lv: G.WIND.level, chests: G.state.chests, enemies: !G.enemiesOff, ops: G.state.ops || [], vg: G.voiceGlobal ? 1 : 0,
+    removed: [...G.state.removed], killed: [...(G.state.killed || [])], wind: G.Boats.wind.dir, lv: G.WIND.level, chests: G.state.chests, enemies: !G.enemiesOff, ops: G.state.ops || [], vg: G.voiceGlobal ? 1 : 0, ki: G.keepInv ? 1 : 0,
     weather: G.Climate ? G.Climate.serialize() : null, digs: G.Dig ? G.Dig.serialize() : [], pets: G.Pets ? G.Pets.serialize() : [],
   });
   G.save = function () {
@@ -245,7 +245,7 @@
     for (const ch of [...G.World.chunks.values()]) G.World.unload(ch);
     G.World.rebuild();
     G.initWorldGen(seed);
-    G.state = { removed: new Set(), chests: {}, ops: [] }; G.voiceGlobal = false; if (G.Drops) G.Drops.clear(); if (G.Sea) G.Sea.clear();
+    G.state = { removed: new Set(), chests: {}, ops: [] }; G.voiceGlobal = false; G.keepInv = false; if (G.Drops) G.Drops.clear(); if (G.Sea) G.Sea.clear();
     if (G.POI) G.POI.reset();
     if (G.Structures && G.Structures.group) G.Structures.clear();
     if (G.MapUI) G.MapUI.reset();
@@ -283,7 +283,7 @@
     if (save) {
       G.state.removed = new Set(save.removed || []);
       G.state.killed = new Set(save.killed || []);
-      G.state.chests = save.chests || {}; G.state.ops = save.ops || []; G.voiceGlobal = !!save.vg;
+      G.state.chests = save.chests || {}; G.state.ops = save.ops || []; G.voiceGlobal = !!save.vg; G.keepInv = !!save.ki;
       G.time = save.time; G.Boats.wind.dir = save.wind || 0.6;
       if (G.Climate) G.Climate.load(save.weather);
       if (G.Dig) G.Dig.load(save.digs);
@@ -325,10 +325,10 @@
     G.Player.vel.set(0, 0, 0);
   };
   // istantanea del mondo per il server multigiocatore
-  G.netSnapshot = () => ({ seed: G.seed, time: G.time, weather: G.Climate ? G.Climate.serialize() : null, digs: G.Dig ? G.Dig.serialize() : [], pets: G.Pets ? G.Pets.serialize() : [], wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, enemies: !G.enemiesOff, vg: G.voiceGlobal ? 1 : 0, chests: G.state.chests, removed: [...G.state.removed], killed: [...(G.state.killed || [])], builds: G.Build.serialize(), boats: G.Boats.serialize() });
+  G.netSnapshot = () => ({ seed: G.seed, time: G.time, weather: G.Climate ? G.Climate.serialize() : null, digs: G.Dig ? G.Dig.serialize() : [], pets: G.Pets ? G.Pets.serialize() : [], wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, enemies: !G.enemiesOff, vg: G.voiceGlobal ? 1 : 0, ki: G.keepInv ? 1 : 0, mapEx: [...(G.Player.explored || [])], mapDisc: G.Player.discovered || {}, chests: G.state.chests, removed: [...G.state.removed], killed: [...(G.state.killed || [])], builds: G.Build.serialize(), boats: G.Boats.serialize() });
   // ingresso in una partita altrui
   G.startFromSnapshot = function (snap, you) {
-    G.enemiesOff = snap.enemies === false; G.voiceGlobal = !!snap.vg;
+    G.enemiesOff = snap.enemies === false; G.voiceGlobal = !!snap.vg; G.keepInv = !!snap.ki;
     resetWorld(snap.seed);
     G.state.removed = new Set(snap.removed || []);
     G.state.killed = new Set(snap.killed || []);
@@ -372,6 +372,7 @@
     G.PHOTO = await G.TEX.loadPhotos('assets/');
     try { G.SCAN = await G.TEX.loadScans('assets/models/'); } catch (e) { G.SCAN = null; console.warn('modelli scansionati non disponibili', e); }
     try { if (G.AnimLib) await G.AnimLib.load('assets/models/animali/'); } catch (e) { console.warn('animali animati non disponibili', e); }
+    try { if (G.Humans) await G.Humans.load('assets/models/persone/'); } catch (e) { console.warn('persone non disponibili', e); }
     $('loadText').textContent = 'Faccio crescere le foreste…';
     await new Promise((r) => setTimeout(r, 0));
     G.createMaterials(G.TEX, S);
@@ -583,6 +584,21 @@
     if (useFxaa) {
       post.fxaa.uniforms.t.value = rtC.texture; post.fxaa.uniforms.uRes.value.set(G.rtSize[0], G.rtSize[1]);
       post.quad.material = post.fxaa; renderer.setRenderTarget(null); renderer.render(post.scene, post.cam); mark('fxaa');
+    }
+    // F2: istantanea dell'immagine appena disegnata (il buffer è ancora valido in questo momento)
+    if (G.shotReq) { G.shotReq = false; try { G.saveShot(renderer.domElement.toDataURL('image/png')); } catch (e) { G.UI.toast('Istantanea non riuscita', 'warn'); } }
+  };
+  G.saveShot = async function (url) {
+    const fl = document.createElement('div'); fl.className = 'shotflash'; document.body.appendChild(fl); setTimeout(() => fl.remove(), 450);
+    if (G.Audio && G.Audio.click) G.Audio.click();
+    if (window.deriva && window.deriva.saveShot) {
+      const r = await window.deriva.saveShot(url);
+      G.UI.toast(r && r.ok ? 'Istantanea salvata in Immagini › Deriva' : 'Non sono riuscito a salvare l’istantanea', r && r.ok ? 'good' : 'warn');
+    } else {
+      const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
+      const a = document.createElement('a'); a.href = url; a.download = `Deriva_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}-${p2(d.getSeconds())}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      G.UI.toast('Istantanea scaricata', 'good');
     }
   };
   let _mt = 0; const _bwM = [0, 0, 0, 0];

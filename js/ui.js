@@ -75,7 +75,7 @@
   };
 
   const TREE_N = { oak: 'Quercia', birch: 'Betulla', pine: 'Pino', palm: 'Palma', faretra: 'Albero faretra' };
-  const PIECE_HINT = { porta: 'apri / chiudi', baule: 'apri', forziere: 'apri', banco: 'crea (griglia 5×5)', falo: 'cucina', letto: 'dormi' };
+  const PIECE_HINT = { porta: 'apri / chiudi', baule: 'apri', barile: 'apri', forziere: 'apri', banco: 'crea (griglia 5×5)', falo: 'cucina', letto: 'dormi' };
   function targetHTML(tg) {
     const p = P(), held = p.held();
     if (!tg) return '';
@@ -163,8 +163,10 @@
     const Cl = G.Climate;
     if (Cl && (!UI._wT || nowB - UI._wT > 1000)) { UI._wT = nowB; const K = Cl.KINDS[Cl.state.kind], snow = Cl.cur.snow > Cl.cur.rain && Cl.cur.snow > 0.3; UI._wx = ` · ${snow ? '❄ Neve' : K.icon + ' ' + K.n} · ${Math.round(Cl.felt !== undefined ? Cl.felt : Cl.airTemp(p.pos.x, p.pos.z, p.pos.y))}°C${G.sky.night > 0.3 ? ' · ' + Cl.PHASE_ICON[Cl.moonIndex()] + ' ' + Cl.moonName() : ''}`; }
     const ck = `Giorno ${Math.floor(G.time) + 1} · ${String(hh).padStart(2, '0')}:${String(mm - (mm % 5)).padStart(2, '0')} · ${UI._bio}${UI._wx || ''}`;
-    if (ck !== UI._ck) { UI._ck = ck; $('clock').textContent = ck; }
-    { const cd = $('coordhud'); if (cd) { const show = G.settings.coords !== false; const t = show ? `X ${Math.round(p.pos.x)} · Z ${Math.round(p.pos.z)}` : ''; if (t !== UI._cd) { UI._cd = t; cd.textContent = t; cd.hidden = !show; } } }
+    // giorno, ora, coordinate, vento e il resto stanno nella schermata tecnica (F3)
+    const f3 = !!G.settings.f3;
+    if (f3 !== UI._f3on) { UI._f3on = f3; $('clock').hidden = true; const cd = $('coordhud'); if (cd) cd.hidden = true; let el = $('f3'); if (!el) { el = document.createElement('div'); el.id = 'f3'; $('hud').appendChild(el); } el.hidden = !f3; }
+    if (f3 && (!UI._f3T || nowB - UI._f3T > 250)) { UI._f3T = nowB; $('f3').innerHTML = f3HTML(p, ck); }
     // mirino e bersaglio
     let html = '';
     if (!UI.open && !p.placing && !UI.boatPlacing) html = targetHTML(p.target);
@@ -209,15 +211,36 @@
     }
     renderHints();
   };
+  // schermata tecnica (F3), come quella di Minecraft
+  function f3HTML(p, ck) {
+    const r1 = (v) => v.toFixed(1), dir = ['Nord', 'Nord-est', 'Est', 'Sud-est', 'Sud', 'Sud-ovest', 'Ovest', 'Nord-ovest'];
+    const hd = ((-p.yaw * 180 / Math.PI) % 360 + 360) % 360, wdir = G.Boats ? ((G.Boats.wind.dir * 180 / Math.PI) % 360 + 360) % 360 : 0;
+    const Cl = G.Climate, cx = Math.floor(p.pos.x / G.CHUNK), cz = Math.floor(p.pos.z / G.CHUNK), gh = G.heightAt(p.pos.x, p.pos.z);
+    const L = [];
+    L.push(`<b>Deriva ${G.VERSION}</b> · ${Math.round(G.fps || 0)} FPS · ${G.settings.preset || ''}`);
+    L.push(`${ck}`);
+    L.push(`<b>XYZ</b> ${r1(p.pos.x)} / ${r1(p.pos.y)} / ${r1(p.pos.z)}`);
+    L.push(`<b>Chunk</b> ${cx}, ${cz} · terreno ${r1(gh)} m · mare ${r1(G.waveHeight ? G.waveHeight(p.pos.x, p.pos.z, G.clock) : 0)} m`);
+    L.push(`<b>Direzione</b> ${dir[Math.round(hd / 45) % 8]} (${Math.round(hd)}°) · inclinazione ${Math.round(p.pitch * 180 / Math.PI)}°`);
+    L.push(`<b>Vento</b> forza ${G.WIND.level}${Cl ? ' (ora ' + r1(Cl.windLevel()) + ')' : ''} · da ${dir[Math.round(((wdir + 180) % 360) / 45) % 8]} (${Math.round(wdir)}°) · onde ${r1(G.waveAmp || 0)}`);
+    if (Cl) L.push(`<b>Meteo</b> ${Cl.KINDS[Cl.state.kind].n} · nuvole ${Math.round(Cl.cur.cloud * 100)}% · pioggia ${Math.round(Cl.cur.rain * 100)}% · temperatura ${Math.round(Cl.felt !== undefined ? Cl.felt : 15)}°C`);
+    if (p.boat) L.push(`<b>Barca</b> ${p.boat.T.n} · ${r1(Math.abs(p.boat.speed) * 1.944)} nodi · scafo ${G.Sea ? Math.round(G.Sea.hullOf(p.boat) / G.Sea.hullMax(p.boat) * 100) : 100}%`);
+    L.push(`<b>Vita</b> ${Math.round(p.health)} · fame ${Math.round(p.hunger)} · sete ${Math.round(p.thirst)}${p.under ? ' · ossigeno ' + Math.round(p.oxygen) : ''}`);
+    L.push(`<b>Mondo</b> seme ${G.seed} · ${G.mode} · nemici ${G.enemiesOff ? 'no' : 'sì'} · tieni l'inventario ${G.keepInv ? 'sì' : 'no'}`);
+    L.push(`<b>Entità</b> animali ${G.Entities.list.length} · oggetti a terra ${G.Drops ? G.Drops.list.length : 0}${G.Sea && G.Sea.enc.length ? ' · incontri ' + G.Sea.enc.map((e) => e.name).join(', ') : ''}`);
+    if (G.Net && G.Net.on) L.push(`<b>Rete</b> ${G.Net.isHost ? 'ospiti tu' : 'ospite'} · giocatori ${G.Net.remotes.size + 1} · ping ${Math.round(G.Net.ping || 0)} ms`);
+    L.push(`<span class="dim">F3 per chiudere · F2 istantanea</span>`);
+    return L.map((l) => `<div>${l}</div>`).join('');
+  }
   function hintList() {
     const p = P(), k = [];
     if (UI.boatPlacing) return ['Sagoma', [['Clic', 'traccia la sagoma'], ['Esc', 'annulla']]];
     if (p.placing) return ['Costruzione', [['Tasto destro', 'posa'], ['R', 'ruota'], ['Esc', 'annulla']]];
     if (p.boat) {
       const T = p.boat.T;
-      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
+      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], ...(G.Sea && G.Sea.nearCannon && G.Sea.nearCannon(p) ? [['Clic sinistro (mano vuota)', 'spara col cannone · guarda in alto per tirare lontano']] : []), ...(p.boat.hull !== undefined && G.Sea && p.boat.hull < G.Sea.hullMax(p.boat) ? [['Assi in mano + tasto destro', 'ripara lo scafo']] : []), ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
       if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], [G.useKey(), 'lascia i remi']]];
-      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], ...(p.boat.inv ? [['G', 'stiva']] : []), [G.useKey(), 'lascia il timone']]];
+      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], ...(p.boat.inv ? [['G', 'stiva']] : []), ...(G.Sea && G.Sea.hasCannons(p.boat) ? [['Clic sinistro', 'bordata di cannoni']] : []), [G.useKey(), 'lascia il timone']]];
     }
     const held = p.held(), id = held && held.id, d = id && G.ITEMS[id];
     if (id === 'arco') k.push(['Tieni premuto clic sinistro', 'tendi e scocca']);
@@ -225,7 +248,7 @@
     else if (G.FreeBoat && G.FreeBoat.isPiece(id) && id !== 'torcia' && id !== 'baule') k.push(['Tasto destro', id === 'fasciame' || id === 'ponte_barca' ? 'sul mare: inizia una barca libera · su una barca: monta' : 'su una barca libera: monta']);
     else if (['pala', 'piccone'].includes(G.toolClass(id))) k.push(['Clic sinistro sul terreno', G.toolClass(id) === 'pala' ? 'scava (o scava sulla X)' : 'scava nella roccia']);
     else if (id === 'cannocchiale') { k.push([G.isTouch ? 'Guarda' : 'Tieni premuto tasto destro', 'guarda lontano']); k.push([G.isTouch ? 'Zoom' : 'Rotella', 'ingrandimento ×2–×8']); }
-    const use = id === 'mappa_tesoro' ? 'leggi la mappa' : d && d.cat === 'blueprint' ? 'impara il progetto' : id === 'libro' ? 'apri il libro' : id === 'canna' ? (p.fish ? 'tira su la lenza' : 'lancia la lenza') : id === 'ciotola' ? 'raccogli acqua' : d && G.Build.isPlaceable(id) ? 'posiziona' : d && (d.food || d.water) ? 'mangia / bevi' : null;
+    const use = id === 'mappa_tesoro' ? 'leggi la mappa' : d && d.cat === 'blueprint' ? 'impara il progetto' : id === 'libro' ? 'apri il libro' : id === 'canna' ? (p.fish ? 'tira su la lenza' : 'lancia la lenza') : id === 'ciotola' ? 'raccogli acqua' : id === 'terra' ? 'rimetti la terra nel buco' : d && G.Build.isPlaceable(id) ? 'posiziona' : d && (d.food || d.water) ? 'mangia / bevi' : null;
     if (p.fly) k.push(['W A S D', 'vola'], ['Spazio / C', 'sali / scendi'], ['Spazio ×2', 'atterra']);
     else if (p.swim) k.push(['W A S D', 'nuota'], ['Spazio', 'risali'], ['C', 'immergiti']);
     else k.push(['W A S D', 'muoviti'], ['Spazio', 'salta'], ['Maiusc', 'corri']);
@@ -467,7 +490,7 @@
   // creativa: inventario rapido a tema (tasti 1-8 con l'inventario aperto)
   const KITS = [
     ['Barche', 'fasciame', ['fasciame', 'ponte_barca', 'zavorra', 'timone', 'albero_barca', 'vela', 'remo', 'panca', 'cannone', 'progetto_canoa', 'progetto_catamarano', 'progetto_galeone', 'vela_leggendaria', 'corda', 'stoffa', 'assi', 'chiodi', 'munizioni', 'baule', 'torcia', 'cannocchiale', 'bussola_oro']],
-    ['Legno', 'muro', ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'scala', 'recinto', 'torcia', 'banco', 'baule', 'letto', 'falo', 'trappola', 'assi', 'tronco', 'bastone', 'chiodi', 'corda', 'ascia_ferro']],
+    ['Legno', 'muro', ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'scala', 'recinto', 'torcia', 'banco', 'baule', 'barile', 'letto', 'falo', 'trappola', 'assi', 'tronco', 'bastone', 'chiodi', 'corda', 'ascia_ferro']],
     ['Pietra', 'muro_pietra', ['pavimento_pietra', 'muro_pietra', 'muro_porta_pietra', 'muro_finestra_pietra', 'tetto_pietra', 'scala_pietra', 'pilastro', 'porta', 'torcia', 'camino', 'fornace', 'baule', 'letto', 'banco', 'pietra', 'carbone', 'lingotto_ferro', 'piccone_ferro']],
     ['Attrezzi', 'piccone_ferro', ['piccone_ferro', 'ascia_ferro', 'pala_ferro', 'coltello', 'canna', 'cannocchiale', 'scudo', 'ciotola', 'lanterna', 'bussola_oro', 'pinne', 'mappa_tesoro', 'piccone', 'ascia', 'pala', 'cappello_lana', 'maglione_lana', 'mantello_pelle', 'stivali_pelle', 'cappello_paglia']],
     ['Armi', 'spada_ferro', ['spada_ferro', 'sciabola', 'lancia', 'arco', 'freccia', 'pistola', 'pistola_capitano', 'munizioni', 'coltello_ossidiana', 'scudo', 'cannone', 'trappola']],
@@ -618,7 +641,7 @@
         ${G.Boats.unlocked(UI.bookBoat) ? '<button class="bigbtn" data-act="placeboat">Traccia la sagoma in mare</button>' : `<p class="lockmsg">Ti manca il progetto. Cercalo nei forzieri, nei relitti, dai mercanti o come ricompensa delle missioni più difficili.</p>`}
         <p class="sub" style="margin-top:10px">${all ? 'Hai già tutto il necessario.' : 'Puoi tracciare la sagoma subito e montare le parti man mano che raccogli i materiali.'}</p>`;
     } else if (tab === 'ricette') {
-      L += `<p>Disponi i materiali nella griglia come nei disegni. Le ricette grandi richiedono il <em>banco da lavoro</em>, che apre una griglia 5×5.</p><p>Nell’inventario (<em>I</em> o <em>Tab</em>) puoi anche fare clic su una ricetta per riempire la griglia in automatico.</p>`;
+      L += `<p>Disponi i materiali nella griglia come nei disegni. Le ricette grandi richiedono il <em>banco da lavoro</em>, che apre una griglia 5×5.</p><p>Nell’inventario (<em>E</em> o <em>I</em>) puoi anche fare clic su una ricetta per riempire la griglia in automatico.</p>`;
       const small = G.RECIPES.filter((r) => r.size === 3), big = G.RECIPES.filter((r) => r.size === 5);
       L += recCards(small.slice(0, 10));
       R += `<h2>Case e parti navali</h2><div class="sub">le ultime quattro solo al banco da lavoro 5×5</div>` + recCards(small.slice(10).concat(big));
@@ -655,7 +678,7 @@
     swap: SV('<path d="M4 8h13l-3-3M20 16H7l3 3"/>'), tools: SV('<path d="M14 6l4 4-9 9H5v-4z"/><path d="M13 7l4 4"/>'),
   };
   const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Maiusc', 'correre'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
-    ['E · I · Tab', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
+    ['E · I', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
     ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
   UI.CONTROLS = CONTROLS;
@@ -771,7 +794,7 @@
         ${opt('o-fov', 'Campo visivo', 60, 100, 1, S.fov, (v) => `${v}°`)}
         </div><h5>Comandi</h5><div class="ctrl2">${CONTROLS.map(([k, v]) => `<div class="kp"><kbd>${k}</kbd><span>${v}</span></div>`).join('')}</div>`;
       else if (tab === 'interfaccia') body = `<h5>A schermo</h5><div class="sgrid">
-        ${chk('o-coord', 'Mostra le coordinate', S.coords !== false, 'sotto la bussola: X e Z, da dare agli amici')}${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
+        ${chk('o-f3', 'Schermata tecnica (F3)', !!S.f3, 'coordinate, giorno e ora, vento, meteo e altri dettagli')}${chk('o-minimap', 'Minimappa', S.minimap !== false, 'in alto a destra')}${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
         </div>`;
       else body = `<div class="sgrid">${worldSettingsHTML()}</div>`;
       h += `<div class="swin" role="dialog" aria-label="Impostazioni"><nav class="stabs"><h2>Impostazioni</h2>${TABS.map(([k, ic, n]) => `<button data-stab="${k}" class="${tab === k ? 'on' : ''}">${MICO[ic]}${n}</button>`).join('')}</nav>
@@ -792,6 +815,7 @@
       <div class="opt"><label>Modalità${client ? '<small>la decide chi ospita</small>' : ''}</label><div class="seg small">${['sopravvivenza', 'creativa'].map((m) => `<button data-setmode="${m}" class="${G.mode === m ? 'on' : ''}" ${client ? 'disabled' : ''}>${G.Worlds.MODE_N[m]}</button>`).join('')}</div></div>
       <div class="opt"><label>Nemici${client ? '<small>li decide chi ospita</small>' : ''}</label><div class="seg small">${[[1, 'Sì'], [0, 'No']].map(([v, l]) => `<button data-seten="${v}" class="${!G.enemiesOff === !!v ? 'on' : ''}" ${client ? 'disabled' : ''}>${l}</button>`).join('')}</div></div>
       <div class="opt"><label>Chat vocale${client ? '<small>la decide chi ospita</small>' : '<small>in vicinanza: si sentono solo i giocatori vicini · ovunque: tutti, sempre allo stesso volume</small>'}</label><div class="seg small">${[[0, 'In vicinanza'], [1, 'Ovunque']].map(([v, l]) => `<button data-m="vg" data-v="${v}" class="${(G.voiceGlobal ? 1 : 0) === v ? 'on' : ''}" ${client ? 'disabled' : ''}>${l}</button>`).join('')}</div></div>
+      <div class="opt"><label>Tieni l'inventario<small>${client ? 'lo decide chi ospita' : 'sì: morendo non perdi niente · no: gli oggetti cadono dove muori (5 minuti per riprenderli)'}</small></label><div class="seg small">${[[1, 'Sì'], [0, 'No']].map(([v, l]) => `<button data-m="ki" data-v="${v}" class="${(G.keepInv ? 1 : 0) === v ? 'on' : ''}" ${client ? 'disabled' : ''}>${l}</button>`).join('')}</div></div>
       ${G.worldId ? `<div class="opt"><label>Copia del mondo<small>file .deriva da aprire su un altro PC</small></label><button class="mini-btn" data-m="exportCur">Esporta</button></div>` : ''}`;
   }
   function playersHTML() {
@@ -920,6 +944,7 @@
     else if (m === 'worlds' || m === 'newWorld') { UI.mpMsg = ''; UI.showMenu(m); }
     else if (m === 'op') { const r = G.Net.remotes.get(b.dataset.id); if (r) { G.Net.setOp(r.id, !r.op); UI.toast(r.op ? `${r.name} ora è operatore` : `${r.name} non è più operatore`, 'good'); UI.showMenu('main'); } }
     else if (m === 'tpda') { const r = G.Net.remotes.get(b.dataset.id); if (r) { UI.hideMenu(); UI.toast(G.Cmd.tpTo(r.name)); G._lockTry = 0; G.requestLock(); } }
+    else if (m === 'ki') { G.keepInv = b.dataset.v === '1'; G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; UI.showMenu('settings'); }
     else if (m === 'vg') { G.voiceGlobal = b.dataset.v === '1'; G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; UI.showMenu('settings'); }
     else if (m === 'resume') { UI.hideMenu(); G._lockTry = 0; G.requestLock(); }
     else if (m === 'savequit') { G.save(); G.toTitle(); }
@@ -957,7 +982,7 @@
     }
     const base = G.PRESETS[S.preset] || G.PRESETS.media;
     const map = { 'o-shadow': ['shadows', v ? (base.shadows || 1024) : 0], 'o-god': ['godrays', v], 'o-fx': ['fx', v], 'o-view': ['view', v], 'o-grass': ['grass', v], 'o-pixel': ['pixel', v], 'o-fov': ['fov', v], 'o-sens': ['sens', v], 'o-vol': ['volume', v],
-      'o-ao': ['ao', v], 'o-coord': ['coords', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
+      'o-ao': ['ao', v], 'o-f3': ['f3', v], 'o-minimap': ['minimap', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
     if (!map[t.id]) return;
     const [k, val] = map[t.id];
     if (['shadows', 'godrays', 'ao', 'view', 'pixel'].includes(k) && G.adaptReset) G.adaptReset();
@@ -976,10 +1001,12 @@
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT') return;
       const k = e.code;
+      if (k === 'F2' && G.started) { e.preventDefault(); G.shotReq = true; return; }
+      if (k === 'F3' && G.started) { e.preventDefault(); G.settings.f3 = !G.settings.f3; G.store.set('deriva_settings', G.settings); UI._f3T = 0; return; }
       if (UI.menu) { if (k === 'Escape' && UI.menu !== 'main') UI.showMenu('main'); else if (k === 'Escape' && G.started) { UI.hideMenu(); G._lockTry = 0; G.requestLock(); } return; }
       if (!G.started) return;
       if (UI.open) {
-        if (k === 'Escape' || k === 'Tab' || k === 'KeyI' || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
+        if (k === 'Escape' || k === 'KeyI' || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
         else if (/^Digit[1-8]$/.test(k) && !UI.hoverSlot && UI.open === 'inv' && G.creative()) UI.applyKit(+k.slice(5) - 1);
         else if (/^Digit[1-9]$/.test(k) && UI.hoverSlot && UI.open !== 'book') {
           // tasto numerico sopra uno slot: scambia con la barra rapida
@@ -996,7 +1023,7 @@
       }
       P_.keys[k] = true;
       if (/^Digit[1-9]$/.test(k)) { P_.sel = +k.slice(5) - 1; UI.refreshHotbar(); }
-      else if (k === 'KeyI' || k === 'Tab') UI.openInventory(3);
+      else if (k === 'KeyI') UI.openInventory(3);
       else if (k === 'KeyB') UI.openBook();
       else if (k === 'KeyM') G.MapUI.open();
       else if (k === 'KeyJ') G.MapUI.openJournal();

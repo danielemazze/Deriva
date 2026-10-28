@@ -14,7 +14,7 @@
   const _a = new V3(), _b = new V3(), _c = new V3();
 
   /* ---------------- scafo delle barche ---------------- */
-  S.hullMax = (b) => (b.free ? 60 + (b.pcs ? b.pcs.length * 6 : 0) : Math.round(b.T.L * b.T.W * 7 + 40));
+  S.hullMax = (b) => b.hullMaxO || (b.free ? 60 + (b.pcs ? b.pcs.length * 6 : 0) : Math.round(b.T.L * b.T.W * 7 + 40));
   S.hullOf = (b) => (b.hull === undefined ? S.hullMax(b) : b.hull);
   S.boatPos = (b, out) => (out || new V3()).set(b.root.position.x, b.root.position.y + (b.T.deck || 1), b.root.position.z);
   S.damageBoat = function (b, n, x, y, z) {
@@ -26,15 +26,18 @@
     if (G.Audio) G.Audio.hit('wood');
     if (G.Player.boat === b) { G.Player.dmgFlash = Math.max(G.Player.dmgFlash, 0.35); S.shake = 0.5; if (!S._hullTip || performance.now() - S._hullTip > 9000) { S._hullTip = performance.now(); G.UI.toast(`Lo scafo è danneggiato (${Math.round(b.hull / max * 100)}%): riparalo con assi e chiodi`, 'warn'); } }
     if (b.hull <= 0) S.sinkBoat(b);
-    else if (G.Net && G.Net.on) G.Net.send({ t: 'bhull', id: b.id, h: Math.round(b.hull) });
+    else if (G.Net && G.Net.on && !b.pirate) G.Net.send({ t: 'bhull', id: b.id, h: Math.round(b.hull) });
+    if (b.pirate && b.enc) S.hpShow = { e: b.enc, t: 4 };
   };
+  // riparare: le barche grandi chiedono molto più legno (assi e chiodi per ogni 20% di scafo)
+  S.repairCost = (b) => b.free ? { assi: 4, chiodi: 1 } : { assi: Math.max(4, Math.round(b.T.L * b.T.W / 5)), chiodi: Math.max(1, Math.round(b.T.L / 6)) };
   S.repair = function (P, b) {
-    const max = S.hullMax(b), cur = S.hullOf(b);
+    const max = S.hullMax(b), cur = S.hullOf(b), c = S.repairCost(b);
     if (cur >= max) { G.UI.toast('Lo scafo è già a posto'); return true; }
-    if (!G.creative() && (P.count('assi') < 2 || P.count('chiodi') < 1)) { G.UI.toast('Per riparare servono 2 assi e 1 chiodo', 'warn'); return true; }
-    if (!G.creative()) { P.take('assi', 2); P.take('chiodi', 1); }
-    b.hull = Math.min(max, cur + max * 0.25);
-    if (G.Audio) G.Audio.hit('wood');
+    if (!G.creative() && (P.count('assi') < c.assi || P.count('chiodi') < c.chiodi)) { G.UI.toast(`Per riparare servono ${c.assi} assi e ${c.chiodi} ${c.chiodi > 1 ? 'chiodi' : 'chiodo'}`, 'warn'); return true; }
+    if (!G.creative()) { P.take('assi', c.assi); P.take('chiodi', c.chiodi); }
+    b.hull = Math.min(max, cur + max * 0.2);
+    if (G.Audio) { G.Audio.hit('wood'); setTimeout(() => G.Audio.hit('wood'), 180); }
     G.UI.toast(`Scafo riparato: ${Math.round(b.hull / max * 100)}%`, 'good');
     if (G.Net && G.Net.on) G.Net.send({ t: 'bhull', id: b.id, h: Math.round(b.hull) });
     return true;
@@ -45,12 +48,13 @@
     if (b.inv) for (const st of b.inv) if (st && G.Drops) G.Drops.spawn(st, p.x + (Math.random() - 0.5) * 4, p.y + 1, p.z + (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 2, 2, (Math.random() - 0.5) * 2, { delay: 1 });
     if (b.free) { b.flood = 1e5; return; }
     if (P.boat === b) { P.leaveBoat(true); P.pos.set(p.x + 2, G.SEA - 0.5, p.z); P.vel.set(0, 0, 0); }
-    G.UI.toast('La barca è affondata! Il carico galleggia: recuperalo', 'warn');
-    if (G.Net && G.Net.on) G.Net.send({ t: 'bdelboat', id: b.id });
+    if (b.onSink) b.onSink(b);
+    else G.UI.toast('La barca è affondata! Il carico galleggia: recuperalo', 'warn');
+    if (G.Net && G.Net.on && !b.pirate) G.Net.send({ t: 'bdelboat', id: b.id });
     // affonda piano, poi sparisce
     S.sinking.push({ root: b.root, t: 0 });
     const i = G.Boats.list.indexOf(b); if (i >= 0) G.Boats.list.splice(i, 1);
-    G.saveSoon();
+    if (!b.pirate) G.saveSoon();
   };
   S.sinking = [];
 
@@ -72,13 +76,15 @@
       b.vel.y -= 9.8 * dt; b.pos.addScaledVector(b.vel, dt); b.m.position.copy(b.pos);
       let hit = false;
       // colpisce le barche dei giocatori (se a sparare è un pirata) o le navi pirata (se spari tu)
-      if (b.owner === 'pirate') {
-        for (const bo of G.Boats.list) { const bp = S.boatPos(bo, _b); const r = Math.max(1.6, bo.T.L * 0.45); if (Math.hypot(b.pos.x - bp.x, b.pos.z - bp.z) < r && b.pos.y < bp.y + 2.5 && b.pos.y > bp.y - 2) { S.damageBoat(bo, 14 + Math.random() * 8, b.pos.x, b.pos.y, b.pos.z); hit = true; break; } }
-        if (!hit && Math.hypot(b.pos.x - P.pos.x, b.pos.y - (P.pos.y + 1), b.pos.z - P.pos.z) < 1.3) { P.hurt(26); hit = true; }
-      } else {
-        for (const e of S.enc) { if (e.type !== 'pirati' || e.dead) continue; if (Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z) < 10 && Math.abs(_c.set(b.pos.x - e.pos.x, 0, b.pos.z - e.pos.z).dot(_a.set(Math.cos(e.yaw), 0, -Math.sin(e.yaw)))) < 3.2 && b.pos.y < e.pos.y + 6) { S.hitEnc(e, 60, b.pos); hit = true; break; } }
-        if (!hit) for (const e of S.enc) { if (e.type !== 'kraken' || e.dead) continue; const h = krakenRay(e, b.pos, null, 0); if (h) { S.hitEnc(e, 55, b.pos); hit = true; break; } }
+      // le palle colpiscono le barche dell'altra parte: i pirati le tue, tu le loro
+      for (const bo of G.Boats.list) {
+        if (!!bo.pirate === (b.owner === 'pirate') || bo.sunk) continue;
+        const bp = S.boatPos(bo, _b), fx = Math.sin(bo.yaw), fz = Math.cos(bo.yaw), dx = b.pos.x - bp.x, dz = b.pos.z - bp.z;
+        const along = dx * fx + dz * fz, side = dx * fz - dz * fx;
+        if (Math.abs(along) < bo.T.L * 0.5 && Math.abs(side) < Math.max(1.1, bo.T.W * 0.55) && b.pos.y < bp.y + 3 && b.pos.y > bp.y - 2.2) { S.damageBoat(bo, b.owner === 'pirate' ? 14 + Math.random() * 8 : 26 + Math.random() * 10, b.pos.x, b.pos.y, b.pos.z); hit = true; break; }
       }
+      if (!hit && b.owner === 'pirate' && Math.hypot(b.pos.x - P.pos.x, b.pos.y - (P.pos.y + 1), b.pos.z - P.pos.z) < 1.3) { P.hurt(26); hit = true; }
+      if (!hit && b.owner !== 'pirate') for (const e of S.enc) { if (e.type !== 'kraken' || e.dead) continue; const h = krakenRay(e, b.pos, null, 0); if (h) { S.hitEnc(e, 55, b.pos); hit = true; break; } }
       const wy = G.waveHeight(b.pos.x, b.pos.z, G.clock);
       if (!hit && b.pos.y < wy) { G.FX.burst(b.pos.x, wy + 0.2, b.pos.z, [0.85, 0.93, 0.97], 18, 4, { size: 1.4 }); if (G.Audio) G.Audio.splash(); hit = true; }
       if (!hit && b.pos.y < G.World.groundAt(b.pos.x, b.pos.z)) { G.FX.burst(b.pos.x, b.pos.y + 0.3, b.pos.z, [0.5, 0.45, 0.4], 14, 3); hit = true; }
@@ -86,9 +92,33 @@
     }
   }
   // bordata dal galeone del giocatore: dal lato verso cui guardi
+  S.hasCannons = (b) => { if (!b || b.free || !b.parts) return false; const ci = b.parts.findIndex((p) => p.name === 'Cannoni'); return ci >= 0 && b.filled[ci]; };
+  // posizioni dei cannoni sul ponte (coordinate locali della barca, come in boats.js)
+  S.cannonSpots = function (b) { const T = b.T, out = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const z = (0.28 + i * 0.1 - 0.5) * T.L; out.push({ x: sd * (G.Boats.deckHalfW(T, z) - 0.35), z, sd }); } return out; };
+  // a piedi sul ponte, vicino a un cannone: clic sinistro spara solo quello
+  S.nearCannon = function (P) {
+    const b = P.boat; if (!b || P.helm || !S.hasCannons(b)) return null;
+    let best = null, bd = 1.7;
+    for (const c of S.cannonSpots(b)) { const d = Math.hypot(P.local.x - c.x, P.local.z - c.z); if (d < bd) { bd = d; best = c; } }
+    return best;
+  };
+  S.fireCannonNear = function (P) {
+    const b = P.boat, best = S.nearCannon(P);
+    if (!best) return false;
+    if ((S.gunCd1 || 0) > 0) return true;
+    if (!G.creative() && P.count('munizioni') <= 0) { G.UI.toast('Per sparare col cannone serve una munizione', 'warn'); S.gunCd1 = 1; return true; }
+    if (!G.creative()) P.take('munizioni', 1);
+    S.gunCd1 = 1.6;
+    const cy = Math.cos(b.yaw), sy = Math.sin(b.yaw), wx = b.root.position.x + best.x * cy + best.z * sy, wz = b.root.position.z - best.x * sy + best.z * cy;
+    const ox = best.sd * cy, oz = -best.sd * sy, look = P.lookDir(_c);
+    const from = new V3(wx + ox * 0.9, b.root.position.y + (b.T.deck || 1) + 0.55, wz + oz * 0.9);
+    const aim = Math.max(25, Math.min(110, 60 + look.y * 120));
+    S.fireBall(from, new V3(from.x + ox * aim + look.x * 8, G.SEA, from.z + oz * aim + look.z * 8), 'player', 2.5);
+    return true;
+  };
   S.broadside = function (P) {
     const b = P.boat; if (!b || b.free) return false;
-    const ci = b.parts.findIndex((p) => p.name === 'Cannoni'); if (ci < 0 || !b.filled[ci]) return false;
+    if (!S.hasCannons(b)) return false;
     if ((S.gunCd || 0) > 0) return true;
     if (!G.creative() && P.count('munizioni') <= 0) { G.UI.toast('Per i cannoni servono munizioni', 'warn'); S.gunCd = 1; return true; }
     if (!G.creative()) P.take('munizioni', 1);
@@ -228,75 +258,109 @@
     return best >= 0 ? { t: best } : null;
   }
 
-  /* ---------------- NAVI PIRATA ---------------- */
+  /* ---------------- NAVI PIRATA ----------------
+     Sono galeoni veri (G.Boats): si sale a bordo, ci si sbatte contro, hanno lo scafo
+     come le tue barche. Un "capitano" automatico li guida e spara le bordate. */
+  function skullFlag() {
+    if (KM.flag) return KM.flag;
+    const fc = document.createElement('canvas'); fc.width = 128; fc.height = 80; const x = fc.getContext('2d');
+    x.fillStyle = '#0d0d0d'; x.fillRect(0, 0, 128, 80); x.fillStyle = '#eee'; x.beginPath(); x.arc(64, 32, 15, 0, 7); x.fill(); x.fillRect(55, 42, 18, 9); x.fillStyle = '#0d0d0d'; x.beginPath(); x.arc(58, 31, 4, 0, 7); x.arc(70, 31, 4, 0, 7); x.fill();
+    x.strokeStyle = '#eee'; x.lineWidth = 6; x.beginPath(); x.moveTo(38, 56); x.lineTo(90, 72); x.moveTo(90, 56); x.lineTo(38, 72); x.stroke();
+    const t = new THREE.CanvasTexture(fc); t.encoding = THREE.sRGBEncoding;
+    return (KM.flag = new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 }));
+  }
   S.spawnPirates = function (near) {
     const P = G.Player, c = near || P.pos, a0 = Math.random() * 6.28;
-    const parts = G.Boats.parts('galeone'), T = G.BOAT_TPL.galeone;
-    const root = new THREE.Group(), inner = new THREE.Group(); root.add(inner); G.scene.add(root);
-    for (const p of parts) {
-      let geo = p.geo;
-      // vele nere e lacere: la geometria clonata viene scurita nei colori dei vertici
-      if (p.mat === 'cloth') { geo = p.geo.clone(); const c = geo.attributes.color, n = geo.attributes.position.count; const col = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const k = 0.13 + Math.random() * 0.05; col[i * 3] = k * 1.05; col[i * 3 + 1] = k; col[i * 3 + 2] = k * 0.95; } geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); }
-      if (p.mat === 'cloth' && !KM.sail) KM.sail = new THREE.MeshStandardMaterial({ map: G.MAT.cloth.map, normalMap: G.MAT.cloth.normalMap, color: 0x0d0b0a, vertexColors: false, side: THREE.DoubleSide, roughness: 0.95 });
-      const m = new THREE.Mesh(geo, p.mat === 'cloth' ? KM.sail : G.Boats.matFor(p)); m.castShadow = true; inner.add(m);
-    }
-    // bandiera col teschio
-    const fc = document.createElement('canvas'); fc.width = 128; fc.height = 80; const x = fc.getContext('2d');
-    x.fillStyle = '#111'; x.fillRect(0, 0, 128, 80); x.fillStyle = '#eee'; x.beginPath(); x.arc(64, 34, 16, 0, 7); x.fill(); x.fillRect(54, 44, 20, 10); x.fillStyle = '#111'; x.beginPath(); x.arc(58, 32, 4, 0, 7); x.arc(70, 32, 4, 0, 7); x.fill();
-    x.strokeStyle = '#eee'; x.lineWidth = 6; x.beginPath(); x.moveTo(36, 56); x.lineTo(92, 72); x.moveTo(92, 56); x.lineTo(36, 72); x.stroke();
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(fc), side: THREE.DoubleSide, roughness: 0.9 }));
-    flag.position.set(1.2, 18.5, 0); inner.add(flag);
+    const x = c.x + Math.cos(a0) * 170, z = c.z + Math.sin(a0) * 170;
+    const parts = G.Boats.parts('galeone');
+    const b = G.Boats.create({ tpl: 'galeone', x, z, yaw: Math.atan2(c.x - x, c.z - z), filled: parts.map(() => true) });
+    b.pirate = true; b.hullMaxO = 380; b.hull = 380;
+    if (!KM.sail) KM.sail = new THREE.MeshStandardMaterial({ map: G.MAT.cloth.map, normalMap: G.MAT.cloth.normalMap, color: 0x0d0b0a, side: THREE.DoubleSide, roughness: 0.95 });
+    b.meshes.forEach((m, i) => { const p = parts[i]; m.castShadow = true; m.material = p.name === 'Bandiera' ? skullFlag() : p.mat === 'cloth' ? KM.sail : G.Boats.matFor(p); });
+    // bottino nella stiva: quando affonda galleggia
+    const loot = [['doblone', 35 + ((Math.random() * 30) | 0)], ['munizioni', 6 + ((Math.random() * 8) | 0)], ['corda', 4], ['assi', 10], ['chiodi', 6]];
+    if (Math.random() < 0.4) loot.push(['pistola', 1]); if (Math.random() < 0.3) loot.push(['mappa_tesoro', 1]); if (Math.random() < 0.2) loot.push(['progetto_galeone', 1]);
+    b.inv = new Array(54).fill(null); loot.forEach(([id, n], i) => { if (G.ITEMS[id]) b.inv[i] = { id, n }; });
     // equipaggio sul ponte
     const crew = [];
-    for (let i = 0; i < 5; i++) { const pp = G.People.build((Math.random() * 1e6) | 0, { pirate: true, captain: i === 0 }); pp.root.position.set((Math.random() - 0.5) * 3, (T && T.deck) || 2.4, -6 + i * 3); pp.root.rotation.y = Math.random() * 6.28; inner.add(pp.root); crew.push(pp); }
-    const pos = new V3(c.x + Math.cos(a0) * 170, G.SEA, c.z + Math.sin(a0) * 170);
-    const e = { type: 'pirati', root, inner, crew, pos, yaw: Math.atan2(c.x - pos.x, c.z - pos.z), speed: 0, hp: 360, max: 360, t: 0, gunT: 4, dead: false, deadT: 0, name: 'Nave pirata', flag, L: (T && T.L) || 19 };
+    const T = b.T, spots = [[0, -T.L * 0.3], [-1.2, -3], [1.2, 0.5], [-1.1, 3.5], [1.0, 6]];
+    spots.forEach(([lx, lz], i) => { const pp = G.People.build((Math.random() * 1e6) | 0, { pirate: true, captain: i === 0, female: false }); pp.root.position.set(lx, (T.deck || 1) + (i === 0 ? 2.6 : 0), lz); pp.root.rotation.y = Math.random() * 6.28; b.inner.add(pp.root); crew.push(pp); });
+    const e = { type: 'pirati', boat: b, crew, pos: b.root.position, yaw: b.yaw, t: 0, gunT: 4, dead: false, deadT: 0, name: 'Nave pirata', side: 1 };
+    Object.defineProperty(e, 'hp', { get: () => S.hullOf(b) }); Object.defineProperty(e, 'max', { get: () => S.hullMax(b) });
+    b.enc = e;
+    b.ai = (bo, dt) => pirateAI(e, bo, dt);
+    b.onSink = () => pirateSunk(e);
     S.enc.push(e);
-    G.UI.toast('Vela nera all’orizzonte: PIRATI! Scappa col vento o affrontali (cannoni del galeone, pistole, frecce)', 'warn');
+    G.UI.toast('Vela nera all’orizzonte: PIRATI! Scappa col vento o affrontali: cannoni, pistole, frecce… o sali a bordo!', 'warn');
     return e;
   };
-  function updatePirates(e, dt) {
-    const P = G.Player, tgt = P.boat ? S.boatPos(P.boat, new V3()) : P.pos.clone();
-    e.t += dt;
-    if (!e.dead) {
-      // si porta di fianco al bersaglio, a una quarantina di metri, e spara di bordata
-      const dx = tgt.x - e.pos.x, dz = tgt.z - e.pos.z, dist = Math.hypot(dx, dz);
-      const toT = Math.atan2(dx, dz);
-      let want = dist > 60 ? toT : toT + Math.PI / 2 * (G.angleDiff(e.yaw, toT + Math.PI / 2) < 0 ? 1 : 1);
-      if (dist < 25) want = toT + Math.PI * 0.6;
-      e.yaw += G.clamp(G.angleDiff(e.yaw, want), -dt * 0.35, dt * 0.35);
-      const vmax = dist > 60 ? 9 : 5.5; e.speed += (vmax - e.speed) * Math.min(1, dt * 0.3);
-      e.pos.x += Math.sin(e.yaw) * e.speed * dt; e.pos.z += Math.cos(e.yaw) * e.speed * dt;
-      // a terra non ci va
-      if (G.heightAt(e.pos.x + Math.sin(e.yaw) * 14, e.pos.z + Math.cos(e.yaw) * 14) > -3) e.yaw += dt * 0.8;
-      e.gunT -= dt;
-      if (e.gunT <= 0 && dist < 85 && (P.boat || P.swim)) {
-        e.gunT = 5 + Math.random() * 3;
-        const rx = Math.cos(e.yaw), rz = -Math.sin(e.yaw), side = (dx * rx + dz * rz) > 0 ? 1 : -1;
-        for (let k = 0; k < 4; k++) { const along = (k - 1.5) * 2.2; const from = new V3(e.pos.x + Math.sin(e.yaw) * along + rx * side * 3, e.pos.y + 2.6, e.pos.z + Math.cos(e.yaw) * along + rz * side * 3); setTimeout(() => !e.dead && S.fireBall(from, tgt, 'pirate', 5 + dist * 0.06), k * 180); }
-      }
-      if (dist > 320) { e.gone = (e.gone || 0) + dt; if (e.gone > 5) return false; } else e.gone = 0;
-    } else {
-      e.deadT += dt; e.speed *= Math.pow(0.5, dt);
-      if (e.deadT > 12) return false;
+  function pirateAI(e, b, dt) {
+    const P = G.Player, tgt = P.boat && !P.boat.pirate ? S.boatPos(P.boat, new V3()) : P.pos.clone();
+    const dx = tgt.x - b.x, dz = tgt.z - b.z, dist = Math.hypot(dx, dz), toT = Math.atan2(dx, dz);
+    // lontano: punta dritto; vicino: si mette di fianco (bordata) a circa 40 m; troppo vicino: si allontana
+    let want = toT;
+    if (dist < 70) want = toT + (Math.PI / 2) * e.side;
+    if (dist < 24) want = toT + Math.PI * 0.75 * e.side;
+    if (P.boat === b) want = b.yaw; // qualcuno a bordo: niente manovre strane
+    b.yaw += G.clamp(G.angleDiff(b.yaw, want), -dt * 0.32, dt * 0.32);
+    b.rudder = G.clamp(G.angleDiff(b.yaw, want), -1, 1) * 0.6;
+    const vmax = dist > 70 ? 8.5 : 5;
+    b.speed += (vmax - b.speed) * Math.min(1, dt * 0.25);
+    // fondale davanti: vira
+    if (G.heightAt(b.x + Math.sin(b.yaw) * 16, b.z + Math.cos(b.yaw) * 16) > -3) { b.yaw += dt * 0.7 * e.side; b.speed *= 0.97; }
+    e.gunT -= dt;
+    if (e.gunT <= 0 && dist < 90 && (P.boat || P.swim) && P.boat !== b) {
+      e.gunT = 5 + Math.random() * 3;
+      const rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), sd = (dx * rx + dz * rz) > 0 ? 1 : -1;
+      const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw);
+      for (let k = 0; k < 4; k++) { const along = (k - 1.5) * 2.2; const from = new V3(b.x + fx * along + rx * sd * 3, b.root.position.y + (b.T.deck || 1) + 0.6, b.z + fz * along + rz * sd * 3); setTimeout(() => { if (!e.dead) S.fireBall(from, tgt, 'pirate', 5 + dist * 0.06); }, k * 180); }
     }
-    const wy = G.waveHeight(e.pos.x, e.pos.z, G.clock);
-    const sinkK = e.dead ? Math.min(1, e.deadT / 11) : 0;
-    e.pos.y = wy - 0.9 - sinkK * 16;
-    e.root.position.copy(e.pos); e.root.rotation.y = e.yaw;
-    const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw);
-    const hF = G.waveHeight(e.pos.x + fx * 7, e.pos.z + fz * 7, G.clock), hB = G.waveHeight(e.pos.x - fx * 7, e.pos.z - fz * 7, G.clock);
-    e.inner.rotation.x = Math.atan2(hB - hF, 14) + sinkK * 0.5; e.inner.rotation.z = Math.sin(e.t * 0.7) * 0.05 + sinkK * 0.4;
-    for (const pp of e.crew) G.People.animate(pp, dt, 0, 'idle', 0);
-    e.flag.rotation.y = Math.sin(e.t * 3) * 0.3;
-    return true;
+  }
+  // naufraghi: i pirati restano a galla e nuotano via, lontano da te
+  S.swimmers = [];
+  function pirateSunk(e) {
+    e.dead = true;
+    const b = e.boat, P = G.Player;
+    b.inner.updateMatrixWorld(true);
+    for (const pp of e.crew) {
+      const wp = new V3(); pp.root.getWorldPosition(wp); b.inner.remove(pp.root); G.scene.add(pp.root);
+      const away = Math.atan2(wp.x - P.pos.x, wp.z - P.pos.z) + (Math.random() - 0.5) * 0.9;
+      S.swimmers.push({ p: pp, pos: new V3(wp.x + (Math.random() - 0.5) * 3, G.SEA, wp.z + (Math.random() - 0.5) * 3), yaw: away, t: 0, speed: 1.1 + Math.random() * 0.5, delay: Math.random() * 1.5 });
+    }
+    G.UI.toast('La nave pirata affonda! I pirati scappano a nuoto. Il bottino galleggia: recuperalo', 'good');
+    if (G.Player.stats) G.Player.stats.pirateShips = (G.Player.stats.pirateShips || 0) + 1;
+  }
+  function updateSwimmers(dt) {
+    for (let i = S.swimmers.length - 1; i >= 0; i--) {
+      const s = S.swimmers[i]; s.t += dt; s.delay -= dt;
+      if (s.delay <= 0) {
+        s.yaw += Math.sin(s.t * 0.4 + i) * dt * 0.15;
+        const nx = s.pos.x + Math.sin(s.yaw) * s.speed * dt, nz = s.pos.z + Math.cos(s.yaw) * s.speed * dt;
+        if (G.heightAt(nx, nz) < -0.6) { s.pos.x = nx; s.pos.z = nz; } else s.yaw += dt * 1.5;
+      }
+      s.pos.y = G.waveHeight(s.pos.x, s.pos.z, G.clock) - 0.15;
+      s.p.root.position.copy(s.pos); s.p.root.rotation.set(0, s.yaw, 0);
+      G.People.animate(s.p, dt, 0, s.delay > 0 ? 'idle' : 'swim', 0);
+      if (s.t > 70 || s.pos.distanceTo(G.Player.pos) > 220) { G.scene.remove(s.p.root); S.swimmers.splice(i, 1); }
+    }
+  }
+  function updatePirates(e, dt) {
+    const b = e.boat; e.t += dt; e.yaw = b.yaw;
+    if (!e.dead) {
+      for (const pp of e.crew) G.People.animate(pp, dt, 0, 'idle', 0);
+      const P = G.Player, d = Math.hypot(P.pos.x - b.x, P.pos.z - b.z);
+      if (d > 340) { e.gone = (e.gone || 0) + dt; if (e.gone > 5) { G.Boats.remove(b); return false; } } else e.gone = 0;
+      return true;
+    }
+    e.deadT += dt;
+    return e.deadT < 14;
   }
 
   /* ---------------- colpi agli incontri ---------------- */
   S.raycast = function (o, d, max) {
     let best = null;
     for (const e of S.enc) {
-      if (e.dead) continue;
+      if (e.dead || (e.boat && G.Player.boat === e.boat)) continue;
       if (e.type === 'kraken') { const h = krakenRay(e, o, d, max); if (h && (!best || h.t < best.t)) best = { t: h.t, enc: e }; }
       else {
         const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw);
@@ -307,6 +371,7 @@
   };
   S.hitEnc = function (e, dmg, at) {
     if (e.dead) return;
+    if (e.type === 'pirati') { S.damageBoat(e.boat, dmg * 0.7, at ? at.x : e.pos.x, at ? at.y : e.pos.y + 2, at ? at.z : e.pos.z); return; }
     e.hp -= dmg;
     if (at) G.FX.burst(at.x, at.y, at.z, e.type === 'kraken' ? [0.3, 0.08, 0.35] : [0.55, 0.4, 0.25], 12, 3);
     if (G.Audio) G.Audio.hit(e.type === 'kraken' ? 'soft' : 'wood');
@@ -327,10 +392,11 @@
   /* ---------------- incontri casuali in mare aperto ---------------- */
   S.update = function (dt) {
     const P = G.Player;
-    S.gunCd = Math.max(0, (S.gunCd || 0) - dt);
+    S.gunCd = Math.max(0, (S.gunCd || 0) - dt); S.gunCd1 = Math.max(0, (S.gunCd1 || 0) - dt);
     S.shake = Math.max(0, (S.shake || 0) - dt * 1.5);
     if (S.hpShow) { S.hpShow.t -= dt; if (S.hpShow.t <= 0) S.hpShow = null; }
-    for (let i = S.enc.length - 1; i >= 0; i--) { const e = S.enc[i]; const keep = e.type === 'kraken' ? updateKraken(e, dt) : updatePirates(e, dt); if (!keep) { G.scene.remove(e.root); if (e.head) G.scene.remove(e.head); S.enc.splice(i, 1); } }
+    for (let i = S.enc.length - 1; i >= 0; i--) { const e = S.enc[i]; const keep = e.type === 'kraken' ? updateKraken(e, dt) : updatePirates(e, dt); if (!keep) { if (e.root) G.scene.remove(e.root); if (e.head) G.scene.remove(e.head); S.enc.splice(i, 1); } }
+    updateSwimmers(dt);
     for (let i = S.sinking.length - 1; i >= 0; i--) { const s = S.sinking[i]; s.t += dt; s.root.position.y -= dt * 0.8; s.root.rotation.z += dt * 0.08; if (s.t > 14) { G.scene.remove(s.root); S.sinking.splice(i, 1); } }
     updateBalls(dt);
     hud();
@@ -356,7 +422,7 @@
     if (e) { boss.children[0].textContent = e.name; boss.querySelector('u').style.width = (Math.max(0, e.hp / e.max) * 100).toFixed(1) + '%'; }
     const b = G.Player.boat, show = b && !b.free && b.hull !== undefined && (e || b.hull < S.hullMax(b));
     hl.style.display = show ? '' : 'none';
-    if (show) { const k = b.hull / S.hullMax(b); hl.querySelector('u').style.width = (k * 100).toFixed(1) + '%'; hl.children[0].textContent = 'Scafo ' + Math.round(k * 100) + '%' + (k < 1 && !e ? ' · assi in mano + clic destro per riparare' : ''); hl.classList.toggle('low', k < 0.3); }
+    if (show) { const k = b.hull / S.hullMax(b); hl.querySelector('u').style.width = (k * 100).toFixed(1) + '%'; hl.children[0].textContent = 'Scafo ' + Math.round(k * 100) + '%' + (k < 1 && !e ? ` · assi in mano + tasto destro per riparare (${S.repairCost(b).assi} assi, ${S.repairCost(b).chiodi} chiodi)` : ''); hl.classList.toggle('low', k < 0.3); }
   }
-  S.clear = function () { for (const e of S.enc) { G.scene.remove(e.root); if (e.head) G.scene.remove(e.head); } S.enc.length = 0; for (const b of S.balls) G.scene.remove(b.m); S.balls.length = 0; };
+  S.clear = function () { for (const e of S.enc) { if (e.root) G.scene.remove(e.root); if (e.head) G.scene.remove(e.head); if (e.boat && G.Boats.list.includes(e.boat)) G.Boats.remove(e.boat); } for (const w of S.swimmers) G.scene.remove(w.p.root); S.swimmers.length = 0; S.enc.length = 0; for (const b of S.balls) G.scene.remove(b.m); S.balls.length = 0; };
 })();

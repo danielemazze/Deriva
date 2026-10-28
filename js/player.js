@@ -150,7 +150,7 @@
     const waterY = G.waterLevelAt ? G.waterLevelAt(P.pos.x, P.pos.z, t, P.pos.y + 0.5) : G.waveHeight(P.pos.x, P.pos.z, t);
     if (P.boat) updateBoatRide(dt, t);
     else {
-      const ground = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.05));
+      const ground = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.22));
       const px0 = P.pos.x, pz0 = P.pos.z;
       const depth = waterY - ground;
       P.swim = depth > 1.35 && P.pos.y < waterY - 0.9;
@@ -220,7 +220,7 @@
         let ceil = G.Build.ceilingAt(P.pos.x, P.pos.z, P.pos.y + HEIGHT, RAD * 0.8);
         if (G.Dig && G.Dig.activeAt(P.pos.x, P.pos.z)) ceil = Math.min(ceil, G.Dig.ceiling(P.pos.x, P.pos.z, P.pos.y + HEIGHT));
         if (P.pos.y + HEIGHT > ceil && P.vel.y > 0) { P.pos.y = ceil - HEIGHT; P.vel.y = 0; }
-        const g2 = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.05));
+        const g2 = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.22));
         if (P.pos.y <= g2 + 0.001) {
           if (P.vel.y < -16) {
             if (G.Build.inHay(P.pos.x, P.pos.y, P.pos.z)) { if (P.vel.y < -18) { P.stats = P.stats || {}; P.stats.leaps = (P.stats.leaps || 0) + 1; G.UI.toast('Salto della fede!', 'good'); G.FX.burst(P.pos.x, P.pos.y + 0.6, P.pos.z, [0.95, 0.85, 0.5], 24, 3); } }
@@ -274,8 +274,9 @@
       // visuale da lontano: si vede anche il tuo personaggio al timone
       if (!P.selfAv && G.Net && G.Net.buildAvatar) { P.selfAv = G.Net.buildAvatar(G.Net.on ? G.Net.slot || 0 : 0); G.scene.add(P.selfAv.g); }
       if (P.selfAv) { const av = P.selfAv, sit = !!b.T.sit; av.g.visible = true; av.g.position.set(P.pos.x, P.pos.y, P.pos.z); av.g.rotation.y = (b.yaw || 0) + Math.PI;
-        av.legL.rotation.x = av.legR.rotation.x = sit ? -1.4 : 0; av.body.position.y = sit ? -0.75 : 0;
-        const st = Math.sin(t * 1.3) * 0.08; av.armL.rotation.x = -1.1 + st; av.armR.rotation.x = -1.1 - st; }
+        if (av.person) G.Humans.pose(av.person, 1 / 60, 0, sit ? 'sit' : 'helm', 0);
+        else { av.legL.rotation.x = av.legR.rotation.x = sit ? -1.4 : 0; av.body.position.y = sit ? -0.75 : 0;
+          const st = Math.sin(t * 1.3) * 0.08; av.armL.rotation.x = -1.1 + st; av.armR.rotation.x = -1.1 - st; } }
     } else {
       if (P.selfAv) P.selfAv.g.visible = false;
       const bobY = P.onGround && !(P.boat && P.helm) ? Math.sin(P.bob * 2) * 0.035 : 0;
@@ -405,6 +406,15 @@
     if (P.health <= 0) P.die();
   };
   P.die = function () {
+    // senza "tieni l'inventario" tutto cade per terra dove si muore (si può tornare a riprenderlo)
+    if (!G.creative() && !G.keepInv && G.Drops) {
+      const at = P.pos.clone(); let n = 0;
+      const drop = (st) => { if (!st) return; const a = Math.random() * 6.28, v = 1 + Math.random() * 2; G.Drops.spawn(Object.assign({}, st), at.x, at.y + 1, at.z, Math.cos(a) * v, 2.5, Math.sin(a) * v, { delay: 1.5 }); n++; };
+      for (let i = 0; i < P.inv.length; i++) { drop(P.inv[i]); P.inv[i] = null; }
+      if (P.equip) for (let i = 0; i < P.equip.length; i++) { drop(P.equip[i]); P.equip[i] = null; }
+      if (n) { P.deathAt = { x: at.x, y: at.y, z: at.z, t: Date.now() }; setTimeout(() => G.UI.toast(`Hai perso tutto: è rimasto dove sei morto (X ${Math.round(at.x)} · Z ${Math.round(at.z)}), hai 5 minuti per riprenderlo`, 'warn'), 600); }
+      G.UI.refreshHotbar();
+    }
     P.health = 60; P.hunger = Math.max(P.hunger, 50); P.thirst = Math.max(P.thirst, 50); P.oxygen = 100;
     if (P.boat) P.leaveBoat(true);
     const sp = P.spawn || G.findSpawn();
@@ -488,6 +498,7 @@
   P.primary = function () {
     const it = P.held(), toolId = it ? it.id : null, tool = G.toolClass(toolId), pow = G.toolPower(toolId);
     if (P.boat && P.helm && G.Sea && G.Sea.broadside(P)) { P.actionCd = 0.4; return; }
+    if (P.boat && !P.helm && G.Sea && (!P.held() || P.held().id === 'munizioni') && G.Sea.fireCannonNear(P)) { P.actionCd = 0.4; return; }
     if (tool === 'arco') return; // l'arco si tende tenendo premuto (vedi combat.js)
     if (tool === 'pistola' || tool === 'pistola_capitano') { if (!P.boat || !P.helm) G.Combat.fire(P, tool); P.actionCd = 0.3; return; }
     const W = G.ITEMS[toolId] || {};
@@ -621,6 +632,7 @@
     if (id === 'canna') { P.fishAction(); return; }
     if (id === 'ciotola') { if (aimWater(4.5)) { P.take('ciotola', 1); P.give('ciotola_salata', 1); if (G.Audio) G.Audio.splash(); } else G.UI.toast('Mira il mare vicino a te'); return; }
     if (tg && tg.kind === 'animal' && it && G.Pets && G.BREED[tg.ent.sp] && G.BREED[tg.ent.sp].includes(id) && G.Pets.feed(tg.ent, it)) return;
+    if (id === 'terra' && G.Dig) { const r = G.Dig.fill(P); if (r === 'ok') { P.take('terra', 1); P.actionCd = 0.25; G.saveSoon(); } if (r) return; }
     if (id === 'torcia') { P.placeTorch(); return; }
     if (id && G.Build.isPlaceable(id)) { P.startPlacing(id); return; }
     if (it && P.consume(it)) return;
@@ -628,6 +640,7 @@
     const L = P.equip[0], lid = L ? L.id : null;
     if (L) {
       if (G.ITEMS[lid].shield || lid === 'cannocchiale') return;
+      if (lid === 'torcia') { P.placeTorch(true); return; } // la torcia in mano sinistra si appoggia lo stesso
       if (lid === 'libro') { G.UI.openBook(); return; }
       if (lid === 'mappa_tesoro') { G.Treasure.read(L); return; }
       if (P.consume(L, true)) return;
@@ -654,7 +667,7 @@
     if (P.boat && id === 'assi' && !P.helm) return true;
     if (P.boat) return !!(P.helm || P.inHelmZone() || (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && P.boat.parts[tg.part] && P.boat.parts[tg.part].name === 'Stiva'));
     if (!tg) return false;
-    if (tg.kind === 'piece') return ['porta', 'baule', 'forziere', 'banco', 'falo', 'letto', 'fornace'].includes(tg.piece.t);
+    if (tg.kind === 'piece') return ['porta', 'baule', 'barile', 'forziere', 'banco', 'falo', 'letto', 'fornace'].includes(tg.piece.t);
     if (tg.kind === 'npc') return true;
     if (tg.kind === 'boat') return true;
     if (tg.kind === 'animal') return !!(tg.ent.def.shear && tg.ent.st && tg.ent.st.wool !== false && !(G.BREED && G.BREED[tg.ent.sp] && id && G.BREED[tg.ent.sp].includes(id)));
@@ -680,6 +693,7 @@
         else G.UI.openChest(p.inv, 'Baule', { piece: p });
         return;
       }
+      if (p.t === 'barile') { if (!p.inv) p.inv = new Array(18).fill(null); G.UI.openChest(p.inv, 'Barile', { piece: p }); return; }
       if (p.t === 'banco') { G.UI.openInventory(5); return; }
       if (p.t === 'falo' || p.t === 'fornace') { G.UI.openFire(p); return; }
       if (p.t === 'letto') { P.sleep(p); return; }
@@ -730,11 +744,12 @@
   /* ---------------- COSTRUZIONE ---------------- */
   P.startPlacing = function (id) { P.placing = id; };
   // la torcia si piazza subito, per terra o attaccata alla parete che guardi
-  P.placeTorch = function () {
+  P.placeTorch = function (left) {
     P.lookDir(_dir);
     const r = G.Build.placeTorch(P.cam.position, _dir);
     if (!r.ok) { G.UI.toast(r.reason, 'warn'); return; }
-    P.take('torcia', 1);
+    if (left && P.equip[0] && P.equip[0].id === 'torcia') { if (!G.creative()) { P.equip[0].n--; if (P.equip[0].n <= 0) P.equip[0] = null; } G.UI.refreshHotbar && G.UI.refreshHotbar(); }
+    else P.take('torcia', 1);
     const piece = G.Build.add({ t: 'torcia', x: r.x, y: r.y, z: r.z, rot: r.rot, wall: r.wall });
     if (G.Net && G.Net.on) G.Net.send({ t: 'badd', p: G.Build.serializeOne(piece) });
     P.actionCd = 0.25; G.saveSoon();

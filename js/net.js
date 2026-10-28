@@ -52,6 +52,8 @@
     // in multigiocatore gli animali di terra li simula il server
     for (const a of G.Entities.list.slice()) if (a.kind === 'animal' && !a.remote) G.Entities.removeAnimal(a);
     if (!isHost) G.startFromSnapshot(m.snap, m.you);
+    // mappa comune: si riceve quella della partita e si manda la propria
+    if (G.MapUI) { G.MapUI.merge(m.snap && m.snap.mapEx, m.snap && m.snap.mapDisc); setTimeout(() => { if (N.on) G.MapUI.flush(true); }, 1500); }
     for (const p of m.players) N.addRemote(p.id, p.name, p.slot, p.st);
     G.UI.refreshPlayers();
     G.UI.toast(isHost ? 'Partita aperta: gli amici possono unirsi' : 'Sei nella partita!', 'good');
@@ -104,7 +106,7 @@
         if (G.Audio) G.Audio.hit('soft');
         break;
       }
-      case 'time': if (!N.isHost) { N.targetTime = m.time; if (m.vg !== undefined) G.voiceGlobal = !!m.vg; if (m.wind !== undefined) G.Boats.wind.dir = m.wind; if (m.lv !== undefined && m.lv !== G.WIND.level) G.setWind(m.lv); if (m.mode && m.mode !== G.mode) G.setMode(m.mode); if (m.en !== undefined && !!m.en === !!G.enemiesOff) G.setEnemies(!!m.en); if (m.wx && G.Climate) { const C = G.Climate; if (m.wx.kind !== C.state.kind) C.setWeather(m.wx.kind, m.wx.lock, false); C.state.t = m.wx.t; C.state.lock = !!m.wx.lock; G.moonOffset = m.wx.moon || 0; } } break;
+      case 'time': if (!N.isHost) { N.targetTime = m.time; if (m.vg !== undefined) G.voiceGlobal = !!m.vg; if (m.ki !== undefined) G.keepInv = !!m.ki; if (m.wind !== undefined) G.Boats.wind.dir = m.wind; if (m.lv !== undefined && m.lv !== G.WIND.level) G.setWind(m.lv); if (m.mode && m.mode !== G.mode) G.setMode(m.mode); if (m.en !== undefined && !!m.en === !!G.enemiesOff) G.setEnemies(!!m.en); if (m.wx && G.Climate) { const C = G.Climate; if (m.wx.kind !== C.state.kind) C.setWeather(m.wx.kind, m.wx.lock, false); C.state.t = m.wx.t; C.state.lock = !!m.wx.lock; G.moonOffset = m.wx.moon || 0; } } break;
       case 'chat': G.UI.toast(`${m.from}: ${m.text}`); break;
       case 'drop': case 'dpick': if (G.Drops) G.Drops.onNet(m); break;
       case 'opset': N.op = !!m.on; G.UI.toast(m.on ? 'Ora sei operatore: puoi usare i comandi (T) e gli strumenti (K)' : 'Non sei più operatore', m.on ? 'good' : ''); if (G.UI.menu) G.UI.showMenu(G.UI.menu); break;
@@ -122,6 +124,7 @@
       case 'give': for (const [id, n] of m.items) G.Player.give(id, n); break;
       case 'chest': G.Structures.netChest(m.id, m.inv); break;
       case 'fx': G.Combat.netFx(m); break;
+      case 'mapex': if (G.MapUI) G.MapUI.merge(m.k, m.d); break;
       case 'dig': if (G.Dig && Array.isArray(m.s)) G.Dig.add(m.s, true); break;
       case 'pets': if (G.Pets && Array.isArray(m.l)) G.Pets.remote = m.l; break;
     }
@@ -168,7 +171,7 @@
     }
     if (N.pingT <= 0) { N.pingT = 2; N.send({ t: 'ping', c: now }); }
     if (N.pdT <= 0) { N.pdT = 8; N.send({ t: 'pdata', data: P.serialize() }); }
-    if (N.isHost && N.timeT <= 0) { N.timeT = 3; N.send({ t: 'time', time: G.time, wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, en: G.enemiesOff ? 0 : 1, vg: G.voiceGlobal ? 1 : 0, wx: G.Climate ? G.Climate.serialize() : undefined }); }
+    if (N.isHost && N.timeT <= 0) { N.timeT = 3; N.send({ t: 'time', time: G.time, wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, en: G.enemiesOff ? 0 : 1, vg: G.voiceGlobal ? 1 : 0, ki: G.keepInv ? 1 : 0, wx: G.Climate ? G.Climate.serialize() : undefined }); }
     if (!N.isHost && N.targetTime !== undefined) { const d = N.targetTime - G.time; if (Math.abs(d) > 0.02) G.time = N.targetTime; else G.time += d * Math.min(1, dt); }
     // stato della barca che guido
     if (P.boat && P.helm && G.Boats.isComplete(P.boat) && N.boatT <= 0) {
@@ -192,6 +195,15 @@
     return s;
   }
   function buildAvatar(slot) {
+    // persona vera (vestiti Quaternius) se i modelli sono caricati; guarda verso -z come il giocatore
+    if (G.Humans && G.Humans.ready) {
+      try {
+        const look = [11, 23, 37, 41][slot % 4], outfit = ['ranger', 'contadino', 'ranger_f', 'contadina'][slot % 4];
+        const p = G.Humans.build(look, { outfit, noHood: true, skin: ['Light', 'Dark', 'Light', 'Deep'][slot % 4] });
+        const g = new THREE.Group(); p.root.rotation.y = Math.PI; g.add(p.root);
+        return { g, body: p.body, head: p.head, person: p, hand: p.handR, handL: p.handL };
+      } catch (e) { console.warn(e); }
+    }
     const shirt = new THREE.MeshStandardMaterial({ color: N.COLORS[slot % 4], roughness: 0.85 });
     const pants = new THREE.MeshStandardMaterial({ color: 0x3a3f4a, roughness: 0.9 });
     const skin = new THREE.MeshStandardMaterial({ color: 0xd9a27a, roughness: 0.7 });
@@ -245,6 +257,13 @@
     r.g.position.copy(r.pos);
     r.g.rotation.y = r.yaw;
     const sitting = !!r.sit;
+    if (r.person) {
+      r.swing = Math.max(0, r.swing - dt * 3);
+      r.person.look = -r.pitch * 0.5;
+      G.Humans.pose(r.person, dt, r.swimming || sitting ? 0 : r.speed, r.swimming ? 'swim' : sitting ? 'sit' : r.swing > 0 ? 'attack' : 'idle', 1 - r.swing);
+      r.g.visible = r.target.y > -90;
+      return;
+    }
     r.phase += r.speed * dt * 2.4;
     const sw = Math.sin(r.phase) * Math.min(r.speed * 0.18, 0.8);
     r.legL.rotation.x = sitting ? -1.4 : sw; r.legR.rotation.x = sitting ? -1.4 : -sw;

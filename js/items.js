@@ -50,6 +50,7 @@
     banco: { n: 'Banco da lavoro', d: 'Sblocca la griglia di creazione 5×5.', cat: 'place' },
     falo: { n: 'Falò', d: 'Cuoce il cibo e fa luce di notte.', cat: 'place' },
     baule: { n: 'Baule', d: 'Conserva 27 oggetti.', cat: 'place' },
+    barile: { n: 'Barile', d: 'Botte di doghe e cerchi di ferro: conserva 18 oggetti. Sta bene in casa, in cantina e sulle barche.', cat: 'place' },
     letto: { n: 'Letto', d: 'Dormi per saltare la notte e salva il punto di rinascita.', cat: 'place' },
     torcia: { n: 'Torcia', d: 'Illumina le notti.', cat: 'place' },
     pavimento: { n: 'Pavimento', d: 'Base della casa (3×3 m).', cat: 'place' },
@@ -99,7 +100,7 @@
     cappello_paglia: { n: 'Cappello di paglia', d: 'Ripara dal sole: con il caldo hai meno sete.', cat: 'wear', stack: 1, wear: 1, cool: 2 },
     scudo: { n: 'Scudo', d: 'Mettilo nella mano sinistra (F) e tieni premuto il tasto destro per parare: blocca gran parte dei colpi.', cat: 'tool', stack: 1, shield: true },
     trappola: { n: 'Trappola', d: 'Posala dove passano gli animali: li cattura vivi. Poi attirali col cibo verso il recinto.', cat: 'place' },
-    terra: { n: 'Terra', d: 'Scavata dal terreno.', cat: 'res' },
+    terra: { n: 'Terra', d: 'Scavata dal terreno. Tasto destro su un buco scavato per richiuderlo.', cat: 'res' },
     carbone: { n: 'Carbone', d: 'Si trova scavando nella roccia. Fa torce migliori.', cat: 'res' },
     ossidiana: { n: 'Ossidiana', d: 'Vetro vulcanico nero e tagliente, dalle pendici dei vulcani.', cat: 'res' },
     coltello_ossidiana: { n: 'Coltello di ossidiana', d: 'Affilatissimo: colpisce forte e taglia in fretta.', cat: 'weapon', stack: 1, dmg: 4.5, cd: 0.38 },
@@ -185,6 +186,7 @@
     R('stoffa', 1, ['LL', 'LL']),
     R('stoffa', 2, ['FFF', 'FFF', 'FFF']),
     R('baule', 1, ['AAA', 'ATA', 'AAA']),
+    R('barile', 1, ['A.A', 'AIA', 'A.A']),
     R('letto', 1, ['SSS', 'AAA']),
     R('pavimento', 2, ['AAA', 'AAA']),
     R('muro', 2, ['AA', 'AA', 'AA']),
@@ -441,6 +443,7 @@
       stick(c, 16, 50, 44, 38, 5, '#6b4524'); stick(c, 48, 50, 20, 38, 5, '#7a5530');
       c.beginPath(); c.moveTo(20, 46); c.quadraticCurveTo(18, 24, 32, 8); c.quadraticCurveTo(46, 24, 44, 46); c.closePath(); c.fillStyle = lg(c, 0, 8, 0, 46, ['#ffe27a', '#ff9a2e', '#e2461e']); c.fill();
       c.beginPath(); c.moveTo(26, 46); c.quadraticCurveTo(26, 32, 32, 22); c.quadraticCurveTo(38, 32, 38, 46); c.fillStyle = '#fff4b8'; c.fill(); },
+    barile(c) { c.beginPath(); c.moveTo(18, 10); c.quadraticCurveTo(10, 32, 18, 54); c.lineTo(46, 54); c.quadraticCurveTo(54, 32, 46, 10); c.closePath(); c.fillStyle = lg(c, 10, 0, 54, 0, ['#7a4e26', '#c08850', '#7a4e26']); c.fill(); outline(c); c.strokeStyle = 'rgba(60,35,15,.6)'; c.lineWidth = 1; for (const x of [24, 32, 40]) { c.beginPath(); c.moveTo(x, 11); c.lineTo(x, 53); c.stroke(); } c.fillStyle = '#3a3c40'; for (const y of [16, 44]) c.fillRect(13, y, 38, 4); },
     baule(c) { rr(c, 8, 18, 48, 36, 3); c.fillStyle = lg(c, 0, 18, 0, 54, ['#b07a46', '#7a4e26']); c.fill(); outline(c);
       c.fillStyle = '#5a3a1e'; c.fillRect(8, 28, 48, 4); c.fillStyle = '#c9a25e'; rr(c, 28, 26, 8, 10, 1); c.fill(); outline(c, 1.2);
       c.strokeStyle = 'rgba(60,30,10,0.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(8, 42); c.lineTo(56, 42); c.stroke(); },

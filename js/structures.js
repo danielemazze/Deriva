@@ -1007,6 +1007,8 @@
     // la roccia scavata: scala, corridoio, camera sepolcrale
     const sph = [];
     for (let t = 0; t <= 1.0001; t += 0.05) { const lz = SZ0 + 0.6 - (SZ0 + 0.6 - SZ1) * t, fy = FL * t; sph.push([SX, fy + 1.7, lz, 1.95]); }
+    // pozzo aperto dalla corte fino ai gradini: il terreno sopra la scala si toglie del tutto (niente prato sopra l'ingresso)
+    for (let t = 0.12; t <= 1.0001; t += 0.16) { const lz = SZ0 - (SZ0 - SZ1) * t, fy = FL * t; sph.push([SX, fy / 2 + 0.6, lz, -fy / 2 + 2.3]); }
     for (let lz = SZ1; lz >= -6; lz -= 0.9) sph.push([SX, FL + 1.55, lz, 1.85]);
     for (let lx = SX; lx >= 5.5; lx -= 0.9) sph.push([lx, FL + 1.55, -6, 1.85]);
     for (let lx = -4.5; lx <= 4.5; lx += 2.2) for (let lz = -12.5; lz <= -0.5; lz += 2.2) sph.push([lx, FL + 2.3, lz, 2.7]);
@@ -1175,6 +1177,7 @@
     const P = G.Player; P.discovered = P.discovered || {};
     if (P.discovered[poi.id]) return;
     P.discovered[poi.id] = Date.now();
+    if (G.MapUI && G.MapUI.discOut) G.MapUI.discOut.push(poi.id);
     const what = poi.type === 'village' ? `${poi.name} · ${G.POI.STYLE_N[poi.style]}${poi.inhabited ? '' : ' (abbandonato)'}` : poi.name;
     G.UI.toast(`Scoperta: ${what}`, 'good');
     if (G.Audio) G.Audio.bell();

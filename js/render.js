@@ -11,6 +11,8 @@
     [0.92, -0.45, 0.13, 8.2], [0.15, -1.0, 0.10, 5.1], [-0.8, -0.6, 0.07, 3.3],
   ].map(([x, z, q, L]) => { const l = Math.hypot(x, z); const k = (2 * Math.PI) / L; return { dx: x / l, dz: z / l, q, k, c: Math.sqrt(9.8 / k), a: q / k }; });
   G.waveAmp = 0.5;
+  // le onde scorrono più piano della fisica pura: il mare respira con calma
+  G.WAVE_TS = 0.68;
   /* vento: livello 0 (bonaccia) … 10 (burrasca). Decide onde, schiuma, vele e vegetazione. */
   G.WIND = { level: 4, dir: 0.6 };
   // onde più alte col vento forte (in burrasca il mare si alza davvero)
@@ -38,7 +40,7 @@
     let px = 0, py = 0, pz = 0;
     const c = G.waveRot[0], s = G.waveRot[1], lx = c * x + s * z, lz = -s * x + c * z;
     for (const w of G.WAVES) {
-      const f = w.k * (w.dx * lx + w.dz * lz) - w.c * w.k * t;
+      const f = w.k * (w.dx * lx + w.dz * lz) - w.c * w.k * t * G.WAVE_TS;
       const A = w.a * G.waveAmp, cf = Math.cos(f);
       px += w.q * A * w.dx * cf; pz += w.q * A * w.dz * cf; py += A * Math.sin(f);
     }
@@ -58,7 +60,7 @@
     let s = 'uniform float uWaveAmp; uniform vec2 uWaveRot;\nvec3 gerstner(vec2 p0, float t, out vec3 nrm){ vec2 p = vec2(uWaveRot.x*p0.x + uWaveRot.y*p0.y, -uWaveRot.y*p0.x + uWaveRot.x*p0.y); vec3 d=vec3(0.); vec3 n=vec3(0.,1.,0.); float f; float A;\n';
     for (const w of G.WAVES) {
       const v = (x) => x.toFixed(5);
-      s += `f=${v(w.k)}*dot(vec2(${v(w.dx)},${v(w.dz)}),p)-${v(w.c * w.k)}*t; A=${v(w.a)}*uWaveAmp;
+      s += `f=${v(w.k)}*dot(vec2(${v(w.dx)},${v(w.dz)}),p)-${v(w.c * w.k * G.WAVE_TS)}*t; A=${v(w.a)}*uWaveAmp;
       d.x+=${v(w.q)}*A*${v(w.dx)}*cos(f); d.z+=${v(w.q)}*A*${v(w.dz)}*cos(f); d.y+=A*sin(f);
       n.x-=${v(w.dx)}*${v(w.k)}*A*cos(f); n.z-=${v(w.dz)}*${v(w.k)}*A*cos(f); n.y-=${v(w.q)}*${v(w.k)}*A*sin(f);\n`;
     }
@@ -121,7 +123,7 @@
         #endif`);
       const fsHead = 'varying vec3 vWPos; varying vec3 vWN; uniform float uTime; uniform float uSunInt; uniform float uWaterY; uniform float uWet; uniform float uDry;\n' + G.GLSL_CAUSTIC + '\n';
       if (opt.terrain) {
-        fs = fsHead + 'varying vec4 vBio; varying vec3 vBio2;\nuniform sampler2D tSand; uniform sampler2D tSandN; uniform sampler2D tRock; uniform sampler2D tRockN; uniform sampler2D tDirt; uniform sampler2D tDirtN; uniform sampler2D tSea; uniform sampler2D tSeaN; uniform float uDual; uniform float uPhoto; uniform vec4 uDig[48]; uniform int uDigN;\n' + `
+        fs = fsHead + 'varying vec4 vBio; varying vec3 vBio2;\nuniform sampler2D tSand; uniform sampler2D tSandN; uniform sampler2D tRock; uniform sampler2D tRockN; uniform sampler2D tDirt; uniform sampler2D tDirtN; uniform sampler2D tSea; uniform sampler2D tSeaN; uniform float uDual; uniform float uPhoto; uniform vec4 uDig[64]; uniform int uDigN;\n' + `
         float tHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float tNoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
           return mix(mix(tHash(i), tHash(i+vec2(1,0)), f.x), mix(tHash(i+vec2(0,1)), tHash(i+vec2(1,1)), f.x), f.y); }
@@ -155,7 +157,7 @@
       if (opt.terrain) {
         // dove si è scavato il terreno normale sparisce (lo sostituisce la galleria)
         fs = fs.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-          for (int i = 0; i < 48; i++) { if (i >= uDigN) break; vec4 ds = uDig[i]; vec3 dd = vWPos - ds.xyz; if (dot(dd, dd) < ds.w * ds.w) discard; }`);
+          for (int i = 0; i < 64; i++) { if (i >= uDigN) break; vec4 ds = uDig[i]; vec3 dd = vWPos - ds.xyz; if (dot(dd, dd) < ds.w * ds.w) discard; }`);
         fs = fs.replace('#include <map_fragment>', `
           float tUnder, tSnow;
           vec4 tw = terrainW4(tUnder, tSnow);
@@ -419,7 +421,7 @@
           for (int i = 0; i < 24; i++) { if (i >= uDigWN) break; vec3 dd = vWPos - uDigW[i].xyz; if (dot(dd, dd) < uDigW[i].w * uDigW[i].w) discard; }
           vec3 V = uCam - vWPos; float dist = length(V); V /= dist;
           vec2 wdir = vec2(uWaveRot.x*0.97 - uWaveRot.y*0.24, uWaveRot.y*0.97 + uWaveRot.x*0.24); // verso del vento
-          vec2 u1 = vWPos.xz*0.045 - uTime*wdir*(0.012 + uWindLv*0.03), u2 = vWPos.xz*0.12 - uTime*(wdir*(0.02 + uWindLv*0.05) + vec2(-wdir.y, wdir.x)*0.006);
+          vec2 u1 = vWPos.xz*0.045 - uTime*wdir*(0.008 + uWindLv*0.016), u2 = vWPos.xz*0.12 - uTime*(wdir*(0.012 + uWindLv*0.028) + vec2(-wdir.y, wdir.x)*0.004);
           vec3 n1 = texture2D(tNormal, u1).xyz*2.0-1.0, n2 = texture2D(tNormal, u2).xyz*2.0-1.0;
           float ds = mix(0.42, 0.06, clamp(dist/260.0, 0.0, 1.0)) * (0.12 + uWindLv * 1.25);
           vec3 N = normalize(vN + vec3(n1.x + n2.x, 0.0, n1.y + n2.y) * ds);

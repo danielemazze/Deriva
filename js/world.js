@@ -69,6 +69,7 @@
     MAT.planksB = G.patch(std({ map: TEX.planksT.map, normalMap: TEX.planksT.normal, vertexColors: true, roughness: 0.82, side: THREE.DoubleSide }), { key: 'planksB', alphaTag: 0.85 });
     MAT.logsB = G.patch(std({ map: TEX.barkT.map, normalMap: TEX.barkT.normal, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), { key: 'logsB', alphaTag: 0.85 });
     MAT.rope = G.patch(std({ color: 0xc8a46a, roughness: 0.9 }), { key: 'rope' });
+    MAT.cannon = std({ color: 0x0e0e10, roughness: 0.5, metalness: 0.3, envMapIntensity: 0.2 }); // ferro scuro (canna e affusto)
     TEX.woolT.map.repeat.set(3, 2); TEX.woolT.normal.repeat.set(3, 2);
     MAT.wool = G.patch(std({ map: TEX.woolT.map, normalMap: TEX.woolT.normal, color: 0xe8e2d6, roughness: 1 }), { key: 'wool' });
     MAT.cow = G.patch(std({ map: TEX.cowHideT.map, color: 0xd8d4cc, roughness: 0.85 }), { key: 'cow' });

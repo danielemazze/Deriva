@@ -40,6 +40,7 @@
     const obj = THREE.SkeletonUtils.clone(m.scene);
     const root = new THREE.Group(), inner = new THREE.Group(); root.add(inner); inner.add(obj);
     inner.scale.setScalar(m.scale); inner.position.y = -m.minY * m.scale;
+    obj.rotation.y = Math.PI; // i modelli guardano dalla parte opposta rispetto al gioco: si girano, così camminano col muso in avanti
     const mixer = new THREE.AnimationMixer(obj), acts = {};
     for (const [k, c] of Object.entries(m.clips)) acts[k] = mixer.clipAction(c);
     let cur = null;

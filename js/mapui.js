@@ -12,12 +12,15 @@
 
   /* ---------------- esplorazione ---------------- */
   MU.track = function (dt) {
+    MU.miniT = (MU.miniT || 0) - dt; if (MU.miniT <= 0) { MU.miniT = 0.12; MU.drawMini(); }
     MU.t = (MU.t || 0) - dt; if (MU.t > 0) return; MU.t = 0.5;
     const p = P(), ex = (p.explored = p.explored || new Set());
     const cx = Math.floor(p.pos.x / G.CHUNK), cz = Math.floor(p.pos.z / G.CHUNK), R = p.boat ? 3 : 2;
-    for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > R * R + 1) continue; const k = (cx + dx) + ',' + (cz + dz); if (!ex.has(k)) { ex.add(k); MU.queue.push(k); } }
+    for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > R * R + 1) continue; const k = (cx + dx) + ',' + (cz + dz); if (!ex.has(k)) { ex.add(k); MU.queue.push(k); MU.outbox.push(k); } }
+    // in multigiocatore la mappa è una sola: quello che scopri lo vedono anche gli altri
+    if (G.Net && G.Net.on && (MU.sendT = (MU.sendT || 0) - 0.5) <= 0 && (MU.outbox.length || MU.discOut.length)) { MU.sendT = 2; MU.flush(); }
     // disegna qualche riquadro nuovo per volta
-    for (let i = 0; i < 4 && MU.queue.length; i++) MU.tile(MU.queue.shift());
+    for (let i = 0, n = MU.queue.length > 200 ? 20 : 4; i < n && MU.queue.length; i++) MU.tile(MU.queue.shift());
   };
   const _bw2 = [0, 0], _bw = [0, 0, 0, 0];
   MU.tile = function (k) {
@@ -49,7 +52,62 @@
     MU.tiles.set(k, c);
     return c;
   };
-  MU.reset = function () { MU.tiles.clear(); MU.queue = []; };
+  /* ---------------- minimappa (in alto a destra) ---------------- */
+  MU.drawMini = function () {
+    const on = G.settings.minimap !== false && G.started && !G.UI.menu;
+    let c = document.getElementById('minimap');
+    if (!c) { c = document.createElement('canvas'); c.id = 'minimap'; c.className = 'minimap'; const h = document.getElementById('hud'); if (!h) return; h.appendChild(c); }
+    c.hidden = !on; if (!on) return;
+    const css = c.clientWidth || 150, dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(css * dpr);
+    if (c.width !== W) { c.width = c.height = W; }
+    const x = c.getContext('2d'), p = P(), ex = p.explored || new Set();
+    const MPP = 1.6; // metri per pixel (css): la minimappa copre circa 240 m
+    const k = dpr / MPP, cx = W / 2, cz = W / 2;
+    x.save(); x.clearRect(0, 0, W, W);
+    x.beginPath(); x.arc(cx, cz, W / 2 - 1, 0, 7); x.clip();
+    x.fillStyle = '#1d3a44'; x.fillRect(0, 0, W, W);
+    const R = (W / 2) / k, c0x = Math.floor((p.pos.x - R) / G.CHUNK), c1x = Math.floor((p.pos.x + R) / G.CHUNK), c0z = Math.floor((p.pos.z - R) / G.CHUNK), c1z = Math.floor((p.pos.z + R) / G.CHUNK);
+    x.imageSmoothingEnabled = true;
+    for (let tz = c0z; tz <= c1z; tz++) for (let tx = c0x; tx <= c1x; tx++) {
+      const key = tx + ',' + tz; if (!ex.has(key)) continue;
+      const t = MU.tiles.get(key); if (!t) continue;
+      x.drawImage(t, cx + (tx * G.CHUNK - p.pos.x) * k, cz + (tz * G.CHUNK - p.pos.z) * k, G.CHUNK * k + 0.6, G.CHUNK * k + 0.6);
+    }
+    // luoghi scoperti vicini
+    x.font = `${Math.round(13 * dpr)}px serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    for (const q of MU.knownPOIs()) { const sx = cx + (q.poi.x - p.pos.x) * k, sy = cz + (q.poi.z - p.pos.z) * k; if (Math.hypot(sx - cx, sy - cz) > W / 2 - 8 * dpr) continue; x.lineWidth = 3 * dpr; x.strokeStyle = 'rgba(0,0,0,.7)'; x.strokeText(ICON[q.poi.type] || '•', sx, sy); x.fillStyle = q.seen ? '#f2e6c8' : '#b9b09a'; x.fillText(ICON[q.poi.type] || '•', sx, sy); }
+    // le tue barche
+    for (const b of G.Boats.list) { if (b.pirate) continue; const sx = cx + (b.x - p.pos.x) * k, sy = cz + (b.z - p.pos.z) * k; if (Math.hypot(sx - cx, sy - cz) > W / 2 - 6 * dpr) continue; x.fillStyle = '#c99a5a'; x.beginPath(); x.ellipse(sx, sy, 2.2 * dpr, 4.5 * dpr, -b.yaw, 0, 7); x.fill(); }
+    // pericoli in mare
+    if (G.Sea) for (const e of G.Sea.enc) { if (e.dead) continue; const sx = cx + (e.pos.x - p.pos.x) * k, sy = cz + (e.pos.z - p.pos.z) * k; const d = Math.hypot(sx - cx, sy - cz), m = W / 2 - 7 * dpr; const ux = d > m ? cx + (sx - cx) / d * m : sx, uy = d > m ? cz + (sy - cz) / d * m : sy; x.fillStyle = '#ff4a3a'; x.beginPath(); x.arc(ux, uy, 3.5 * dpr, 0, 7); x.fill(); }
+    // gli altri giocatori (sul bordo se sono lontani)
+    if (G.Net && G.Net.on) for (const r of G.Net.remotes.values()) {
+      let sx = cx + (r.pos.x - p.pos.x) * k, sy = cz + (r.pos.z - p.pos.z) * k; const d = Math.hypot(sx - cx, sy - cz), m = W / 2 - 7 * dpr;
+      if (d > m) { sx = cx + (sx - cx) / d * m; sy = cz + (sy - cz) / d * m; }
+      x.fillStyle = G.Net.COLOR_CSS[r.slot % 4]; x.strokeStyle = '#000'; x.lineWidth = 1.5 * dpr; x.beginPath(); x.arc(sx, sy, 4.2 * dpr, 0, 7); x.fill(); x.stroke();
+    }
+    // tu: freccia al centro
+    x.translate(cx, cz); x.rotate(-p.yaw);
+    x.fillStyle = '#ff4a3a'; x.strokeStyle = '#fff'; x.lineWidth = 1.5 * dpr; x.beginPath(); x.moveTo(0, -8 * dpr); x.lineTo(5.5 * dpr, 6 * dpr); x.lineTo(0, 3 * dpr); x.lineTo(-5.5 * dpr, 6 * dpr); x.closePath(); x.fill(); x.stroke();
+    x.restore();
+    // N in alto
+    x.font = `600 ${Math.round(11 * dpr)}px system-ui, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'top'; x.lineWidth = 3 * dpr; x.strokeStyle = 'rgba(0,0,0,.6)'; x.strokeText('N', cx, 3 * dpr); x.fillStyle = '#f2e6c8'; x.fillText('N', cx, 3 * dpr);
+  };
+  MU.reset = function () { MU.tiles.clear(); MU.queue = []; MU.outbox = []; MU.discOut = []; };
+  MU.outbox = []; MU.discOut = [];
+  MU.flush = function (all) {
+    const p = P();
+    const keys = all ? [...(p.explored || [])] : MU.outbox.splice(0);
+    const d = {}; for (const id of all ? Object.keys(p.discovered || {}) : MU.discOut.splice(0)) d[id] = (p.discovered || {})[id] || Date.now();
+    for (let i = 0; i < Math.max(1, keys.length); i += 1500) G.Net.send({ t: 'mapex', k: keys.slice(i, i + 1500), d: i === 0 ? d : {} });
+  };
+  // scoperte degli altri giocatori
+  MU.merge = function (keys, disc) {
+    const p = P(), ex = (p.explored = p.explored || new Set());
+    for (const k of keys || []) if (typeof k === 'string' && !ex.has(k)) { ex.add(k); MU.queue.push(k); }
+    p.discovered = p.discovered || {};
+    for (const [id, t] of Object.entries(disc || {})) if (!p.discovered[id]) p.discovered[id] = t;
+  };
 
   /* ---------------- luoghi noti ---------------- */
   MU.knownPOIs = function () {
