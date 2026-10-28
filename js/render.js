@@ -13,7 +13,11 @@
   G.waveAmp = 0.5;
   /* vento: livello 0 (bonaccia) … 10 (burrasca). Decide onde, schiuma, vele e vegetazione. */
   G.WIND = { level: 4, dir: 0.6 };
-  G.windAmp = (lv) => [0.015, 0.08, 0.17, 0.27, 0.4, 0.55, 0.72, 0.92, 1.15, 1.42, 1.75][Math.max(0, Math.min(10, Math.round(lv)))];
+  // onde più alte col vento forte (in burrasca il mare si alza davvero)
+  G.windAmp = (lv) => [0.015, 0.08, 0.17, 0.3, 0.45, 0.64, 0.88, 1.16, 1.5, 1.9, 2.35][Math.max(0, Math.min(10, Math.round(lv)))];
+  // le onde vanno dove soffia il vento: rotazione dell'intero campo d'onda
+  const W0 = Math.atan2(0.25, 1.0);
+  G.waveRot = [1, 0]; G._waveAng = null;
   G.setWind = function (lv) {
     G.WIND.level = Math.max(0, Math.min(10, Math.round(lv)));
   };
@@ -25,16 +29,20 @@
     const target = G.windAmp(eff) * (1 - cold * 0.8);
     G.waveAmp += (target - G.waveAmp) * Math.min(1, dt * 0.35);
     const lv = eff / 10;
+    { const wd = G.Boats ? G.Boats.wind.dir : 0, want = Math.atan2(Math.cos(wd), Math.sin(wd)) - W0; // verso: (sin wd, cos wd) in x,z
+      if (G._waveAng === null) G._waveAng = want; else G._waveAng += (G.angleDiff ? G.angleDiff(G._waveAng, want) : 0) * Math.min(1, dt * 0.05);
+      G.waveRot[0] = Math.cos(G._waveAng); G.waveRot[1] = Math.sin(G._waveAng); }
     G.shared.uWind.value += (0.08 + lv * 1.9 - G.shared.uWind.value) * Math.min(1, dt * 0.5);
   };
   G.waveDisp = function (x, z, t, out) {
     let px = 0, py = 0, pz = 0;
+    const c = G.waveRot[0], s = G.waveRot[1], lx = c * x + s * z, lz = -s * x + c * z;
     for (const w of G.WAVES) {
-      const f = w.k * (w.dx * x + w.dz * z) - w.c * w.k * t;
+      const f = w.k * (w.dx * lx + w.dz * lz) - w.c * w.k * t;
       const A = w.a * G.waveAmp, cf = Math.cos(f);
       px += w.q * A * w.dx * cf; pz += w.q * A * w.dz * cf; py += A * Math.sin(f);
     }
-    out[0] = px; out[1] = py; out[2] = pz; return out;
+    out[0] = c * px - s * pz; out[1] = py; out[2] = s * px + c * pz; return out;
   };
   const _d = [0, 0, 0];
   G.waveHeight = function (x, z, t) {
@@ -47,14 +55,14 @@
 
   /* ---------------- GLSL condiviso ---------------- */
   const GLSL_WAVES = () => {
-    let s = 'uniform float uWaveAmp;\nvec3 gerstner(vec2 p, float t, out vec3 nrm){ vec3 d=vec3(0.); vec3 n=vec3(0.,1.,0.); float f; float A;\n';
+    let s = 'uniform float uWaveAmp; uniform vec2 uWaveRot;\nvec3 gerstner(vec2 p0, float t, out vec3 nrm){ vec2 p = vec2(uWaveRot.x*p0.x + uWaveRot.y*p0.y, -uWaveRot.y*p0.x + uWaveRot.x*p0.y); vec3 d=vec3(0.); vec3 n=vec3(0.,1.,0.); float f; float A;\n';
     for (const w of G.WAVES) {
       const v = (x) => x.toFixed(5);
       s += `f=${v(w.k)}*dot(vec2(${v(w.dx)},${v(w.dz)}),p)-${v(w.c * w.k)}*t; A=${v(w.a)}*uWaveAmp;
       d.x+=${v(w.q)}*A*${v(w.dx)}*cos(f); d.z+=${v(w.q)}*A*${v(w.dz)}*cos(f); d.y+=A*sin(f);
       n.x-=${v(w.dx)}*${v(w.k)}*A*cos(f); n.z-=${v(w.dz)}*${v(w.k)}*A*cos(f); n.y-=${v(w.q)}*${v(w.k)}*A*sin(f);\n`;
     }
-    s += 'nrm=normalize(n); return d; }\n';
+    s += 'd.xz = vec2(uWaveRot.x*d.x - uWaveRot.y*d.z, uWaveRot.y*d.x + uWaveRot.x*d.z); n.xz = vec2(uWaveRot.x*n.x - uWaveRot.y*n.z, uWaveRot.y*n.x + uWaveRot.x*n.z); nrm=normalize(n); return d; }\n';
     return s;
   };
   G.GLSL_CAUSTIC = `
@@ -374,7 +382,7 @@
       side: THREE.DoubleSide, depthTest: false, depthWrite: false, transparent: false,
       uniforms: {
         tScene: { value: null }, tDepth: { value: null }, tNormal: { value: null }, uRes: { value: new THREE.Vector2() },
-        uNear: { value: 0.1 }, uFar: { value: 2000 }, uTime: G.shared.uTime, uWaveAmp: { value: G.waveAmp }, uWindLv: { value: 0.4 }, uCam: { value: new THREE.Vector3() },
+        uNear: { value: 0.1 }, uFar: { value: 2000 }, uTime: G.shared.uTime, uWaveAmp: { value: G.waveAmp }, uWaveRot: { value: new THREE.Vector2(1, 0) }, uWindLv: { value: 0.4 }, uCam: { value: new THREE.Vector3() },
         uSunDir: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() },
         uAmb: { value: new THREE.Color() }, uFogDen: { value: 0.002 }, uUnder: { value: 0 }, uOffset: { value: new THREE.Vector2() },
         uVort: { value: [new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0)] },
@@ -397,7 +405,7 @@
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        uniform sampler2D tScene, tDepth, tNormal; uniform vec2 uRes; uniform float uNear, uFar, uTime, uFogDen, uUnder, uWaveAmp, uWindLv, uSSR; uniform vec4 uVort[4]; uniform mat4 uVP; uniform vec4 uDigW[24]; uniform int uDigWN;
+        uniform sampler2D tScene, tDepth, tNormal; uniform vec2 uRes; uniform float uNear, uFar, uTime, uFogDen, uUnder, uWaveAmp, uWindLv, uSSR; uniform vec2 uWaveRot; uniform vec4 uVort[4]; uniform mat4 uVP; uniform vec4 uDigW[24]; uniform int uDigWN;
         uniform vec3 uCam, uSunDir, uSunCol, uZen, uHor, uAmb;
         varying vec3 vWPos; varying vec3 vN; varying float vH; varying float vViewZ;
         float lin(float d){ float z = d*2.0-1.0; return 2.0*uNear*uFar/(uFar+uNear - z*(uFar-uNear)); }
@@ -410,7 +418,8 @@
           if (sceneZ < vViewZ - 0.05) discard;
           for (int i = 0; i < 24; i++) { if (i >= uDigWN) break; vec3 dd = vWPos - uDigW[i].xyz; if (dot(dd, dd) < uDigW[i].w * uDigW[i].w) discard; }
           vec3 V = uCam - vWPos; float dist = length(V); V /= dist;
-          vec2 u1 = vWPos.xz*0.045 + uTime*vec2(0.018,0.011), u2 = vWPos.xz*0.12 - uTime*vec2(0.012,0.026);
+          vec2 wdir = vec2(uWaveRot.x*0.97 - uWaveRot.y*0.24, uWaveRot.y*0.97 + uWaveRot.x*0.24); // verso del vento
+          vec2 u1 = vWPos.xz*0.045 - uTime*wdir*(0.012 + uWindLv*0.03), u2 = vWPos.xz*0.12 - uTime*(wdir*(0.02 + uWindLv*0.05) + vec2(-wdir.y, wdir.x)*0.006);
           vec3 n1 = texture2D(tNormal, u1).xyz*2.0-1.0, n2 = texture2D(tNormal, u2).xyz*2.0-1.0;
           float ds = mix(0.42, 0.06, clamp(dist/260.0, 0.0, 1.0)) * (0.12 + uWindLv * 1.25);
           vec3 N = normalize(vN + vec3(n1.x + n2.x, 0.0, n1.y + n2.y) * ds);
@@ -455,6 +464,9 @@
             col = mix(col, refl, clamp(fres, 0.0, 0.92));
             float sp = max(dot(R, uSunDir), 0.0);
             col += uSunCol * (pow(sp, 900.0)*6.0 + pow(sp, 90.0)*0.22);
+            // luce che attraversa le creste (verde-azzurro), più visibile controluce
+            float crestH = smoothstep(0.15, 1.0, vH / (uWaveAmp + 0.01));
+            col += vec3(0.02, 0.2, 0.17) * crestH * lightLvl * (0.4 + 0.9 * pow(max(dot(-V, uSunDir), 0.0), 2.0)) * (1.0 - fres);
             // schiuma riva + creste
             float fn = vn(vWPos.xz*0.9 + uTime*0.25)*0.6 + vn(vWPos.xz*2.7 - uTime*0.4)*0.4;
             // schiuma a chiazze sulla battigia (non un velo bianco uniforme), più forte col vento
@@ -463,7 +475,10 @@
             float lace = smoothstep(0.5, 0.85, fn + sin(vth*9.0 - uTime*1.7)*0.18);
             float bands = smoothstep(0.6, 0.95, sin(vth*6.0 - uTime*2.2 + fn*3.0)*0.5+0.5) * (1.0 - smoothstep(0.0, 2.2, vth)) * notBoat;
             float crest = smoothstep(0.55, 1.0, vH / (0.9*uWaveAmp+0.01) + fn*0.25) * smoothstep(0.25, 0.7, wl);
-            float foam = clamp(shore*lace*(0.45 + wl*0.5) + bands*(0.25 + wl*0.45)*fn + crest*fn*(0.3 + wl*0.7), 0.0, 1.0);
+            // strisce di schiuma allungate nel verso del vento quando soffia forte
+            vec2 wp = vec2(dot(vWPos.xz, wdir), dot(vWPos.xz, vec2(-wdir.y, wdir.x)));
+            float streak = smoothstep(0.62, 0.9, vn(vec2(wp.x * 0.05 - uTime * 0.2, wp.y * 0.6)) * vn(vec2(wp.x * 0.13, wp.y * 1.7))) * smoothstep(0.5, 0.9, wl) * (1.0 - clamp(dist / 300.0, 0.0, 1.0));
+            float foam = clamp(shore*lace*(0.45 + wl*0.5) + bands*(0.25 + wl*0.45)*fn + crest*fn*(0.3 + wl*0.7) + streak * 0.55, 0.0, 1.0);
             // schiuma a spirale dei gorghi, centro scuro
             for (int i = 0; i < 4; i++) { vec4 v = uVort[i]; if (abs(v.w) < 0.02) continue; vec2 dv = vWPos.xz - v.xy; float dd = length(dv) / v.z;
               if (dd > 1.7) continue; float ang = atan(dv.y, dv.x) * sign(v.w);

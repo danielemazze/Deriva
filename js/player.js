@@ -18,6 +18,8 @@
   /* ---------------- INVENTARIO ---------------- */
   P.count = (id) => (G.creative && G.creative() ? 9999 : P.inv.reduce((s, it) => s + (it && it.id === id ? it.n : 0), 0));
   P.give = function (id, n, silent) {
+    // bottino raccolto nel mondo: salta fuori a terra e si raccoglie passandoci sopra (come in Minecraft)
+    if (P._popPos && G.Drops && n > 0) { const q = P._popPos; G.Drops.pop(id, n, q.x, q.y, q.z); return; }
     const def = G.ITEMS[id]; let left = n;
     for (let pass = 0; pass < 2 && left > 0; pass++) {
       const order = [...Array(36).keys()];
@@ -29,7 +31,7 @@
       }
     }
     if (!silent) G.UI.pickup(id, n - left);
-    if (left > 0) G.UI.toast('Inventario pieno', 'warn');
+    if (left > 0) { G.UI.toast('Inventario pieno: l’oggetto è a terra', 'warn'); if (G.Drops) G.Drops.spawn({ id, n: left }, P.pos.x, P.pos.y + 0.6, P.pos.z, 0, 1.5, 0, { delay: 3 }); }
     G.UI.refreshHotbar();
     return n - left;
   };
@@ -63,7 +65,7 @@
     // modello in mano (viewmodel)
     P.vm = new THREE.Group(); camera.add(P.vm);
     P.vmHolder = new THREE.Group(); P.vm.add(P.vmHolder);
-    P.vm.position.set(0.36, -0.36, -0.62);
+    P.vm.position.set(0.5, -0.4, -0.62); // mani larghe: il centro dello schermo resta libero
     const skin = new THREE.MeshStandardMaterial({ color: 0xd9a27a, roughness: 0.7 });
     const sleeve = new THREE.MeshStandardMaterial({ color: 0x3f5a6b, roughness: 0.9 });
     P.arm = new THREE.Group();
@@ -73,7 +75,7 @@
     P.vmItem = new THREE.Group(); P.vmHolder.add(P.vmItem);
     P.vmCache = {};
     // mano sinistra
-    P.vmL = new THREE.Group(); camera.add(P.vmL); P.vmL.position.set(-0.38, -0.38, -0.6);
+    P.vmL = new THREE.Group(); camera.add(P.vmL); P.vmL.position.set(-0.52, -0.4, -0.6);
     P.vmLHolder = new THREE.Group(); P.vmL.add(P.vmLHolder);
     P.vmLItem = new THREE.Group(); P.vmLHolder.add(P.vmLItem);
     P.vmCacheL = {};
@@ -121,7 +123,7 @@
     if (P.vmId === id && P._torchSrc) return;
     P.vmId = id;
     P.vmItem.clear();
-    if (id) { if (!P.vmCache[id]) P.vmCache[id] = toolMesh(id); P.vmItem.add(P.vmCache[id]); }
+    if (id) { if (!P.vmCache[id]) { if (id === 'scudo') { const m = shieldMesh(); m.rotation.y -= 0.5; m.rotation.z -= 0.15; P.vmCache[id] = m; } else P.vmCache[id] = toolMesh(id); } P.vmItem.add(P.vmCache[id]); }
     const rt = id === 'torcia' || id === 'lanterna';
     P.heldTorch = rt || lt;
     P.torchPower = id === 'lanterna' || lid === 'lanterna' ? 2.4 : 0.85;
@@ -188,6 +190,16 @@
         P.vel.x += (_dir.x * sp - P.vel.x) * Math.min(1, dt * acc);
         P.vel.z += (_dir.z * sp - P.vel.z) * Math.min(1, dt * acc);
         // arrampicata: scale a pioli con W, muri con W + Spazio
+        // scale a pioli: Spazio tenuto premuto = sali, C = scendi, nient'altro = resti aggrappato
+        const lad = G.Build.ladderAt(P.pos, RAD, HEIGHT);
+        if (lad && (k.Space || k.KeyC || k.ControlLeft || (!P.onGround && P.onLadder))) {
+          P.climbing = true; P.onLadder = true;
+          P.vel.x *= 0.25; P.vel.z *= 0.25;
+          P.vel.y = k.Space ? 3.2 : k.KeyC || k.ControlLeft ? -2.8 : 0;
+          if (k.Space && P.pos.y > lad.y1 - 0.9) { P.vel.x += _f.x * 3; P.vel.z += _f.z * 3; } // in cima: scendi sul pavimento
+          P.fallFrom = P.pos.y;
+        } else {
+        P.onLadder = false;
         const cb = (k.KeyW) && G.Build.climbAt(P.pos, RAD, HEIGHT, _f.x, _f.z);
         P.climbing = !!(cb && (cb.ladder || k.Space));
         if (P.climbing) {
@@ -195,7 +207,15 @@
           if (P.pos.y > cb.y1 - 0.6) { P.vel.x += _f.x * 2.5; P.vel.z += _f.z * 2.5; }
           P.fallFrom = P.pos.y;
         } else P.vel.y -= 22 * dt;
+        }
         if (k.Space && P.onGround && !P.climbing) { P.vel.y = 7.4; P.onGround = false; }
+        // salite realistiche: sui pendii troppo ripidi (oltre ~42°) non si sale, si scivola giù
+        if (P.onGround && !P.climbing && !P.swim) {
+          const nx = P.pos.x + P.vel.x * dt, nz = P.pos.z + P.vel.z * dt, g0 = G.World.groundAt(P.pos.x, P.pos.z), g1 = G.World.groundAt(nx, nz), run = Math.hypot(nx - P.pos.x, nz - P.pos.z);
+          if (run > 1e-4 && Math.abs(P.pos.y - g0) < 0.3 && g1 - g0 > run * 0.9 && G.Build.groundAt(nx, nz, P.pos.y + 0.6, 0.05) < g1 - 0.2) { P.vel.x *= -0.15; P.vel.z *= -0.15; if (!P._steepTip) { P._steepTip = 1; G.UI.toast('Troppo ripido: cerca un passaggio meno scosceso (o scava dei gradini)'); } }
+          const n = G.normalAt(P.pos.x, P.pos.z);
+          if (n[1] < 0.72 && Math.abs(P.pos.y - g0) < 0.15 && G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y + 0.3, 0.05) < g0 - 0.2) { P.vel.x += n[0] * 9 * dt; P.vel.z += n[2] * 9 * dt; }
+        }
         P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt; P.pos.y += P.vel.y * dt;
         let ceil = G.Build.ceilingAt(P.pos.x, P.pos.z, P.pos.y + HEIGHT, RAD * 0.8);
         if (G.Dig && G.Dig.activeAt(P.pos.x, P.pos.z)) ceil = Math.min(ceil, G.Dig.ceiling(P.pos.x, P.pos.z, P.pos.y + HEIGHT));
@@ -251,7 +271,13 @@
       cam.position.y = Math.max(cam.position.y, G.waveHeight(cam.position.x, cam.position.z, t) + 0.6);
       cam.lookAt(b.x, b.y + 2, b.z);
       P.vm.visible = false;
+      // visuale da lontano: si vede anche il tuo personaggio al timone
+      if (!P.selfAv && G.Net && G.Net.buildAvatar) { P.selfAv = G.Net.buildAvatar(G.Net.on ? G.Net.slot || 0 : 0); G.scene.add(P.selfAv.g); }
+      if (P.selfAv) { const av = P.selfAv, sit = !!b.T.sit; av.g.visible = true; av.g.position.set(P.pos.x, P.pos.y, P.pos.z); av.g.rotation.y = (b.yaw || 0) + Math.PI;
+        av.legL.rotation.x = av.legR.rotation.x = sit ? -1.4 : 0; av.body.position.y = sit ? -0.75 : 0;
+        const st = Math.sin(t * 1.3) * 0.08; av.armL.rotation.x = -1.1 + st; av.armR.rotation.x = -1.1 - st; }
     } else {
+      if (P.selfAv) P.selfAv.g.visible = false;
       const bobY = P.onGround && !(P.boat && P.helm) ? Math.sin(P.bob * 2) * 0.035 : 0;
       cam.position.set(P.eye.x, P.eye.y + bobY, P.eye.z);
       cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
@@ -265,11 +291,16 @@
     if (P.heldTorch) { P.lookDir(_o); P.torchPos.copy(P.eye).addScaledVector(_o, 0.6).add(new V3(0, -0.15, 0)); if (P._torchSrc === 'l') { P.torchPos.x -= Math.cos(P.yaw) * 0.45; P.torchPos.z += Math.sin(P.yaw) * 0.45; } }
     // scudo: tasto destro tenuto = parata (lo scudo sale davanti)
     const L = P.equip[0];
-    P.blocking = !!(L && G.ITEMS[L.id] && G.ITEMS[L.id].shield && P.mouse.r && !G.UI.open && !P.boat);
-    const bk = P._blockK = G.lerp(P._blockK || 0, P.blocking ? 1 : 0, Math.min(1, dt * 14));
-    P.vmL.position.set(-0.38 + bk * 0.22, -0.38 + bk * 0.12, -0.6 + bk * 0.08);
+    const HR = P.held(), shR = !!(HR && G.ITEMS[HR.id] && G.ITEMS[HR.id].shield), shL = !!(L && G.ITEMS[L.id] && G.ITEMS[L.id].shield);
+    P.blocking = (shL || shR) && P.mouse.r && !G.UI.open && !P.boat;
+    const bk = P._blockK = G.lerp(P._blockK || 0, P.blocking && shL ? 1 : 0, Math.min(1, dt * 14));
+    const bkR = P._blockR = G.lerp(P._blockR || 0, P.blocking && shR && !shL ? 1 : 0, Math.min(1, dt * 14));
+    P.vmL.position.set(-0.52 + bk * 0.32, -0.4 + bk * 0.14, -0.6 + bk * 0.08);
+    P.vm.position.set(0.5 - bkR * 0.32, -0.4 + bkR * 0.14, -0.62 + bkR * 0.1);
     P.vmLHolder.rotation.set(Math.sin(P.bob) * 0.02, bk * 0.5, 0);
     P.vmL.visible = P.vm.visible && !!L;
+    Crack.update(dt);
+    if (P._shakeT > 0 && P._shakeP && P._shakeP.mesh) { P._shakeT -= dt; const m = P._shakeP.mesh, a = P._shakeT > 0 ? Math.sin(P._shakeT * 90) * 0.025 * (P._shakeT / 0.2) : 0; if (m.userData.bx === undefined) { m.userData.bx = m.position.x; m.userData.bz = m.position.z; } m.position.x = m.userData.bx + a; m.position.z = m.userData.bz + a * 0.6; if (P._shakeT <= 0) { m.position.x = m.userData.bx; m.position.z = m.userData.bz; delete m.userData.bx; P._shakeP = null; } }
     updateStats(dt);
     updateTarget();
     P.actionCd = Math.max(0, P.actionCd - dt);
@@ -359,8 +390,8 @@
     const moving = P.vel.lengthSq() > 1;
     const sprint = (P.keys.ShiftLeft || P.keys.ShiftRight) && moving && !P.swim;
     const Cl = G.Climate;
-    P.hunger = Math.max(0, P.hunger - dt * 0.085 * (sprint ? 1.7 : P.swim ? 1.35 : 1) * (Cl ? Cl.hungerMul() : 1));
-    P.thirst = Math.max(0, P.thirst - dt * 0.12 * (sprint ? 1.6 : 1) * (G.sky.day > 0.5 ? 1.1 : 0.85) * (Cl ? Cl.thirstMul() : 1));
+    P.hunger = Math.max(0, P.hunger - dt * 0.021 * (sprint ? 1.7 : P.swim ? 1.35 : 1) * (Cl ? Cl.hungerMul() : 1));
+    P.thirst = Math.max(0, P.thirst - dt * 0.029 * (sprint ? 1.6 : 1) * (G.sky.day > 0.5 ? 1.1 : 0.85) * (Cl ? Cl.thirstMul() : 1));
     if (P.under) { P.oxygen = Math.max(0, P.oxygen - dt * 100 / 32 * (G.Combat && G.Combat.has('pinne') ? 0.4 : 1)); if (P.oxygen <= 0) P.hurt(dt * 7, true); }
     else P.oxygen = Math.min(100, P.oxygen + dt * 40);
     if (P.hunger <= 0 || P.thirst <= 0) P.hurt(dt * 0.6, true);
@@ -414,9 +445,49 @@
     if (G.FreeBoat) G.FreeBoat.updateGhost(P);
   }
 
+
+  /* ---------------- CREPE: si vede che l'oggetto si sta spaccando, colpo dopo colpo ---------------- */
+  const Crack = (G.Crack = { mesh: null, key: null, t: 0, tex: [] });
+  function crackTex(stage) {
+    const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+    let seed = 7 + stage * 0; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const N = 2 + stage * 2, L = 30 + stage * 22;
+    const branch = (x0, y0, a, len, w, depth) => {
+      let px = x0, py = y0;
+      x.beginPath(); x.moveTo(px, py);
+      const n = Math.max(3, Math.round(len / 10));
+      for (let i = 0; i < n; i++) { a += (rnd() - 0.5) * 0.9; px += Math.cos(a) * len / n; py += Math.sin(a) * len / n; x.lineTo(px, py); if (depth < 2 && rnd() < 0.18 + stage * 0.04) { x.stroke(); branch(px, py, a + (rnd() < 0.5 ? 0.9 : -0.9), len * 0.5, w * 0.7, depth + 1); x.beginPath(); x.moveTo(px, py); } }
+      x.stroke();
+    };
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    for (const pass of [0, 1]) {
+      seed = 7; x.strokeStyle = pass ? 'rgba(14,10,6,.92)' : 'rgba(255,240,220,.22)'; x.lineWidth = pass ? 1.3 + stage * 0.3 : 2.8 + stage * 0.4;
+      for (let k = 0; k < N; k++) branch(128, 128, (k / N) * 6.283 + rnd() * 0.6, L * (0.6 + rnd() * 0.5), 2, 0);
+    }
+    if (stage >= 3) { const g = x.createRadialGradient(128, 128, 0, 128, 128, 30 + stage * 6); g.addColorStop(0, 'rgba(10,8,5,.55)'); g.addColorStop(1, 'rgba(10,8,5,0)'); x.fillStyle = g; x.fillRect(0, 0, 256, 256); }
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  }
+  // key: oggetto colpito · pos: punto colpito · frac: 0 integro → 1 rotto · size: metri
+  Crack.hit = function (key, pos, frac, size) {
+    if (!Crack.mesh) {
+      for (let i = 1; i <= 5; i++) Crack.tex[i] = crackTex(i);
+      Crack.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: Crack.tex[1], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      Crack.mesh.renderOrder = 4; G.scene.add(Crack.mesh);
+    }
+    const stage = Math.max(1, Math.min(5, Math.ceil(frac * 5)));
+    if (key !== Crack.key) { Crack.key = key; Crack.mesh.position.copy(pos).addScaledVector(P.lookDir(_o), -0.04); Crack.mesh.rotation.set(0, 0, Math.random() * 6.28); Crack.sz = size; }
+    const m = Crack.mesh; m.material.map = Crack.tex[stage]; m.material.opacity = 1; m.visible = true;
+    m.quaternion.copy(P.cam.quaternion); m.rotateZ(Crack.spin = (Crack.spin || Math.random() * 6.28));
+    m.scale.setScalar(Crack.sz * (0.6 + frac * 0.4));
+    Crack.t = 6; Crack.shake = 0.18;
+  };
+  Crack.clear = function () { Crack.key = null; if (Crack.mesh) Crack.mesh.visible = false; };
+  Crack.update = function (dt) { if (!Crack.mesh || !Crack.mesh.visible) return; Crack.t -= dt; if (Crack.t < 1) Crack.mesh.material.opacity = Math.max(0, Crack.t); if (Crack.t <= 0) Crack.clear(); };
+
   /* ---------------- AZIONE PRIMARIA (colpire) ---------------- */
   P.primary = function () {
     const it = P.held(), toolId = it ? it.id : null, tool = G.toolClass(toolId), pow = G.toolPower(toolId);
+    if (P.boat && P.helm && G.Sea && G.Sea.broadside(P)) { P.actionCd = 0.4; return; }
     if (tool === 'arco') return; // l'arco si tende tenendo premuto (vedi combat.js)
     if (tool === 'pistola' || tool === 'pistola_capitano') { if (!P.boat || !P.helm) G.Combat.fire(P, tool); P.actionCd = 0.3; return; }
     const W = G.ITEMS[toolId] || {};
@@ -425,8 +496,10 @@
     const tg = P.target;
     // piccone e pala sul terreno (senza bersagli davanti): si scava
     if ((tool === 'piccone' || tool === 'pala') && (!tg || tg.kind === 'piece' && false) && G.Dig) { if (G.Dig.dig(P, tool, pow)) { P.actionCd = (tool === 'pala' ? 0.5 : 0.45) / Math.sqrt(pow); return; } }
-    if (!tg) return;
     const melee = W.dmg || (tool === 'coltello' ? 2.5 : tool === 'ascia' ? 2 : tool === 'piccone' ? 1.5 : 1);
+    // tentacoli del Kraken o fiancata pirata a portata di spada
+    if (G.Sea && G.Sea.enc.length) { P.lookDir(_dir); const sh = G.Sea.raycast(P.cam.position, _dir, 4); if (sh && (!tg || sh.t < (tg.t || 9))) { G.Sea.hitEnc(sh.enc, melee * 4, P.cam.position.clone().addScaledVector(_dir, sh.t)); return; } }
+    if (!tg) return;
     if (tg.kind === 'res') hitResource(tg.res, tool, pow);
     else if (tg.kind === 'remote') { G.Net.hit(tg.remote, Math.round(melee * 4)); }
     else if (tg.kind === 'animal') { G.Entities.hit(tg.ent, melee, P); if (G.Audio && W.dmg) G.Audio.hit('soft'); }
@@ -436,19 +509,30 @@
       const p = tg.piece;
       if (p.gen) { G.UI.toast(p.t === 'letto' ? 'Questo letto è della locanda' : 'Non puoi smontarlo'); return; } p.hp = (p.hp === undefined ? (G.Build.isStone && G.Build.isStone(p.t) ? 6 : 3) : p.hp) - (tool === 'ascia' ? 1.5 : tool === 'piccone' ? 1.5 * pow : 1);
       G.FX.burst(P.cam.position.x + _dir.x * tg.t, P.cam.position.y + _dir.y * tg.t, P.cam.position.z + _dir.z * tg.t, [0.75, 0.55, 0.3], 6, 2);
+      { const mx = G.Build.isStone && G.Build.isStone(p.t) ? 6 : 3; if (p.hp > 0) Crack.hit(p, P.cam.position.clone().addScaledVector(_dir, tg.t), 1 - p.hp / mx, 0.9); else Crack.clear(); P._shakeP = p; P._shakeT = 0.2; }
       if (G.Audio) G.Audio.hit('wood');
       if (p.hp <= 0) {
         if (p.inv) for (const s of p.inv) if (s) P.give(s.id, s.n, true);
         if (p.cook) { if (p.cook.in) P.give(p.cook.in.id, p.cook.in.n, true); if (p.cook.out) P.give(p.cook.out.id, p.cook.out.n, true); if (p.cook.fuel) P.give(p.cook.fuel.id, p.cook.fuel.n, true); }
         if (G.pieceKind(p.t) === 'muro_porta') { const door = G.Build.pieces.find((d) => d.t === 'porta' && Math.hypot(d.x - p.x, d.z - p.z) < 0.1 && Math.abs(d.y - p.y) < 0.1); if (door) { G.Build.remove(door); P.give('porta', 1, true); } }
         if (G.Net && G.Net.on) G.Net.send({ t: 'bdel', id: p.id });
-        G.Build.remove(p); P.give(p.t, 1); G.saveSoon();
+        G.Build.remove(p); P._popPos = { x: p.x, y: p.y + 0.3, z: p.z }; P.give(p.t, 1); P._popPos = null; G.saveSoon();
       }
     }
   };
   function hitResource(res, tool, pow) {
+    P._popPos = { x: res.x, y: res.y + Math.min(1.0, (res.height || 1) * 0.4), z: res.z };
+    try { hitResource0(res, tool, pow); } finally { P._popPos = null; }
+  }
+  function hitResource0(res, tool, pow) {
     pow = pow || 1;
-    const hp = (n) => { res.hp -= G.creative() ? 999 : n; return res.hp <= 0; };
+    const hp = (n) => {
+      if (res.hp0 === undefined) res.hp0 = res.hp;
+      res.hp -= G.creative() ? 999 : n;
+      const t = P.target && P.target.t !== undefined ? P.target.t : 2; const hpPos = P.cam.position.clone().addScaledVector(P.lookDir(_o), t);
+      if (res.hp > 0) Crack.hit(res, hpPos, 1 - res.hp / res.hp0, res.type === 'tree' ? Math.min(0.75, res.r * 1.7 + 0.12) : Math.min(1.5, (res.size || 0.6) * 1.3 + 0.2)); else Crack.clear();
+      return res.hp <= 0;
+    };
     const hitPos = new V3(res.x, res.y + Math.min(1.2, res.height * 0.5), res.z);
     if (res.type === 'tree') {
       G.FX.burst(hitPos.x, hitPos.y, hitPos.z, [0.6, 0.42, 0.25], 7, 2.2);
@@ -466,7 +550,7 @@
       if (G.Audio) G.Audio.hit('stone');
       if (hp(tool === 'piccone' ? 2 * pow : 0.5)) { G.World.removeResource(res); P.give('pietra', res.vein ? 1 : Math.max(2, Math.round(2 + res.size * 2)));
         if (res.vein) P.give(res.ore, res.ore === 'oro_grezzo' ? 1 + (Math.random() < 0.4 ? 1 : 0) : 2 + ((Math.random() * 2) | 0));
-        else if (res.ore && Math.random() < 0.7) P.give(res.ore, 1 + (Math.random() < 0.3 ? 1 : 0)); else if (Math.random() < 0.12) P.give('carbone', 1); G.FX.burst(res.x, res.y + 0.4, res.z, [0.6, 0.58, 0.55], 20, 3); }
+        else if (res.ore && Math.random() < 0.7) P.give(res.ore, 1 + (Math.random() < 0.3 ? 1 : 0)); else { const rr = Math.random(), mt = G.climate(res.x, res.z).mt; if (rr < 0.12) P.give('carbone', 1); else if (rr < 0.22 + mt * 0.1) P.give('ferro_grezzo', 1); else if (rr < 0.245 + mt * 0.04) P.give('oro_grezzo', 1); } G.FX.burst(res.x, res.y + 0.4, res.z, [0.6, 0.58, 0.55], 20, 3); }
     } else if (res.type === 'bush') {
       G.FX.burst(hitPos.x, res.y + 0.6, hitPos.z, [0.3, 0.5, 0.2], 10, 2);
       if (G.Audio) G.Audio.hit('leaf');
@@ -567,6 +651,7 @@
   // c'è qualcosa con cui interagire davanti? (allora il tasto destro interagisce invece di usare l'oggetto in mano)
   P.wantsInteract = function () {
     const tg = P.target, it = P.held(), id = it ? it.id : null;
+    if (P.boat && id === 'assi' && !P.helm) return true;
     if (P.boat) return !!(P.helm || P.inHelmZone() || (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && P.boat.parts[tg.part] && P.boat.parts[tg.part].name === 'Stiva'));
     if (!tg) return false;
     if (tg.kind === 'piece') return ['porta', 'baule', 'forziere', 'banco', 'falo', 'letto', 'fornace'].includes(tg.piece.t);
@@ -577,12 +662,15 @@
     return false;
   };
   P.interact = function () {
+    { const it0 = P.held(); if (P.boat && !P.helm && it0 && it0.id === 'assi' && G.Sea) return G.Sea.repair(P, P.boat); }
     const tg = P.target;
     if (P.boat) {
       if (P.helm) { P.leaveHelm(); return; }
       if (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && (P.boat.free || (P.boat.parts[tg.part] && P.boat.parts[tg.part].name === 'Stiva'))) { G.UI.openChest(P.boat.inv, 'Stiva', { boat: P.boat }); return; }
       if (P.inHelmZone()) { P.takeHelm(); return; }
-      P.leaveBoat(); return;
+      // dalla barca si scende solo fisicamente: cammina fino al bordo e salta (o tuffati)
+      if (!P._boatExitTip || performance.now() - P._boatExitTip > 8000) { P._boatExitTip = performance.now(); G.UI.toast('Per scendere: vai al bordo della barca e salta (Spazio)'); }
+      return;
     }
     if (tg && tg.kind === 'piece') {
       const p = tg.piece;

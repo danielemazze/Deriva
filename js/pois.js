@@ -129,28 +129,12 @@
         break;
       }
     }
-    // castello: rarissimo (circa una regione ogni 14), su colline ampie, lontano dalla partenza
-    {
+    // castello: solo in cima alle montagne alte (il sito e l'altopiano li decide il generatore del terreno)
+    if (G.castleSites) for (const C of G.castleSites(x0, z0, REG)) {
       const cr = G.mulberry32(hashR(rx, rz, 13));
-      if (cr() < 0.1 && Math.hypot(x0 + REG / 2, z0 + REG / 2) > 520) {
-        let best = null, bs = -1e9;
-        for (let i = 0; i < 40; i++) {
-          const x = x0 + 75 + cr() * (REG - 150), z = z0 + 75 + cr() * (REG - 150), h = G.heightAt(x, z);
-          if (h < 4 || h > 40) continue;
-          if (G.biomeAt(x, z) === G.BIOME.VULCANO || (G.lakeLevelAt && G.lakeLevelAt(x, z) !== null)) continue;
-          let mn = 1e9, mx = -1e9;
-          for (let a = -2; a <= 2; a++) for (let c = -2; c <= 2; c++) { const g = G.heightAt(x + a * 25, z + c * 25); mn = Math.min(mn, g); mx = Math.max(mx, g); }
-          if (mn < -2.5 || mx - mn > 26) continue;
-          const sc = h * 0.25 - (mx - mn);
-          if (sc > bs) { bs = sc; best = { x, z, h }; }
-        }
-        if (best) {
-          const CN = ['Corvonero', 'Roccascura', 'Montenebbia', 'Pietralunga', 'Valfosca', 'Torrenera', 'Altamura', 'Nidodaquila'];
-          // il castello prende il posto di ciò che c'era sulla collina
-          for (let k = r.length - 1; k >= 0; k--) if (r[k].type !== 'relitto' && Math.hypot(r[k].x - best.x, r[k].z - best.z) < 130) r.splice(k, 1);
-          r.push(Object.assign({ id: `x:${rx}:${rz}`, type: 'castello', name: 'Castello di ' + CN[(cr() * CN.length) | 0], seed: (cr() * 1e9) | 0, rotR: cr() }, best));
-        }
-      }
+      for (let k = r.length - 1; k >= 0; k--) if (r[k].type !== 'relitto' && Math.hypot(r[k].x - C.x, r[k].z - C.z) < 150) r.splice(k, 1);
+      const CN = ['Corvonero', 'Roccascura', 'Montenebbia', 'Pietralunga', 'Valfosca', 'Torrenera', 'Altamura', 'Nidodaquila'];
+      r.push({ id: `x:${rx}:${rz}`, type: 'castello', x: C.x, z: C.z, h: C.level, name: 'Castello di ' + CN[(cr() * CN.length) | 0], seed: (cr() * 1e9) | 0, rotR: C.rotR });
     }
     for (const p of r) P.byIdMap.set(p.id, p);
     P.cache.set(key, r);
@@ -367,7 +351,9 @@
   const T1 = [['doblone', 2, 7, 1], ['bacche', 2, 5, 0.5], ['pesce_cotto', 1, 3, 0.4], ['corda', 1, 3, 0.5], ['stoffa', 1, 2, 0.35], ['freccia', 3, 8, 0.4], ['torcia', 1, 3, 0.35], ['ciotola_acqua', 1, 2, 0.35], ['assi', 2, 6, 0.3], ['mappa_tesoro', 1, 1, 0.12], ['progetto_canoa', 1, 1, 0.05], ['perla', 1, 1, 0.08]];
   const T2 = [['doblone', 6, 18, 1], ['freccia', 6, 14, 0.6], ['munizioni', 2, 6, 0.4], ['sciabola', 1, 1, 0.16], ['arco', 1, 1, 0.14], ['lancia', 1, 1, 0.15], ['pala', 1, 1, 0.18], ['stoffa', 2, 4, 0.4], ['corda', 2, 5, 0.4], ['mappa_tesoro', 1, 1, 0.32], ['perla', 1, 3, 0.3], ['cannocchiale', 1, 1, 0.08], ['pinne', 1, 1, 0.08], ['progetto_catamarano', 1, 1, 0.07], ['progetto_canoa', 1, 1, 0.1], ['cannone', 1, 2, 0.12]];
   const T3 = [['doblone', 20, 55, 1], ['munizioni', 4, 10, 0.6], ['pistola', 1, 1, 0.25], ['sciabola', 1, 1, 0.3], ['perla', 2, 5, 0.5], ['mappa_tesoro', 1, 1, 0.35], ['bussola_oro', 1, 1, 0.16], ['vela_leggendaria', 1, 1, 0.13], ['lanterna', 1, 1, 0.1], ['progetto_galeone', 1, 1, 0.12], ['progetto_catamarano', 1, 1, 0.12], ['cannone', 2, 4, 0.25]];
-  P.TIERS = [null, T1, T2, T3];
+  // tesoro della cripta del castello: il premio più ricco del gioco
+  const T4 = [['doblone', 70, 140, 1], ['lingotto_oro', 3, 8, 1], ['perla', 4, 9, 0.8], ['spada_ferro', 1, 1, 0.7], ['pistola_capitano', 1, 1, 0.3], ['bussola_oro', 1, 1, 0.35], ['vela_leggendaria', 1, 1, 0.3], ['lanterna', 1, 1, 0.45], ['progetto_galeone', 1, 1, 0.4], ['munizioni', 8, 16, 0.7], ['pinne', 1, 1, 0.25], ['cannocchiale', 1, 1, 0.3]];
+  P.TIERS = [null, T1, T2, T3, T4];
   P.loot = function (id, tier, extra) {
     const rnd = G.mulberry32(hashR(id.length, [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7), 91));
     const inv = new Array(27).fill(null);

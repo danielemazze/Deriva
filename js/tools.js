@@ -72,6 +72,12 @@
   T.build = function (id) {
     const M = mats();
     // attrezzi di ferro: stesso modello di quelli di pietra, con la testa di metallo
+    if (/^(ascia|piccone)_legno$/.test(id) || id === 'spada_legno') {
+      const g0 = T.build(id === 'spada_legno' ? 'sciabola' : id.replace('_legno', '')); if (!g0) return null;
+      const wd = M.toolWood || (M.toolWood = new THREE.MeshStandardMaterial({ map: M.wood.map, normalMap: M.wood.normalMap, color: 0xd9b27c, roughness: 0.8 }));
+      g0.traverse((o) => { if (o.isMesh && (o.material === M.stone || o.material === M.flint || (M.steel && o.material === M.steel))) o.material = wd; });
+      return g0;
+    }
     if (/^(ascia|piccone|pala)_ferro$/.test(id) || id === 'spada_ferro') {
       const g0 = T.build(id === 'spada_ferro' ? 'sciabola' : id.replace('_ferro', '')); if (!g0) return null;
       const iron = M.iron || (M.iron = new THREE.MeshStandardMaterial({ color: 0xa9aeb3, roughness: 0.35, metalness: 0.85 }));
@@ -152,7 +158,7 @@
       const top = new V3(0, 0.55, 0.07), bot = new V3(0, -0.55, 0.07);
       const mkStr = () => { const geo = new THREE.BufferGeometry().setFromPoints([top, new V3(0, 0, 0.07), bot]); return new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xe8e0d0 })); };
       const line = mkStr(); str.add(line); g.userData.line = line; g.userData.top = top; g.userData.bot = bot;
-      const arrow = T.build('freccia'); arrow.rotation.x = Math.PI / 2; arrow.position.set(0.0, 0.02, 0.07); arrow.visible = false; g.add(arrow); g.userData.arrow = arrow;
+      const arrow = T.build('freccia'); arrow.rotation.x = -Math.PI / 2; arrow.position.set(0.0, 0.02, 0.07); arrow.visible = false; g.add(arrow); g.userData.arrow = arrow;
       g.rotation.set(0.1, 0, 0.25);
     } else if (id === 'freccia') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.62, 6).translate(0, 0.0, 0), M.wood));

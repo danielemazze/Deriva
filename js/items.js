@@ -37,6 +37,8 @@
     maiale_cotto: { n: 'Braciola', d: '', cat: 'food', food: 20 },
     pesce_crudo: { n: 'Pesce crudo', d: 'Pescato in mare. Cuocilo sul falò.', cat: 'food', food: 3, water: 2 },
     pesce_cotto: { n: 'Pesce alla brace', d: '', cat: 'food', food: 15, water: 4 },
+    tentacolo_crudo: { n: 'Tentacolo di Kraken', d: 'Gommoso e enorme. Cuocilo sul falò.', cat: 'food', food: 4, water: 2 },
+    tentacolo_cotto: { n: 'Tentacolo alla brace', d: 'Un banchetto da marinai: sazia tantissimo.', cat: 'food', food: 35, water: 6 },
     ciotola: { n: 'Ciotola', d: 'Clic destro sul mare per raccogliere acqua.', cat: 'res' },
     ciotola_salata: { n: 'Acqua salata', d: 'Da bollire sul falò per renderla potabile.', cat: 'res' },
     ciotola_acqua: { n: 'Acqua potabile', d: 'Disseta molto.', cat: 'food', water: 38, ret: 'ciotola' },
@@ -117,6 +119,9 @@
     lingotto_ferro: { n: 'Lingotto di ferro', d: 'Per attrezzi, armi e chiodi di ferro.', cat: 'res' },
     lingotto_oro: { n: 'Lingotto d’oro', d: 'Prezioso: i mercanti lo pagano molto.', cat: 'res' },
     chiodi: { n: 'Chiodi di ferro', d: 'Tengono insieme scafi e travi.', cat: 'res' },
+    piccone_legno: { n: 'Piccone di legno', d: 'Il primo attrezzo: scava piano e spacca le pietre piccole. Basta del legno.', cat: 'tool', stack: 1 },
+    ascia_legno: { n: 'Ascia di legno', d: 'Leggera e fragile, ma meglio delle mani per gli alberi.', cat: 'tool', stack: 1 },
+    spada_legno: { n: 'Spada di legno', d: 'Da allenamento: colpisce poco, ma è meglio di niente.', cat: 'weapon', stack: 1, dmg: 2.8, cd: 0.45 },
     piccone_ferro: { n: 'Piccone di ferro', d: 'Spacca rocce e vene molto più in fretta.', cat: 'tool', stack: 1 },
     ascia_ferro: { n: 'Ascia di ferro', d: 'Abbatte gli alberi in pochissimi colpi.', cat: 'tool', stack: 1 },
     pala_ferro: { n: 'Pala di ferro', d: 'Scava più largo e più in fretta.', cat: 'tool', stack: 1 },
@@ -132,15 +137,29 @@
 
   G.COOK = {
     pollo_crudo: 'pollo_cotto', montone_crudo: 'montone_cotto', manzo_crudo: 'manzo_cotto', coniglio_crudo: 'coniglio_cotto',
-    maiale_crudo: 'maiale_cotto', pesce_crudo: 'pesce_cotto', uovo: 'uovo_cotto', funghi: 'funghi_cotti', ciotola_salata: 'ciotola_acqua',
+    maiale_crudo: 'maiale_cotto', pesce_crudo: 'pesce_cotto', tentacolo_crudo: 'tentacolo_cotto', uovo: 'uovo_cotto', funghi: 'funghi_cotti', ciotola_salata: 'ciotola_acqua',
   };
   // fornace: minerale → lingotto; il combustibile (carbone o tronchi) fonde un certo numero di pezzi
   G.SMELT = { ferro_grezzo: 'lingotto_ferro', oro_grezzo: 'lingotto_oro' };
   G.SMELT_FUEL = { carbone: 2, tronco: 1 };
   // classe e forza degli attrezzi (le versioni di ferro fanno lo stesso lavoro, più in fretta)
-  const TOOLCLS = { ascia_ferro: 'ascia', piccone_ferro: 'piccone', pala_ferro: 'pala', coltello_ossidiana: 'coltello' };
+  const TOOLCLS = { ascia_ferro: 'ascia', piccone_ferro: 'piccone', pala_ferro: 'pala', coltello_ossidiana: 'coltello', ascia_legno: 'ascia', piccone_legno: 'piccone' };
   G.toolClass = (id) => (id ? TOOLCLS[id] || id : null);
-  G.toolPower = (id) => (/_ferro$/.test(id || '') ? 1.8 : 1);
+  G.toolPower = (id) => (/_ferro$/.test(id || '') ? 1.8 : /_legno$/.test(id || '') ? 0.6 : 1);
+  // danno delle armi, nella stessa scala della vita di un giocatore (100)
+  G.weaponInfo = function (id) {
+    const d = G.ITEMS[id]; if (!d) return null;
+    const fmt = (v) => (Math.round(v * 10) / 10).toLocaleString('it-IT');
+    if (id === 'arco') return { dmg: '4–36', text: 'Danno 4–36 · più lo tendi, più colpisce forte e lontano (carica piena in 1,5 s)' };
+    if (id === 'pistola') return { dmg: '40', text: 'Danno 40 · un colpo ogni 2,2 s · serve una munizione' };
+    if (id === 'pistola_capitano') return { dmg: '56', text: 'Danno 56 · un colpo ogni 1,3 s · serve una munizione' };
+    if (id === 'freccia') return { dmg: '4–36', text: 'Con l’arco: danno 4–36' };
+    const tool = G.toolClass(id);
+    const melee = d.dmg || (tool === 'coltello' ? 2.5 : tool === 'ascia' ? 2 : tool === 'piccone' ? 1.5 : 0);
+    if (!melee) return null;
+    const cd = d.cd || (tool === 'ascia' || tool === 'piccone' || tool === 'coltello' ? 0.42 : 0.55);
+    return { dmg: fmt(melee * 4), text: `Danno ${fmt(melee * 4)} · ${fmt(1 / cd)} colpi al secondo${d.reach ? ' · colpisce più lontano' : ''}` };
+  };
 
 
   /* ----------------- RICETTE -----------------
@@ -155,6 +174,9 @@
     R('banco', 1, ['AA', 'AA']),
     R('falo', 1, ['.B.', 'BTB', 'PPP']),
     R('torcia', 4, ['F', 'B']),
+    R('ascia_legno', 1, ['AA', 'AB', '.B']),
+    R('piccone_legno', 1, ['AAA', '.B.', '.B.']),
+    R('spada_legno', 1, ['A', 'A', 'B']),
     R('ascia', 1, ['PP', 'PB', '.B']),
     R('piccone', 1, ['PPP', '.B.', '.B.']),
     R('coltello', 1, ['P', 'B']),
@@ -332,6 +354,7 @@
     if (kind === 'gal') { for (const x of [22, 32, 42]) { c.beginPath(); c.moveTo(x, 38); c.lineTo(x, 14); c.stroke(); c.strokeRect(x - 5, 18, 10, 8); } }
     c.fillStyle = 'rgba(220,235,255,0.5)'; for (let x = 12; x < 54; x += 6) c.fillRect(x, 12, 1, 40);
   }
+  function tent(c, cooked) { c.lineCap = 'round'; c.strokeStyle = cooked ? '#8a3a1c' : '#9a3448'; c.lineWidth = 12; c.beginPath(); c.moveTo(12, 52); c.bezierCurveTo(20, 20, 46, 46, 52, 12); c.stroke(); c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1.5; c.stroke(); c.fillStyle = cooked ? '#e0a070' : '#f0c0c8'; for (let i = 0; i < 6; i++) { const t = 0.15 + i * 0.13, x = 12 + 40 * t + 4, y = 52 - 40 * t + 2; c.beginPath(); c.arc(x, y, 2.4, 0, 7); c.fill(); } }
   const PAINT = {
     tronco(c) { rr(c, 8, 22, 40, 22, 6); c.fillStyle = lg(c, 0, 22, 0, 44, ['#7a5530', '#5a3a1e', '#3e2614']); c.fill(); outline(c);
       c.beginPath(); c.ellipse(48, 33, 9, 11, 0, 0, 7); c.fillStyle = '#d9b07a'; c.fill(); outline(c);
@@ -400,6 +423,7 @@
     coniglio_crudo(c) { meat(c, false, '#f2a6a0'); }, coniglio_cotto(c) { meat(c, true); },
     maiale_crudo(c) { meat(c, false, '#f6b0b8'); }, maiale_cotto(c) { meat(c, true); },
     pesce_crudo(c) { fish(c, false); }, pesce_cotto(c) { fish(c, true); },
+    tentacolo_crudo(c) { tent(c, false); }, tentacolo_cotto(c) { tent(c, true); },
     ciotola(c) { bowl(c); },
     ciotola_salata(c) { bowl(c, '#4a8fae'); c.fillStyle = 'rgba(255,255,255,0.6)'; for (let i = 0; i < 5; i++) { c.fillRect(20 + i * 5, 28 + (i % 2) * 2, 2, 2); } },
     ciotola_acqua(c) { bowl(c, '#6cc6ea'); c.fillStyle = 'rgba(255,255,255,0.7)'; c.beginPath(); c.ellipse(26, 29, 6, 1.6, 0, 0, 7); c.fill(); },
@@ -472,9 +496,13 @@
     ferro_grezzo(c) { ore(c, ['#8e8a84', '#5e5b56'], '#b0613c'); }, oro_grezzo(c) { ore(c, ['#8e8a84', '#5e5b56'], '#f0c43c'); },
     lingotto_ferro(c) { ingot(c, ['#d4d8dc', '#8a9096', '#5c6268']); }, lingotto_oro(c) { ingot(c, ['#fff2a8', '#e9b531', '#a87412']); },
     chiodi(c) { for (const [x, a] of [[22, -0.25], [32, 0.05], [42, 0.3]]) { c.save(); c.translate(x, 34); c.rotate(a); rr(c, -2, -16, 4, 30, 1); c.fillStyle = lg(c, -2, 0, 2, 0, ['#c4c8cc', '#6c7278']); c.fill(); outline(c, 1.2); rr(c, -6, -19, 12, 4, 1); c.fillStyle = '#9aa0a6'; c.fill(); outline(c, 1.2); c.restore(); } },
+    piccone_legno(c) { stick(c, 16, 56, 42, 16, 5); c.beginPath(); c.moveTo(14, 18); c.quadraticCurveTo(36, 2, 58, 22); c.lineTo(54, 26); c.quadraticCurveTo(38, 12, 18, 24); c.closePath(); c.fillStyle = lg(c, 0, 6, 0, 26, ['#d8b27a', '#8f6436']); c.fill(); outline(c); },
+    ascia_legno(c) { stick(c, 18, 56, 44, 10, 5); c.beginPath(); c.moveTo(36, 10); c.lineTo(54, 4); c.quadraticCurveTo(62, 16, 54, 32); c.lineTo(40, 22); c.closePath(); c.fillStyle = lg(c, 36, 0, 60, 30, ['#d8b27a', '#8f6436']); c.fill(); outline(c); },
     piccone_ferro(c) { stick(c, 16, 56, 42, 16, 5); c.beginPath(); c.moveTo(14, 18); c.quadraticCurveTo(36, 2, 58, 22); c.lineTo(54, 26); c.quadraticCurveTo(38, 12, 18, 24); c.closePath(); c.fillStyle = lg(c, 0, 6, 0, 26, ['#e2e6ea', '#8a9096']); c.fill(); outline(c); },
     ascia_ferro(c) { stick(c, 18, 56, 44, 10, 5); c.beginPath(); c.moveTo(36, 10); c.lineTo(54, 4); c.quadraticCurveTo(62, 16, 54, 32); c.lineTo(40, 22); c.closePath(); c.fillStyle = lg(c, 36, 0, 60, 30, ['#e2e6ea', '#8a9096']); c.fill(); outline(c); },
     pala_ferro(c) { stick(c, 20, 58, 38, 22, 5); c.beginPath(); c.moveTo(34, 26); c.lineTo(48, 6); c.quadraticCurveTo(58, 8, 56, 18); c.lineTo(42, 32); c.closePath(); c.fillStyle = lg(c, 34, 0, 58, 30, ['#e2e6ea', '#8a9096']); c.fill(); outline(c); },
+    spada_legno(c) { c.beginPath(); c.moveTo(20, 44); c.lineTo(50, 8); c.lineTo(56, 8); c.lineTo(56, 14); c.lineTo(24, 48); c.closePath(); c.fillStyle = lg(c, 20, 44, 56, 8, ['#8f6436', '#e4c48e']); c.fill(); outline(c);
+      stick(c, 14, 40, 30, 54, 4, '#7a5530'); stick(c, 10, 58, 20, 48, 5, '#6b4524'); },
     spada_ferro(c) { c.beginPath(); c.moveTo(20, 44); c.lineTo(50, 8); c.lineTo(56, 8); c.lineTo(56, 14); c.lineTo(24, 48); c.closePath(); c.fillStyle = lg(c, 20, 44, 56, 8, ['#8a9096', '#eef2f6']); c.fill(); outline(c);
       stick(c, 14, 40, 30, 54, 4, '#5a5f64'); stick(c, 10, 58, 20, 48, 5, '#6b4524'); },
     fasciame(c) { for (let i = 0; i < 3; i++) { rr(c, 8, 16 + i * 12, 48, 10, 2); c.fillStyle = lg(c, 8, 0, 56, 0, ['#b98a55', '#8a5c30']); c.fill(); outline(c, 1.5); } c.fillStyle = '#5a5f64'; for (const y of [21, 33, 45]) for (const x of [14, 50]) { c.beginPath(); c.arc(x, y, 1.8, 0, 7); c.fill(); } },

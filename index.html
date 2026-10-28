@@ -47,6 +47,11 @@ button { font-family: inherit; }
 .compass .needle { position: absolute; left: 50%; top: -2px; width: 2px; height: 8px; background: var(--brass-hi); transform: translateX(-50%); }
 .clock { font-family: var(--f-display); font-size: 14px; letter-spacing: 0.06em; color: var(--brass-hi); text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
 
+.tempinfo { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(118px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 4px 6px; max-width: 260px; font-size: 12px; color: var(--foam); text-shadow: 0 1px 3px #000; }
+.tempinfo b { width: 100%; font-weight: 600; font-size: 13px; } .tempinfo b.up { color: #ffb070; } .tempinfo b.dn { color: #8fd0ff; }
+.tempinfo span { background: rgba(6,18,23,.6); border-radius: 6px; padding: 1px 6px; } .tempinfo span.w { border-left: 3px solid #ff9a50; } .tempinfo span.c { border-left: 3px solid #6cc0ff; }
+.tempinfo small { width: 100%; color: var(--mist); font-size: 11px; }
+html.touch .tempinfo { top: calc(96px + env(safe-area-inset-top, 0px)); bottom: auto; left: max(12px, env(safe-area-inset-left, 0px)); max-width: 200px; font-size: 11px; }
 .meters { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 7px; width: 200px; }
 .meter { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 8px; }
 .meter svg { width: 20px; height: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
@@ -72,6 +77,7 @@ button { font-family: inherit; }
 .slot .ghosticon { opacity: .22; filter: grayscale(1); }
 
 .cross { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 3px rgba(0,0,0,.8); }
+.cross.charge { width: 30px; height: 30px; margin: -15px 0 0 -15px; background: conic-gradient(var(--brass-hi) var(--ch, 0deg), rgba(255,255,255,.18) 0); -webkit-mask: radial-gradient(circle, transparent 0 11px, #000 12px); mask: radial-gradient(circle, transparent 0 11px, #000 12px); box-shadow: none; }
 .cross.hot { width: 18px; height: 18px; margin: -9px 0 0 -9px; background: transparent; border: 2px solid var(--brass-hi); }
 .target { position: absolute; left: 50%; top: calc(50% + 24px); transform: translateX(-50%); text-align: center; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.6); min-width: 240px; }
 .target .tname { font-family: var(--f-display); font-size: 18px; color: var(--foam); }
@@ -248,6 +254,7 @@ button { font-family: inherit; }
 .kitbar .kit img { width: 20px; height: 20px; }
 .kitbar .kit.on { background: var(--brass); color: #1f160b; border-color: transparent; } .kitbar .kit.on kbd { background: rgba(0,0,0,.18); }
 html.touch .kitbar .kit kbd, html.touch .kitbar .klbl { display: none; }
+#tooltip .tw { color: #f0a878; font-size: 12px; margin-top: 4px; }
 /* menu a categorie */
 #menu { grid-template-columns: minmax(300px, 380px) 1fr; }
 #menu.modal { grid-template-columns: 1fr; background: rgba(4,12,16,.6); }
@@ -329,6 +336,10 @@ body.creative .modebadge { display: block; }
 /* bussola: segni */
 .cmarks { position: absolute; inset: 0; pointer-events: none; }
 .cm { position: absolute; top: 3px; transform: translateX(-50%); font-style: normal; font-size: 15px; line-height: 18px; text-shadow: 0 0 4px #000, 0 1px 2px #000; }
+.coordhud { font-family: var(--f-ui); font-size: 12px; letter-spacing: .08em; color: var(--foam); opacity: .85; text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; margin-top: 2px; text-align: center; }
+.cm.pl { font-size: 17px; text-shadow: 0 0 4px #000, 0 0 2px #000; }
+.cm.pl b { position: absolute; top: 19px; left: 50%; transform: translateX(-50%); font: 600 11px var(--f-ui); color: #fff; white-space: nowrap; background: rgba(6,18,23,.75); padding: 1px 6px; border-radius: 6px; }
+.cm.pl.edge b { display: none; }
 .cm.gold { color: #ffd84a; } .cm.quest { color: #9fe0ff; } .cm.tx { color: #ff5a40; font-weight: 700; } .cm.edge { opacity: .55; }
 /* cannocchiale */
 body.spyglass #c { filter: none; }
@@ -508,6 +519,12 @@ html.touch #console { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px
 #rotate span { color: var(--mist); }
 @media (max-height: 360px) { .t-act { transform: scale(.86); transform-origin: right bottom; } .t-ctx { bottom: calc(184px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+#seahud{position:absolute;top:96px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;z-index:6}
+#seahud .sb{display:flex;flex-direction:column;align-items:center;gap:3px;font:600 12px/1 system-ui,sans-serif;color:#fff;text-shadow:0 1px 3px #000}
+#seahud .sb i{display:block;width:min(360px,70vw);height:9px;border-radius:5px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);overflow:hidden}
+#seahud .sb u{display:block;height:100%;background:linear-gradient(#e2584a,#9b2a22);transition:width .2s}
+#seahud .boss b{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#ffd8c8}
+#seahud .hull i{width:min(220px,50vw);height:7px}#seahud .hull u{background:linear-gradient(#c9a066,#7c5a2e)}#seahud .hull.low u{background:linear-gradient(#ff7b52,#b83a1a)}
 </style>
 </head>
 <body style="margin:0">
@@ -516,9 +533,10 @@ html.touch #console { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px
 <div id="game">
   <canvas id="c" tabindex="0" aria-label="Mondo di gioco"></canvas>
   <div id="hud" hidden>
-    <div class="compass"><div class="win"><div class="strip" id="compassStrip"></div><div class="cmarks" id="cmarks"></div><div class="needle"></div></div><div class="clock" id="clock">Giorno 1 · 08:00</div></div>
+    <div class="compass"><div class="win"><div class="strip" id="compassStrip"></div><div class="cmarks" id="cmarks"></div><div class="needle"></div></div><div class="clock" id="clock">Giorno 1 · 08:00</div><div class="coordhud" id="coordhud"></div></div>
     <div class="modebadge">Modalità creativa</div>
     <div class="meters" id="meters"></div>
+    <div class="tempinfo" id="tempinfo" hidden></div>
     <div class="heldname" id="heldname"></div>
     <div class="hotbar" id="hotbar"></div>
     <div class="lefthand" id="lefthand" title="Mano sinistra (F per scambiare)"></div>
@@ -553,8 +571,12 @@ html.touch #console { bottom: auto; top: calc(8px + env(safe-area-inset-top, 0px
 <script src="js/render.js"></script>
 <script src="js/models.js"></script>
 <script src="js/world.js"></script>
+<script src="js/gltf.js"></script>
+<script src="js/anim.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/build.js"></script>
+<script src="js/drops.js"></script>
+<script src="js/sea.js"></script>
 <script src="js/boats.js"></script>
 <script src="js/freeboat.js"></script>
 <script src="js/tools.js"></script>

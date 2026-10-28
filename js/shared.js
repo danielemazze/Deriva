@@ -17,6 +17,9 @@
     mucca: { n: 'Mucca', hp: 6, speed: 1.0, flee: 3.0, size: 1.4, drops: [['manzo_crudo', 2, 3]] },
     maiale: { n: 'Maiale', hp: 4, speed: 1.1, flee: 3.4, size: 0.9, drops: [['maiale_crudo', 1, 2]] },
     coniglio: { n: 'Coniglio', hp: 1, speed: 2.2, flee: 6.5, size: 0.3, drops: [['coniglio_crudo', 1, 1]], hop: true },
+    cavallo: { n: 'Cavallo', hp: 8, speed: 1.3, flee: 6.4, size: 1.6, drops: [['pelle', 1, 2], ['manzo_crudo', 1, 2]] },
+    lama: { n: 'Lama', hp: 6, speed: 1.1, flee: 4.4, size: 1.3, drops: [['lana', 1, 2], ['montone_crudo', 1, 1]] },
+    zebra: { n: 'Zebra', hp: 7, speed: 1.3, flee: 6.6, size: 1.5, drops: [['pelle', 1, 2], ['manzo_crudo', 1, 1]] },
     tartaruga: { n: 'Tartaruga', hp: 99, speed: 0.35, flee: 0.5, size: 0.7, drops: [], peaceful: true },
     // predatori e pirati: aggro = raggio di attacco, reach = portata, cd = secondi tra un colpo e l'altro
     lupo: { n: 'Lupo', hp: 6, speed: 1.4, flee: 6.2, size: 0.8, drops: [['pelle', 1, 1]], hostile: { aggro: 15, reach: 1.5, dmg: 7, cd: 1.1, leash: 45 } },
@@ -52,11 +55,12 @@
       const r = rnd();
       let sp = r < 0.28 ? 'gallina' : r < 0.5 ? 'pecora' : r < 0.66 ? 'mucca' : r < 0.8 ? 'maiale' : 'coniglio';
       // fauna secondo il bioma
-      if (b === B.DESERTO) { if (r > 0.25) continue; sp = 'coniglio'; }
+      if (b === B.DESERTO) { if (r > 0.32) continue; sp = r < 0.12 ? 'zebra' : 'coniglio'; }
       else if (b === B.VULCANO) continue;
       else if (b === B.NEVE) { if (r > 0.4) continue; sp = r < 0.25 ? 'coniglio' : 'pecora'; }
-      else if (b === B.MONTAGNA) { if (h > 18 && r > 0.5) continue; sp = r < 0.65 ? 'pecora' : r < 0.85 ? 'coniglio' : 'mucca'; }
+      else if (b === B.MONTAGNA) { if (h > 18 && r > 0.5) continue; sp = r < 0.55 ? 'pecora' : r < 0.75 ? 'coniglio' : r < 0.9 ? 'lama' : 'mucca'; }
       else if (b === B.GIUNGLA || b === B.PLUVIALE) { if (sp === 'mucca' || sp === 'pecora') sp = r < 0.6 ? 'maiale' : 'gallina'; }
+      if (b === B.PIANURA && rnd() < 0.16) sp = rnd() < 0.7 ? 'cavallo' : 'zebra';
       else if (b === B.PIANURA) { if (sp === 'maiale' && r < 0.75) sp = 'mucca'; }
       const herd = sp === 'coniglio' ? 1 : sp === 'gallina' ? 2 + ((rnd() * 3) | 0) : 1 + ((rnd() * 2) | 0);
       for (let k = 0; k < herd; k++) push(sp, x + (rnd() - 0.5) * 4, z + (rnd() - 0.5) * 4);

@@ -36,7 +36,14 @@
   // densità: > 0 dentro la roccia, < 0 nell'aria
   function carveDist(x, y, z, l) {
     let m = -Infinity;
-    for (const i of l) { const s = D.list[i]; const dx = x - s[0], dy = y - s[1], dz = z - s[2]; const v = s[3] - Math.sqrt(dx * dx + dy * dy + dz * dz); if (v > m) m = v; }
+    for (const i of l) {
+      const s = D.list[i]; const dx = x - s[0], dy = y - s[1], dz = z - s[2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (s[3] * 1.3 - d < m) continue;
+      // buchi irregolari: il bordo di ogni scavo è bitorzoluto (sempre verso l'esterno, così il terreno non resta mai sospeso)
+      const ph = s[0] * 1.7 + s[1] * 2.3 + s[2] * 3.1, id = 1 / (d + 1e-4), nx = dx * id, ny = dy * id, nz = dz * id;
+      const n = Math.sin(nx * 3.1 + ph) * Math.sin(ny * 2.7 + ph * 1.3) * Math.sin(nz * 3.4 + ph * 0.7) + 0.5 * Math.sin((nx + nz) * 6.3 + ph * 2.1) * Math.sin(ny * 5.7 - ph);
+      const v = s[3] * (1 + 0.3 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n)))) - d; if (v > m) m = v;
+    }
     return m;
   }
   D.density = function (x, y, z, hCache) {
@@ -128,7 +135,13 @@
     const c = [hx + d.x * r * 0.55, hy + d.y * r * 0.55, hz + d.z * r * 0.55, r];
     // non si scava sotto un villaggio o una costruzione
     for (const b of G.Build.boxes) if (hx > b.x0 - 1 && hx < b.x1 + 1 && hz > b.z0 - 1 && hz < b.z1 + 1 && hy > b.y0 - 1.5 && hy < b.y1 + 0.5) { G.UI.toast('Qui sopra c’è una costruzione', 'warn'); return true; }
-    D.add(c);
+    // un colpo non fa una sfera perfetta: un grappolo di cavità più piccole, diverso ogni volta
+    D.add([c[0], c[1], c[2], r * 0.78]);
+    const nSat = 2 + ((Math.random() * 3) | 0);
+    for (let k = 0; k < nSat; k++) {
+      const a = Math.random() * 6.283, e = (Math.random() - 0.5) * 1.6, rr = r * (0.38 + Math.random() * 0.3), off = r * (0.35 + Math.random() * 0.35);
+      D.add([c[0] + Math.cos(a) * Math.cos(e) * off, c[1] + Math.sin(e) * off * 0.8, c[2] + Math.sin(a) * Math.cos(e) * off, rr]);
+    }
     // materiale: terra in superficie, pietra (e carbone) in profondità, ossidiana nei vulcani
     const surf = G.heightAt(hx, hz) - hy, rocky = G.normalAt(hx, hz)[1] < 0.82 || (G.climate(hx, hz).mt > 0.5 && surf > 0.6) || surf > 1.6;
     const vol = G.biomeAt(hx, hz) === G.BIOME.VULCANO;
@@ -136,7 +149,13 @@
       const vein = G.oreAt(c[0], c[1], c[2]);
       if (vein && tool === 'piccone') { P.give(vein.ore, vein.type === 3 ? (Math.random() < 0.6 ? 1 : 0) : 1); P.give('pietra', 1); if (!D._veinTip) { D._veinTip = 1; G.UI.toast('Hai trovato una vena di ' + { 1: 'carbone', 2: 'ferro', 3: 'oro' }[vein.type] + '!', 'good'); } }
       else if (vein) { if (!D._veinPala || performance.now() - D._veinPala > 5000) { D._veinPala = performance.now(); G.UI.toast('Qui c’è una vena di minerale: per estrarlo serve il piccone', 'warn'); } P.give('pietra', 1); }
-      else if (rocky || vol) P.give('pietra', tool === 'piccone' ? 2 : 1);
+      else if (rocky || vol) {
+        P.give('pietra', tool === 'piccone' ? 2 : 1);
+        // nella roccia si trovano anche minerali sparsi (col piccone): più si scava a fondo e in montagna, più è facile
+        if (tool === 'piccone') { const deep = G.clamp(surf / 8, 0, 1), mt = G.climate(hx, hz).mt; const pf = 0.05 + deep * 0.09 + mt * 0.05, po = 0.008 + deep * 0.025 + mt * 0.01, r = Math.random();
+          if (r < po) { P.give('oro_grezzo', 1); G.UI.toast('Una pepita d’oro nella roccia! Fondila nella fornace', 'good'); }
+          else if (r < po + pf) { P.give('ferro_grezzo', 1); if (!D._feTip) { D._feTip = 1; G.UI.toast('Ferro grezzo! Nella fornace diventa un lingotto', 'good'); } } }
+      }
       else P.give('terra', tool === 'pala' ? 2 : 1);
       if (!vein && surf > 3 && Math.random() < 0.06) P.give('carbone', 1);
       if (vol && Math.random() < 0.3) P.give('ossidiana', 1);

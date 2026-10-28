@@ -13,6 +13,12 @@
   N.COLORS = [0xd9583b, 0x3b8fd9, 0x4fae5a, 0xe0b23a];
   N.COLOR_CSS = ['#e8735a', '#5aa6ec', '#6cc47a', '#efc65a'];
 
+  // operatori: chi ospita li sceglie; restano tali (per nome) anche nelle partite successive
+  N.setOp = function (id, on) {
+    if (!N.isHost) return; const r = N.remotes.get(id); if (!r) return;
+    r.op = !!on; const nm = String(r.name).toLowerCase(); G.state.ops = (G.state.ops || []).filter((x) => x !== nm); if (on) G.state.ops.push(nm); G.saveSoon();
+    N.send({ t: 'op', id, on: on ? 1 : 0 });
+  };
   N.send = function (o) { if (N.ws && N.ws.readyState === 1) N.ws.send(JSON.stringify(o)); };
   // target: indirizzo ws://… oppure un canale del codice partita (G.Relay.join)
   N.connect = function (target, name, isHost) {
@@ -42,7 +48,7 @@
     });
   };
   N.onWelcome = function (m, isHost) {
-    N.on = true; N.id = m.id; N.slot = m.slot; N.isHost = !!m.host; N.ff = m.ff;
+    N.on = true; N.id = m.id; N.slot = m.slot; N.isHost = !!m.host; N.ff = m.ff; N.op = false;
     // in multigiocatore gli animali di terra li simula il server
     for (const a of G.Entities.list.slice()) if (a.kind === 'animal' && !a.remote) G.Entities.removeAnimal(a);
     if (!isHost) G.startFromSnapshot(m.snap, m.you);
@@ -69,9 +75,10 @@
   N.handle = function (m) {
     switch (m.t) {
       case 'bpcs': if (G.FreeBoat) G.FreeBoat.onRemote(m); break;
+      case 'bhull': { const b = G.Boats.byId(m.id); if (b) b.hull = m.h; break; }
       case 'bdelboat': { const b = G.Boats.byId(m.id); if (b) G.Boats.remove(b); break; }
       case 'vsig': if (G.Voice) G.Voice.onSignal(m); break;
-      case 'join': N.addRemote(m.id, m.name, m.slot); G.UI.toast(`${m.name} si è unito alla partita`, 'good'); G.UI.refreshPlayers(); break;
+      case 'join': N.addRemote(m.id, m.name, m.slot); if (N.isHost && G.state.ops && G.state.ops.includes(String(m.name).toLowerCase())) setTimeout(() => N.setOp(m.id, true), 800); G.UI.toast(`${m.name} si è unito alla partita`, 'good'); G.UI.refreshPlayers(); break;
       case 'leave': N.removeRemote(m.id); G.UI.toast(`${m.name} ha lasciato la partita`); G.UI.refreshPlayers(); break;
       case 'st': { const r = N.remotes.get(m.id); if (r) N.applyState(r, m); break; }
       case 'pong': N.ping = Math.round(performance.now() - m.c); break;
@@ -97,8 +104,12 @@
         if (G.Audio) G.Audio.hit('soft');
         break;
       }
-      case 'time': if (!N.isHost) { N.targetTime = m.time; if (m.wind !== undefined) G.Boats.wind.dir = m.wind; if (m.lv !== undefined && m.lv !== G.WIND.level) G.setWind(m.lv); if (m.mode && m.mode !== G.mode) G.setMode(m.mode); if (m.en !== undefined && !!m.en === !!G.enemiesOff) G.setEnemies(!!m.en); if (m.wx && G.Climate) { const C = G.Climate; if (m.wx.kind !== C.state.kind) C.setWeather(m.wx.kind, m.wx.lock, false); C.state.t = m.wx.t; C.state.lock = !!m.wx.lock; G.moonOffset = m.wx.moon || 0; } } break;
+      case 'time': if (!N.isHost) { N.targetTime = m.time; if (m.vg !== undefined) G.voiceGlobal = !!m.vg; if (m.wind !== undefined) G.Boats.wind.dir = m.wind; if (m.lv !== undefined && m.lv !== G.WIND.level) G.setWind(m.lv); if (m.mode && m.mode !== G.mode) G.setMode(m.mode); if (m.en !== undefined && !!m.en === !!G.enemiesOff) G.setEnemies(!!m.en); if (m.wx && G.Climate) { const C = G.Climate; if (m.wx.kind !== C.state.kind) C.setWeather(m.wx.kind, m.wx.lock, false); C.state.t = m.wx.t; C.state.lock = !!m.wx.lock; G.moonOffset = m.wx.moon || 0; } } break;
       case 'chat': G.UI.toast(`${m.from}: ${m.text}`); break;
+      case 'drop': case 'dpick': if (G.Drops) G.Drops.onNet(m); break;
+      case 'opset': N.op = !!m.on; G.UI.toast(m.on ? 'Ora sei operatore: puoi usare i comandi (T) e gli strumenti (K)' : 'Non sei più operatore', m.on ? 'good' : ''); if (G.UI.menu) G.UI.showMenu(G.UI.menu); break;
+      case 'ops': for (const r of N.remotes.values()) r.op = (m.ids || []).includes(r.id); if (G.UI.menu === 'main') G.UI.showMenu('main'); break;
+      case 'wcmd': if (N.isHost && G.Cmd) G.Cmd.run(m.line, m.from); break;
       case 'an': N.syncAnimals(m.l); break;
       case 'adead': {
         const a = G.Entities.byId.get(m.id);
@@ -157,7 +168,7 @@
     }
     if (N.pingT <= 0) { N.pingT = 2; N.send({ t: 'ping', c: now }); }
     if (N.pdT <= 0) { N.pdT = 8; N.send({ t: 'pdata', data: P.serialize() }); }
-    if (N.isHost && N.timeT <= 0) { N.timeT = 3; N.send({ t: 'time', time: G.time, wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, en: G.enemiesOff ? 0 : 1, wx: G.Climate ? G.Climate.serialize() : undefined }); }
+    if (N.isHost && N.timeT <= 0) { N.timeT = 3; N.send({ t: 'time', time: G.time, wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, en: G.enemiesOff ? 0 : 1, vg: G.voiceGlobal ? 1 : 0, wx: G.Climate ? G.Climate.serialize() : undefined }); }
     if (!N.isHost && N.targetTime !== undefined) { const d = N.targetTime - G.time; if (Math.abs(d) > 0.02) G.time = N.targetTime; else G.time += d * Math.min(1, dt); }
     // stato della barca che guido
     if (P.boat && P.helm && G.Boats.isComplete(P.boat) && N.boatT <= 0) {
@@ -224,6 +235,7 @@
       if (m.h && G.Player.toolMesh) { const tm = G.Player.toolMesh(m.h).clone(); tm.scale.setScalar(1.6); tm.rotation.x -= 1.2; r.hand.add(tm); }
     }
   };
+  N.buildAvatar = (slot) => buildAvatar(slot);
   function updateAvatar(r, dt) {
     const prev = r.pos.clone();
     r.pos.lerp(r.target, Math.min(1, dt * 12));

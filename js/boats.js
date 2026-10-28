@@ -325,7 +325,7 @@
   };
   BT.isComplete = (b) => b.filled.every(Boolean);
   BT.byId = (id) => BT.list.find((b) => b.id === id);
-  BT.serializeOne = (b) => Object.assign({ id: b.id, tpl: b.tpl, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), filled: b.filled, inv: b.inv || undefined },
+  BT.serializeOne = (b) => Object.assign({ id: b.id, tpl: b.tpl, x: +b.x.toFixed(2), z: +b.z.toFixed(2), yaw: +b.yaw.toFixed(3), filled: b.filled, inv: b.inv || undefined, hull: b.hull !== undefined ? Math.round(b.hull) : undefined },
     b.free ? { pcs: b.pcs.map(({ t, x, y, z }) => ({ t, x, y, z })), flip: b.flip || 0, sunk: b.sunk ? 1 : 0, flood: Math.round(b.flood || 0), y: +b.y.toFixed(2) } : {});
   BT.fillPart = function (b, i, remote) {
     const p = b.parts[i];

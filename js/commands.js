@@ -13,7 +13,9 @@
   const P = () => G.Player;
   const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
-  Cmd.allowed = () => !(G.Net && G.Net.on && !G.Net.isHost);
+  Cmd.allowed = () => !(G.Net && G.Net.on && !G.Net.isHost && !G.Net.op);
+  // comandi che cambiano il mondo di tutti: per gli operatori li esegue chi ospita
+  const WORLD_CMD = new Set(['ora', 'tempo', 'meteo', 'vento', 'luna', 'modalita', 'modo', 'nemici']);
   const say = (msg, kind) => { G.UI.toast(msg, kind); Cmd.log(msg); };
   Cmd.lines = [];
   Cmd.log = function (msg) { Cmd.lines.push(msg); if (Cmd.lines.length > 8) Cmd.lines.shift(); const l = $('conlog'); if (l) l.innerHTML = Cmd.lines.map((x) => `<div>${esc(x)}</div>`).join(''); };
@@ -93,10 +95,26 @@
     if (!l.length) return 'Nessun villaggio entro 5 km';
     return 'Villaggi segnati sulla mappa (M): ' + l.map((v) => `${v.name} ${Math.round(Math.hypot(v.x - p.x, v.z - p.z))} m ${G.Climate.dirName(Math.atan2(v.x - p.x, v.z - p.z) + Math.PI)}`).join(' · ');
   };
+  Cmd.findPlayer = function (name) {
+    const N = G.Net; if (!N || !N.on) return null; const q = norm(name);
+    const l = [...N.remotes.values()]; return l.find((r) => norm(r.name) === q) || l.find((r) => norm(r.name).startsWith(q)) || (!q && l.length === 1 ? l[0] : null);
+  };
+  Cmd.tpTo = function (name) {
+    if (!G.Net || !G.Net.on) return 'Serve una partita con altri giocatori';
+    const r = Cmd.findPlayer(name); if (!r) return name ? `Nessun giocatore "${name}"` : 'Uso: /tpda Nome';
+    const a = r.yaw || 0, x = r.pos.x - Math.sin(a) * 1.8, z = r.pos.z - Math.cos(a) * 1.8; // davanti all'amico, girato verso di lui
+    const msg = Cmd.teleport(x, z, r.name); const p = P(); p.pos.y = Math.max(p.pos.y, r.pos.y); p.vel.set(0, 0, 0); p.yaw = a + Math.PI;
+    return msg;
+  };
+  Cmd.setOp = function (name, on) {
+    const N = G.Net; if (!N || !N.on) return 'Serve una partita con altri giocatori'; if (!N.isHost) return 'Solo chi ospita sceglie gli operatori';
+    const r = Cmd.findPlayer(name); if (!r) return name ? `Nessun giocatore "${name}"` : 'Uso: /op Nome';
+    N.setOp(r.id, on); return on ? `${r.name} ora è operatore` : `${r.name} non è più operatore`;
+  };
   Cmd.goPlace = function (type) {
     const map = { faro: 'faro', fari: 'faro', relitto: 'relitto', covo: 'covo', pirati: 'covo', rovina: 'rovina', rovine: 'rovina', miniera: 'miniera', accampamento: 'accampamento', castello: 'castello', castelli: 'castello' };
     const t = map[norm(type)]; if (!t) return null;
-    const p = P().pos, l = G.POI.near(p.x, p.z, 5000, t).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
+    const p = P().pos, l = G.POI.near(p.x, p.z, t === 'castello' ? 9000 : 5000, t).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
     if (!l.length) return `Nessun ${type} trovato entro 5 km`;
     const v = l[0]; Cmd.reveal(v);
     if (t === 'relitto') return Cmd.teleport(v.x + 6, v.z, v.name);
@@ -116,6 +134,9 @@
   Cmd.spawn = function (what, n) {
     const p = P(); n = Math.max(1, Math.min(12, n | 0 || 1));
     const w = norm(what);
+    if (w === 'kraken' && G.Sea) { G.Sea.clear(); G.Sea.spawnKraken(); return 'Il Kraken emerge accanto a te!'; }
+    if ((w === 'pirati' || w === 'pirata' || w === 'nave pirata') && G.Sea) { G.Sea.clear(); G.Sea.spawnPirates(); return 'Una nave pirata ti viene incontro!'; }
+    if (w === 'mare' && G.Sea) { G.Sea.clear(); return 'Il mare è di nuovo calmo'; }
     if (w === 'npc' || w === 'abitante' || w === 'mercante' || w === 'persona') {
       for (let i = 0; i < n; i++) G.Structures.spawnWanderer(p.pos.x - Math.sin(p.yaw) * 3 + (Math.random() - 0.5) * 3, p.pos.z - Math.cos(p.yaw) * 3 + (Math.random() - 0.5) * 3, w === 'mercante' ? 'mercante' : 'abitante');
       return `${n} ${n > 1 ? 'abitanti' : 'abitante'} accanto a te: ${G.useHow()} per parlarci`;
@@ -159,17 +180,24 @@
     ['/vai faro · relitto · covo · rovina · miniera · accampamento · castello', 'vai al luogo più vicino'],
     ['/spawn lupo 3 · /spawn pecora · /spawn pirata · /spawn abitante', 'fa comparire animali, nemici, abitanti'],
     ['/tp 120 -340', 'teletrasporto alle coordinate'],
+    ['/tpda Marco', 'teletrasporto da un amico in partita'],
+    ['/coord', 'le tue coordinate (le vedi anche sotto la bussola)'],
+    ['/op Marco · /deop Marco', 'chi ospita dà o toglie i diritti di operatore'],
     ['/modalita creativa · sopravvivenza', 'cambia modalità (anche F4)'],
     ['/nemici si · no', 'attiva o disattiva i nemici'],
     ['/dai assi 64 · /cura · /gorgo', 'oggetti · salute piena · gorgo qui vicino'],
   ];
-  Cmd.run = function (line) {
+  Cmd.run = function (line, remoteFrom) {
     line = String(line || '').trim(); if (!line) return;
     if (line[0] !== '/') { if (G.Net && G.Net.on) { G.Net.send({ t: 'chat', text: line }); } else Cmd.log(line); return; }
     Cmd.history.push(line); if (Cmd.history.length > 30) Cmd.history.shift(); Cmd.hi = -1;
     const parts = line.slice(1).split(/\s+/), c = norm(parts.shift()), rest = parts.join(' ');
     if (c === 'aiuto' || c === 'help' || c === '?') { Cmd.log('Comandi:'); for (const [a, b] of HELP) Cmd.log(`${a} — ${b}`); return; }
-    if (!Cmd.allowed()) { say('In questa partita i comandi li usa solo chi ospita', 'warn'); return; }
+    if (c === 'coord' || c === 'coordinate') { const p = P().pos; say(`Sei a X ${Math.round(p.x)} · Z ${Math.round(p.z)} · quota ${Math.round(p.y)} m`); return; }
+    if (remoteFrom) { if (!WORLD_CMD.has(c)) return; say(`${remoteFrom} (operatore): ${line}`); }
+    else if (c === 'op' || c === 'deop') { say(Cmd.setOp(rest, c === 'op')); return; }
+    else if (!Cmd.allowed()) { say('In questa partita i comandi li usa solo chi ospita (o un operatore)', 'warn'); return; }
+    else if (G.Net && G.Net.on && !G.Net.isHost && WORLD_CMD.has(c)) { G.Net.send({ t: 'wcmd', line }); say('Comando inviato a chi ospita'); return; }
     let r;
     switch (c) {
       case 'ora': case 'tempo': {
@@ -184,6 +212,7 @@
       case 'villaggio': r = Cmd.goVillage(rest); break;
       case 'villaggi': r = Cmd.listVillages(); break;
       case 'vai': r = Cmd.goPlace(rest) || (Cmd.BIOMES[norm(rest)] ? Cmd.goBiome(rest) : norm(rest).startsWith('villagg') ? Cmd.goVillage('') : 'Uso: /vai faro, relitto, covo, rovina, miniera, accampamento'); break;
+      case 'tpda': case 'tpa': r = Cmd.tpTo(rest); break;
       case 'tp': { const [x, z] = parts.map(Number); r = isFinite(x) && isFinite(z) ? Cmd.teleport(x, z) : 'Uso: /tp x z'; break; }
       case 'spawn': case 'evoca': { const n = parts.find((x) => /^\d+$/.test(x)); r = Cmd.spawn(parts.filter((x) => !/^\d+$/.test(x)).join(' '), n ? +n : 1); break; }
       case 'modalita': case 'modo': { const m = norm(rest).startsWith('c') ? 'creativa' : norm(rest).startsWith('s') ? 'sopravvivenza' : null; if (!m) r = 'Uso: /modalita creativa oppure sopravvivenza'; else { if (G.mode !== m) G.UI.toggleMode(); r = 'Modalità: ' + m; } break; }
@@ -227,7 +256,7 @@
     const btn = (act, label, on, extra) => `<button class="mini-btn ${on ? 'on' : ''}" data-tool="${act}" ${extra || ''} ${allowed ? '' : 'disabled'}>${label}</button>`;
     const vl = Cmd.villages().slice(0, 6), p = P().pos;
     const sp = ['gallina', 'pecora', 'mucca', 'maiale', 'coniglio', 'lupo', 'orso', 'giaguaro', 'serpente', 'coccodrillo', 'squalo', 'pirata', 'capitano'];
-    return `<div class="toolsp"><h3>Strumenti<small>${allowed ? 'comandi del mondo · anche dalla console con T o /' : 'li usa solo chi ospita'}</small></h3>
+    return `<div class="toolsp"><h3>Strumenti<small>${allowed ? 'comandi del mondo · anche dalla console con T o /' : 'li usa solo chi ospita (o un operatore)'}</small></h3>
       <div class="tgrid">
       <section><h4>Orario <span class="tval">${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor((hh % 1) * 60)).padStart(2, '0')}</span></h4>
         <div class="tbtns">${Object.entries({ alba: 'Alba', mattina: 'Mattina', mezzogiorno: 'Mezzogiorno', tramonto: 'Tramonto', sera: 'Sera', notte: 'Notte' }).map(([k, n]) => btn('ora:' + k, n)).join('')}</div>
@@ -258,6 +287,12 @@
     const b = e.target.closest('[data-tool]'); if (!b || b.disabled) return !!e.target.closest('input[type=range]');
     const [k, v] = b.dataset.tool.split(':');
     let r = null;
+    // operatore (non chi ospita): i comandi del mondo passano da chi ospita
+    if (G.Net && G.Net.on && !G.Net.isHost) {
+      const hm = (h) => `${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+      const line = k === 'ora' ? '/ora ' + hm(TIMES[v]) : k === 'meteo' ? '/meteo ' + v : k === 'dir' ? `/vento ${G.WIND.level} ${v}` : k === 'luna' ? '/luna ' + v : k === 'mode' ? '/modalita ' + v : k === 'nemici' ? '/nemici ' + v : null;
+      if (line) { Cmd.run(line); return true; }
+    }
     if (k === 'ora') r = Cmd.setHour(TIMES[v]);
     else if (k === 'meteo') r = Cmd.setWeather(v);
     else if (k === 'dir') r = Cmd.setWind(null, v);
@@ -278,6 +313,7 @@
   // cursori del pannello (orario e vento)
   document.addEventListener('input', (e) => {
     const t = e.target; if (!t.dataset || !t.dataset.toolr || !Cmd.allowed()) return;
+    if (G.Net && G.Net.on && !G.Net.isHost) { clearTimeout(Cmd._slT); Cmd._slT = setTimeout(() => { const h = +t.value; Cmd.run(t.dataset.toolr === 'ora' ? `/ora ${Math.floor(h)}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}` : '/vento ' + t.value); }, 250); return; }
     if (t.dataset.toolr === 'ora') Cmd.setHour(+t.value);
     else if (t.dataset.toolr === 'vento') Cmd.setWind(+t.value, null);
   });

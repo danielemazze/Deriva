@@ -297,7 +297,7 @@
     const clr = poiNear.length ? (x, z) => G.POI.clearAt(x, z) : () => 0;
     if (ch.maxH > -1.5) {
       // alberi
-      const TS = 7;
+      const TS = G.lowQ() ? 5.6 : 4.8; // vegetazione fitta: molti più alberi
       for (let gz = 0; gz < C / TS; gz++) for (let gx = 0; gx < C / TS; gx++) {
         const cellX = cx * 100 + gx, cellZ = cz * 100 + gz;
         const r0 = G.hash2(cellX, cellZ, 1);
@@ -314,26 +314,28 @@
         if (h < 3.2) { if (b !== B.NEVE && b !== B.VULCANO && r0 < (b === B.DESERTO ? 0.12 : hot ? 0.55 : 0.1)) kind = pick('palm'); }
         else {
           // densità e specie per bioma
-          const P = [0.06, 0.62 * (0.42 + forest), 0.92, 0.6 * (0.6 + forest * 0.6), 0.05, h < 30 ? 0.4 * (0.5 + forest) : 0, h < 26 ? 0.2 * (0.4 + forest) : 0, 0][b] || 0;
+          const P = Math.min(0.96, ([0.08, 0.62 * (0.42 + forest), 0.92, 0.6 * (0.6 + forest * 0.6), 0.05, h < 30 ? 0.4 * (0.5 + forest) : 0, h < 26 ? 0.2 * (0.4 + forest) : 0, 0][b] || 0) * (b === B.PIANURA ? 1.15 : 1.3));
           if (r0 < P) {
-            if (b === B.PIANURA) kind = v5 < 0.25 ? pick('birch') : pick('oak');
+            if (b === B.PIANURA) kind = v5 < 0.25 ? pick('birch') : v5 < 0.33 ? pick('pine') : pick('oak');
             else if (b === B.FORESTA) { kind = forest > 0.62 ? (v5 < 0.62 ? pick('pine') : v5 < 0.78 ? pick('birch') : pick('oak')) : v5 < 0.28 ? pick('birch') : v5 < 0.4 ? pick('pine') : pick('oak'); if (kind.startsWith('pine') && forest > 0.62) big = 1.25 + G.hash2(cellX, cellZ, 9) * 0.35; }
             else if (b === B.PLUVIALE) { kind = v5 < 0.15 ? pick('palm') : pick('oak'); if (kind.startsWith('oak')) big = 1.45 + G.hash2(cellX, cellZ, 9) * 0.6; }
-            else if (b === B.GIUNGLA) kind = v5 < 0.55 ? pick('palm') : pick('oak');
+            else if (b === B.GIUNGLA) { kind = v5 < 0.5 ? pick('palm') : pick('oak'); if (kind.startsWith('oak')) big = 1.2 + G.hash2(cellX, cellZ, 9) * 0.5; }
             else if (b === B.DESERTO) kind = W.scanned && v5 < 0.7 ? 'faretra0' : pick('palm');
             else if (b === B.NEVE) kind = pick('pine');
             else kind = v5 < 0.85 || h > 18 ? pick('pine') : pick('birch');
           }
         }
         if (!kind) continue;
-        const s = (0.8 + G.hash2(cellX, cellZ, 6) * 0.45) * big;
+        // età diverse: alberelli giovani, adulti, qualche gigante
+        const ag = G.hash2(cellX, cellZ, 8);
+        const s = (ag < 0.18 ? 0.42 + ag * 1.6 : ag > 0.93 ? 1.3 + (ag - 0.93) * 6 : 0.8 + G.hash2(cellX, cellZ, 6) * 0.45) * big;
         const ry = G.hash2(cellX, cellZ, 7) * Math.PI * 2;
         const info = W.treeInfo[kind];
         const sub = kind.replace(/\d/, '');
         add(kind, `${cx},${cz},t,${gx},${gz}`, { m: matrix(x, h - 0.05, z, ry, s), x, y: h, z, s, ry }, { type: 'tree', sub, x, y: h, z, r: info.radius * s, hp: sub === 'pine' ? 6 : 5, height: info.height * s, solid: true });
       }
       // cespugli e rocce terrestri
-      const BS = 6;
+      const BS = G.lowQ() ? 4.6 : 3.9;
       for (let gz = 0; gz < C / BS; gz++) for (let gx = 0; gx < C / BS; gx++) {
         const cellX = cx * 100 + gx + 50, cellZ = cz * 100 + gz + 50;
         const r0 = G.hash2(cellX, cellZ, 11);
@@ -342,8 +344,8 @@
         const h = G.heightAt(x, z);
         const ry = G.hash2(cellX, cellZ, 14) * 6.28;
         const bb = h > 0.5 ? G.biomeAt(x, z) : -1, BB = G.BIOME;
-        const bushP = [0.3, 0.22, 0.3, 0.32, 0, h < 22 ? 0.12 : 0, 0.04, 0][bb] || 0;
-        const rockP = bb === BB.MONTAGNA ? 0.72 : bb === BB.DESERTO ? 0.82 : bb === BB.VULCANO ? 0.55 : bb === BB.NEVE ? 0.8 : 0.9;
+        const bushP = ([0.3, 0.22, 0.3, 0.32, 0, h < 22 ? 0.12 : 0, 0.04, 0][bb] || 0) * 1.6;
+        const rockP = bb === BB.MONTAGNA ? 0.78 : bb === BB.DESERTO ? 0.86 : bb === BB.VULCANO ? 0.66 : bb === BB.NEVE ? 0.85 : 0.93;
         if (bb === BB.DESERTO && h > 2.2 && r0 < 0.3) {
           // cactus: alti a candelabro o bassi a botte
           const v = (G.hash2(cellX, cellZ, 16) * 3) | 0;
@@ -369,22 +371,24 @@
       }
       // erba e fiori
       if (grassD > 0) {
-        const GS = 1.7 / Math.sqrt(grassD);
+        const GS = (G.lowQ() ? 1.3 : 1.12) / Math.sqrt(grassD); // erba molto più fitta
         const n = Math.floor(C / GS);
         for (let gz = 0; gz < n; gz++) for (let gx = 0; gx < n; gx++) {
           const cellX = cx * 1000 + gx, cellZ = cz * 1000 + gz;
           const x = x0 + (gx + G.hash2(cellX, cellZ, 21)) * GS, z = z0 + (gz + G.hash2(cellX, cellZ, 22)) * GS;
           const h = G.heightAt(x, z);
-          if (h < 2.6 || h > 24) continue;
+          if (h < 2.3 || h > 28) continue;
           if (poiNear.length && clr(x, z) === 2) continue;
           const gb = G.biomeAt(x, z), GB = G.BIOME;
-          if (gb === GB.DESERTO || gb === GB.VULCANO || gb === GB.NEVE || (gb === GB.MONTAGNA && h > 20) || (gb !== GB.MONTAGNA && h > 16)) continue;
+          if (gb === GB.DESERTO || gb === GB.VULCANO || gb === GB.NEVE || (gb === GB.MONTAGNA && h > 24) || (gb !== GB.MONTAGNA && h > 20)) continue;
           const dens = (G.nB(x * 0.03, z * 0.03) * 0.5 + 0.55) * (gb === GB.PIANURA ? 1.35 : gb === GB.MONTAGNA ? 0.55 : 1);
           const r = G.hash2(cellX, cellZ, 23);
           if (r > dens) continue;
           const nrm = G.normalAt(x, z); if (nrm[1] < 0.82) continue;
-          const flower = G.hash2(cellX, cellZ, 24) < (gb === GB.PIANURA ? 0.16 : 0.06);
-          const s = 0.7 + G.hash2(cellX, cellZ, 25) * 0.7;
+          // prati fioriti a chiazze
+          const fz = G.nB(x * 0.02 + 31, z * 0.02 - 7) * 0.5 + 0.5;
+          const flower = G.hash2(cellX, cellZ, 24) < (gb === GB.PIANURA ? 0.1 + fz * 0.22 : 0.04 + fz * 0.08);
+          const s = 0.7 + G.hash2(cellX, cellZ, 25) * 0.9;
           const kind = flower ? 'flowers' : 'grass';
           add(kind, `${cx},${cz},g,${gx},${gz}`, { m: matrix(x, h - 0.05, z, G.hash2(cellX, cellZ, 26) * 6.28, s) }, { type: 'grass', x, y: h, z, r: 0.45, hp: 1, height: 0.6, flower });
         }
@@ -408,12 +412,12 @@
         }
       }
       // sottobosco: felci, piante tropicali, funghi, canne, ciottoli
-      const US = 3.2;
+      const US = G.lowQ() ? 2.6 : 2.2; // sottobosco ricco
       const un = Math.floor(C / US);
       for (let gz = 0; gz < un; gz++) for (let gx = 0; gx < un; gx++) {
         const cellX = cx * 1000 + gx + 300, cellZ = cz * 1000 + gz + 300;
         const r = G.hash2(cellX, cellZ, 51);
-        if (r > 0.34) continue;
+        if (r > 0.5) continue;
         const x = x0 + (gx + G.hash2(cellX, cellZ, 52)) * US, z = z0 + (gz + G.hash2(cellX, cellZ, 53)) * US;
         if (clr(x, z)) continue;
         const h = G.heightAt(x, z);
@@ -432,14 +436,14 @@
         } else if (h < 2.2 && h > -0.4 && nrm[1] > 0.85 && r < 0.05) {
           add('pebbles' + ((v * 2) | 0), id, { m: matrix(x, h - 0.02, z, ry, 0.8 + v * 0.8) });
         } else if (h > 2.6 && nrm[1] > 0.82) {
-          if (b === 0 && r < (b0 === UB.PLUVIALE ? 0.2 : 0.12)) add('trop' + ((v * 3) | 0), id, { m: matrix(x, h - 0.05, z, ry, 0.7 + G.hash2(cellX, cellZ, 56) * 0.6) }, { type: 'plant', sub: 'trop', x, y: h, z, r: 0.6, hp: 1, height: 1.2 });
-          else if ((b !== 0 || b0 === UB.PLUVIALE) && forest > 0.45 && r < 0.2 * forest) add('fern' + ((v * 3) | 0), id, { m: matrix(x, h - 0.05, z, ry, 0.8 + G.hash2(cellX, cellZ, 56) * 0.7) }, { type: 'plant', sub: 'fern', x, y: h, z, r: 0.5, hp: 1, height: 0.7 });
-          else if (W.scanned && !G.lowQ() && (b !== 0 || b0 === UB.PLUVIALE) && forest > 0.4 && r > 0.2 && r < 0.27) add('moss0', id, { m: matrix(x, h - 0.03, z, ry, 0.8 + G.hash2(cellX, cellZ, 56) * 0.6) });
-          else if ((b !== 0 || b0 === UB.PLUVIALE) && forest > 0.55 && r > 0.31) add('mush' + ((v * 4) | 0), id, { m: matrix(x, h - 0.02, z, ry, 0.9 + G.hash2(cellX, cellZ, 56) * 0.6) }, { type: 'plant', sub: 'mush', x, y: h, z, r: 0.35, hp: 1, height: 0.25 });
+          if (b === 0 && r < (b0 === UB.PLUVIALE ? 0.3 : 0.22)) add('trop' + ((v * 3) | 0), id, { m: matrix(x, h - 0.05, z, ry, 0.7 + G.hash2(cellX, cellZ, 56) * 0.6) }, { type: 'plant', sub: 'trop', x, y: h, z, r: 0.6, hp: 1, height: 1.2 });
+          else if ((b !== 0 || b0 === UB.PLUVIALE) && forest > 0.3 && r < 0.3 * forest) add('fern' + ((v * 3) | 0), id, { m: matrix(x, h - 0.05, z, ry, 0.8 + G.hash2(cellX, cellZ, 56) * 0.7) }, { type: 'plant', sub: 'fern', x, y: h, z, r: 0.5, hp: 1, height: 0.7 });
+          else if (W.scanned && !G.lowQ() && (b !== 0 || b0 === UB.PLUVIALE) && forest > 0.3 && r > 0.26 && r < 0.36) add('moss0', id, { m: matrix(x, h - 0.03, z, ry, 0.8 + G.hash2(cellX, cellZ, 56) * 0.6) });
+          else if ((b !== 0 || b0 === UB.PLUVIALE) && forest > 0.45 && r > 0.44) add('mush' + ((v * 4) | 0), id, { m: matrix(x, h - 0.02, z, ry, 0.9 + G.hash2(cellX, cellZ, 56) * 0.6) }, { type: 'plant', sub: 'mush', x, y: h, z, r: 0.35, hp: 1, height: 0.25 });
         }
       }
       // legno: tronchi caduti e ceppi nei boschi, legni bianchi sulle spiagge
-      const LS = 12;
+      const LS = 8.5; // più tronchi caduti, ceppi e legni
       for (let gz = 0; gz < C / LS; gz++) for (let gx = 0; gx < C / LS; gx++) {
         const cellX = cx * 100 + gx + 60, cellZ = cz * 100 + gz + 60;
         const r = G.hash2(cellX, cellZ, 61);
@@ -456,7 +460,7 @@
           add('drift0', id, { m: matrix(x, h - 0.05, z, ry, 0.8 + G.hash2(cellX, cellZ, 66) * 0.5) }, { type: 'wood', sub: 'drift', x, y: h, z, r: 0.9, hp: 1, height: 0.3 });
         } else if (h > 3 && h < 18 && [G.BIOME.FORESTA, G.BIOME.PLUVIALE, G.BIOME.MONTAGNA, G.BIOME.PIANURA].includes(G.biomeAt(x, z))) {
           const forest = G.nD(x * 0.012 + 50, z * 0.012) * 0.5 + 0.5;
-          if (r > 0.3 * forest) continue;
+          if (r > 0.45 * forest + 0.05) continue;
           if (W.scanned && v > 0.8) add('drift0', id, { m: matrix(x, h - 0.05, z, ry, 0.8 + G.hash2(cellX, cellZ, 66) * 0.5) }, { type: 'wood', sub: 'drift', x, y: h, z, r: 0.9, hp: 1, height: 0.3 });
           else if (v < 0.55) {
             const k = (G.hash2(cellX, cellZ, 67) * 3) | 0, L = W.logInfo[k];

@@ -31,6 +31,7 @@
     let best = null, bt = len;
     const an = G.Entities.raycast(from, _d, len, 0.22); if (an && an.t < bt) { bt = an.t; best = { kind: 'animal', ent: an.ent }; }
     if (G.Net && G.Net.on) { const rp = G.Net.raycast(from, _d, len); if (rp && rp.t < bt) { bt = rp.t; best = { kind: 'remote', r: rp.remote }; } }
+    if (G.Sea && G.Sea.enc.length) { const sh = G.Sea.raycast(from, _d, len); if (sh && sh.t < bt) { bt = sh.t; best = { kind: 'sea', enc: sh.enc }; } }
     for (const b of G.Build.boxes) { if (b.soft || b.roof || b.slope) continue; const t = G.Build.rayBox(from, _d, b); if (t >= 0 && t < bt) { bt = t; best = { kind: 'solid' }; } }
     const gy = G.World.groundAt(to.x, to.z);
     if (to.y < gy && (!best || best.kind === 'solid')) best = best || { kind: 'ground' };
@@ -41,18 +42,19 @@
     const held = P.held(), id = held ? held.id : null;
     C.reload = Math.max(0, C.reload - dt);
     // arco: tieni premuto per tendere, rilascia per scoccare
-    if (id === 'arco' && !G.UI.open && !P.boat) {
-      if (P.mouse.l) { if (C.charge === 0 && G.Audio) G.Audio.draw(); C.charge = Math.min(1.1, C.charge + dt); }
+    if (id === 'arco' && !G.UI.open && !(P.boat && P.helm)) {
+      if (P.mouse.l) { if (C.charge === 0 && G.Audio) G.Audio.draw(); C.charge = Math.min(1.5, C.charge + dt); }
       else if (C.charge > 0) {
-        const k = Math.min(1, C.charge / 1.0); C.charge = 0;
+        const k = Math.min(1, C.charge / 1.5); C.charge = 0;
         if (k > 0.12) {
           if (P.count('freccia') <= 0) G.UI.toast('Non hai frecce (bastone + pietra + piume)', 'warn');
           else {
             P.take('freccia', 1);
             P.lookDir(_d);
             _o.copy(P.cam.position).addScaledVector(_d, 0.5); _o.y -= 0.05;
-            const v = _d.clone().multiplyScalar(14 + 34 * k);
-            C.shootArrow(_o, v, 1.5 + 5 * k, false);
+            // più è tesa, più la freccia va veloce (gittata) e fa male: danno 4–36
+            const v = _d.clone().multiplyScalar(12 + 46 * k);
+            C.shootArrow(_o, v, 1 + 8 * Math.pow(k, 1.5), false);
             if (G.Net && G.Net.on) G.Net.send({ t: 'fx', k: 'arrow', o: [+_o.x.toFixed(2), +_o.y.toFixed(2), +_o.z.toFixed(2)], v: [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)] });
             if (G.Audio) G.Audio.bow();
           }
@@ -61,11 +63,12 @@
       // corda e freccia nel modello in mano
       const vm = P.vmCache && P.vmCache.arco;
       if (vm && vm.userData.line) {
-        const pull = Math.min(1, C.charge) * 0.32;
+        const pull = Math.min(1, C.charge / 1.5) * 0.32;
         const pos = vm.userData.line.geometry.attributes.position; pos.setXYZ(1, 0, 0, 0.07 + pull); pos.needsUpdate = true;
         vm.userData.arrow.visible = C.charge > 0 && P.count('freccia') > 0; vm.userData.arrow.position.z = 0.07 + pull - 0.32;
       }
     } else C.charge = 0;
+    { const cr = document.getElementById('cross'); if (cr) { const ch = id === 'arco' && C.charge > 0; if (ch !== C._chOn) { C._chOn = ch; cr.classList.toggle('charge', ch); } if (ch) cr.style.setProperty('--ch', (Math.min(1, C.charge / 1.5) * 360).toFixed(0) + 'deg'); } }
     // cannocchiale: tieni premuto il tasto destro
     const lid = P.equip && P.equip[0] ? P.equip[0].id : null;
     C.hasSpy = id === 'cannocchiale' || (lid === 'cannocchiale' && !(id && G.Build.isPlaceable(id)));
@@ -97,6 +100,7 @@
       if (h) {
         if (h.kind === 'animal') { G.Entities.hit(h.ent, a.dmg, P); G.scene.remove(a.m); C.arrows.splice(i, 1); continue; }
         if (h.kind === 'remote') { G.Net.hit(h.r, Math.round(a.dmg * 4)); G.scene.remove(a.m); C.arrows.splice(i, 1); continue; }
+        if (h.kind === 'sea') { G.Sea.hitEnc(h.enc, a.dmg * 4, a.pos); G.scene.remove(a.m); C.arrows.splice(i, 1); continue; }
         a.pos.copy(from).addScaledVector(_d.subVectors(a.pos, from).normalize(), Math.max(0, h.t - 0.2));
         a.stuck = true; a.life = 0;
         if (G.Audio) G.Audio.hit('wood');
@@ -155,11 +159,13 @@
     let best = null, bt = 80;
     const an = G.Entities.raycast(o, _d, bt, 0.08); if (an) { bt = an.t; best = { kind: 'animal', ent: an.ent }; }
     if (G.Net && G.Net.on) { const rp = G.Net.raycast(o, _d, bt); if (rp && rp.t < bt) { bt = rp.t; best = { kind: 'remote', r: rp.remote }; } }
+    if (G.Sea && G.Sea.enc.length) { const sh = G.Sea.raycast(o, _d, bt); if (sh && sh.t < bt) { bt = sh.t; best = { kind: 'sea', enc: sh.enc }; } }
     for (const b of G.Build.boxes) { if (b.soft || b.roof || b.slope) continue; const t = G.Build.rayBox(o, _d, b); if (t >= 0 && t < bt) { bt = t; best = null; } }
     const th = G.Build.terrainHit(o, _d, bt); if (th >= 0 && th < bt) { bt = th; best = null; }
     const dmg = cap ? 14 : 10;
     if (best && best.kind === 'animal') G.Entities.hit(best.ent, dmg, P);
     else if (best && best.kind === 'remote') G.Net.hit(best.r, dmg * 4);
+    else if (best && best.kind === 'sea') G.Sea.hitEnc(best.enc, dmg * 4, o.clone().addScaledVector(_d, bt));
     const hp = o.clone().addScaledVector(_d, bt);
     G.FX.burst(hp.x, hp.y, hp.z, [0.7, 0.65, 0.6], 8, 2);
     const mz = o.clone().addScaledVector(_d, 0.8);

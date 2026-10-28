@@ -137,9 +137,11 @@
     for (const p of V.peers.values()) {
       const r = N.remotes.get(p.id); if (!r || !p.gain || !A || !A.ctx) continue;
       const dx = r.pos.x - P.pos.x, dz = r.pos.z - P.pos.z, d = Math.hypot(dx, dz, r.pos.y - P.pos.y);
-      const k = d < range * 0.3 ? 1 : Math.max(0, 1 - (d - range * 0.3) / (range * 0.7));
+      // chi ospita decide: voce in vicinanza oppure ovunque, sempre allo stesso volume
+      const k = G.voiceGlobal ? 1 : d < range * 0.3 ? 1 : Math.max(0, 1 - (d - range * 0.3) / (range * 0.7));
       p.gain.gain.setTargetAtTime(k * k * (set.vol === undefined ? 1 : set.vol) * 1.6, A.ctx.currentTime, 0.1);
-      if (p.pan) { const rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw); p.pan.pan.setTargetAtTime(G.clamp((dx * rx + dz * rz) / Math.max(1, Math.hypot(dx, dz)), -1, 1) * 0.8, A.ctx.currentTime, 0.1); }
+      if (p.pan && G.voiceGlobal) p.pan.pan.setTargetAtTime(0, A.ctx.currentTime, 0.1);
+      else if (p.pan) { const rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw); p.pan.pan.setTargetAtTime(G.clamp((dx * rx + dz * rz) / Math.max(1, Math.hypot(dx, dz)), -1, 1) * 0.8, A.ctx.currentTime, 0.1); }
       p.level = rms(p.an, p.abuf);
       const sp = p.level > 0.01;
       if (sp) p.spT = 0.35; else p.spT = (p.spT || 0) - dt;

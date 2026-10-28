@@ -36,6 +36,7 @@
     ['t-hold', 'Stiva', 'KeyG', () => P().boat && P().boat.inv],
     ['t-view', 'Vista', 'KeyV', () => P().boat],
     ['t-sprint', 'Corri', 'sprint', () => !P().boat && !P().fly],
+    ['t-drop', 'Lascia', 'drop', () => !!(P().held() && !G.UI.open && !P().boat)],
     ['t-spy', 'Guarda', 'spy', () => G.Combat && G.Combat.hasSpy],
     ['t-zoom', 'Zoom', 'spyzoom', () => G.Combat && G.Combat._spyOn],
     ['t-talk', 'Parla', 'talk', () => !!(G.Net && G.Net.on && G.Voice && G.Voice.settings().mode === 'ptt')],
@@ -90,7 +91,8 @@
           L.x = t.clientX; L.y = t.clientY; L.moved = Math.max(L.moved, Math.hypot(t.clientX - L.sx, t.clientY - L.sy));
           if (G.started && !G.UI.open) {
             const s = 0.0058 * (G.settings.sens || 1);
-            P().yaw -= dx * s; P().pitch = G.clamp(P().pitch - dy * s, -1.5, 1.5);
+            const zk = G.Combat && G.Combat.zoom > 0.05 ? 1 / (1 + G.Combat.zoom * (G.Combat.mag - 1)) : 1;
+            P().yaw -= dx * s * zk; P().pitch = G.clamp(P().pitch - dy * s * zk, -1.5, 1.5);
           }
         }
       }
@@ -133,6 +135,7 @@
         if (code === 'menu') { P().keys = {}; P().ax.f = P().ax.r = 0; G.UI.showMenu('main'); G.save(); return; }
         if (code === 'sprint') { T.sprint = !T.sprint; P().keys.ShiftLeft = T.sprint; b.classList.toggle('on', T.sprint); return; }
         if (code === 'talk') { G.Voice.setPTT(true); b.classList.add('on'); return; }
+        if (code === 'drop') { G.Drops && G.Drops.throwHeld(false); return; }
         if (code === 'spy') { G.Combat.touchSpy = !G.Combat.touchSpy; b.classList.toggle('on', G.Combat.touchSpy); return; }
         if (code === 'spyzoom') { G.Combat.spyZoom(0); return; }
         tap(code);

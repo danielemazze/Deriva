@@ -463,6 +463,8 @@
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * 6.283; const cx = f.x + Math.sin(a) * (R0 - 0.2), cz = f.z + Math.cos(a) * (R0 - 0.2);
       if (i === 0) continue;
+      // il muro dietro la scala non deve spingere fuori dai pioli (finivi sotto il ballatoio)
+      if (i === 6) { cols.push({ x0: cx - 0.75, x1: cx + 0.75, y0: y0 - 1, y1: y0 + H, z0: cz - 0.75, z1: f.z - R0 + 0.3, walk: true }); continue; }
       cols.push({ x0: cx - 0.75, x1: cx + 0.75, y0: y0 - 1, y1: y0 + H, z0: cz - 0.75, z1: cz + 0.75, walk: true, climb: true });
     }
     cols.push({ x0: f.x - 2, x1: f.x + 2, y0: y0 - 1.2, y1: y0, z0: f.z - 2, z1: f.z + 2, walk: true });
@@ -473,10 +475,13 @@
     cols.push({ x0: f.x - 0.45, x1: f.x + 0.45, y0, y1: y0 + H + 0.35, z0: lz - 0.3, z1: lz + 0.35, climb: true, soft: true, ladder: true });
     // ballatoio con botola sopra la scala
     const top = y0 + H;
-    bk.add('stone', CYL(3.2, 3.2, 0.25, f.x, top - 0.25, f.z, 24), [0.9, 0.9, 0.88]);
-    cols.push({ x0: f.x - 3, x1: f.x + 3, y0: top - 0.25, y1: top, z0: f.z - 3 + 1.4, z1: f.z + 3, walk: true });
-    cols.push({ x0: f.x - 3, x1: f.x - 0.55, y0: top - 0.25, y1: top, z0: f.z - 3, z1: f.z - 3 + 1.4, walk: true });
-    cols.push({ x0: f.x + 0.55, x1: f.x + 3, y0: top - 0.25, y1: top, z0: f.z - 3, z1: f.z - 3 + 1.4, walk: true });
+    // ballatoio con una vera botola aperta sopra la scala (prima il disco di pietra la copriva)
+    const HX = 0.75, HZ0 = -3, HZ1 = -1.05;
+    { const sh = new THREE.Shape(); sh.absarc(0, 0, 3.2, 0, Math.PI * 2, false); const hole = new THREE.Path(); hole.moveTo(-HX, -HZ0); hole.lineTo(HX, -HZ0); hole.lineTo(HX, -HZ1); hole.lineTo(-HX, -HZ1); hole.closePath(); sh.holes.push(hole);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.25, bevelEnabled: false, curveSegments: 24 }); g.rotateX(-Math.PI / 2); g.translate(f.x, top - 0.25, f.z); bk.add('stone', g, [0.9, 0.9, 0.88]); }
+    cols.push({ x0: f.x - 3, x1: f.x + 3, y0: top - 0.25, y1: top, z0: f.z + HZ1, z1: f.z + 3, walk: true });
+    cols.push({ x0: f.x - 3, x1: f.x - HX, y0: top - 0.25, y1: top, z0: f.z - 3, z1: f.z + HZ1, walk: true });
+    cols.push({ x0: f.x + HX, x1: f.x + 3, y0: top - 0.25, y1: top, z0: f.z - 3, z1: f.z + HZ1, walk: true });
     for (let i = 0; i < 16; i++) { const a = (i / 16) * 6.283; bk.add('iron', CYL(0.04, 0.04, 1.0, f.x + Math.cos(a) * 3.05, top, f.z + Math.sin(a) * 3.05, 5), [1, 1, 1], false); }
     const rail = new THREE.TorusGeometry(3.05, 0.04, 4, 24); rail.rotateX(Math.PI / 2); rail.translate(f.x, top + 1.0, f.z); bk.add('iron', rail, [1, 1, 1], false);
     for (const [x0, x1, z0, z1] of [[-3.2, 3.2, -3.2, -3.0], [-3.2, 3.2, 3.0, 3.2], [-3.2, -3.0, -3.2, 3.2], [3.0, 3.2, -3.2, 3.2]]) cols.push({ x0: f.x + x0, x1: f.x + x1, y0: top, y1: top + 1.05, z0: f.z + z0, z1: f.z + z1 });
@@ -683,10 +688,14 @@
     };
     // basamento livellato e scalinata
     const dep = y - gmin + 3;
-    P('stone', BOX(2 * HO + 10, dep, 2 * HO + 10, 0, -dep / 2, 0), ST2);
+    // la scala della cripta apre un buco nel basamento: basamento e lastricato si fanno a pezzi attorno
+    const HOLE = [8.8, 12.2, 8.8, 22.2];
+    const around = (a, fn) => { const [hx0, hx1, hz0, hz1] = HOLE; for (const [x0, x1, z0, z1] of [[-a, hx0, -a, a], [hx1, a, -a, a], [hx0, hx1, -a, hz0], [hx0, hx1, hz1, a]]) if (x1 > x0 && z1 > z0) fn(x0, x1, z0, z1); };
+    around(HO + 5, (x0, x1, z0, z1) => P('stone', BOX(x1 - x0, dep, z1 - z0, (x0 + x1) / 2, -dep / 2, (z0 + z1) / 2), ST2));
     P('stone', BOX(2 * HO + 10.6, 0.5, 2 * HO + 10.6, 0, -1.2, 0), ST3);
-    P('stone', BOX(2 * HO + 6, 0.3, 2 * HO + 6, 0, 0.0, 0), [0.7, 0.68, 0.64]);
-    col(-HO - 5, -dep, -HO - 5, HO + 5, 0.15, HO + 5, { walk: true });
+    around(HO + 3, (x0, x1, z0, z1) => P('stone', BOX(x1 - x0, 0.3, z1 - z0, (x0 + x1) / 2, 0.0, (z0 + z1) / 2), [0.7, 0.68, 0.64]));
+    // pavimento: lastre calpestabili sottili (sotto, nella cripta, si passa)
+    around(HO + 5, (x0, x1, z0, z1) => { const bx = wbox(b, y, x0, 0.15, z0, x1, 0.15, z1); bx.y0 = bx.y1 = y + 0.15; bx.shell = 1.4; bx.slope = { ax: 'x', a0: bx.x0, a1: bx.x0 + 1 }; cols.push(bx); });
     { const [fx, fz] = W(0, HO + 12); const low = Math.min(y - 0.5, GROUND(fx, fz)); const rise = y - low; const L = Math.max(6, rise * 1.7); const n = Math.ceil(L / 0.6);
       for (let k = 0; k < n; k++) { const sy = rise * (k / n); P('stone', BOX(12, 0.6, 0.62, 0, -sy - 0.3, HO + 5 + k * 0.6 + 0.3), k % 2 ? ST2 : ST); }
       for (const sx of [-1, 1]) { P('stone', BOX(1.2, 1.3, L, sx * 6.6, -rise / 2 + 0.2, HO + 5 + L / 2), ST3); for (let k = 0; k <= L; k += 6) P('glow', BOX(0.3, 0.45, 0.3, sx * 6.6, -rise * (k / L) + 1.2, HO + 5 + k), [1, 1, 1], false); }
@@ -919,6 +928,111 @@
     for (const zz of [HO - 8, HI + 6, HI - 6]) for (const sx of [-1, 1]) { const bx = sx * 4.5; P('stone', CYL(0.45, 0.3, 1.1, bx, 0, zz, 8), ST3); P('iron', CYL(0.55, 0.6, 0.35, bx, 1.1, zz, 10), [1, 1, 1], false); P('glow', CYL(0.4, 0.2, 0.45, bx, 1.4, zz, 8), [1, 1, 1], false); bk.lights.push(new V3(bx, 1.8, zz).applyMatrix4(M)); }
     // viale lastricato
     P('stone', BOX(6, 0.08, HO + 4, 0, 0.17, (HO + 4) / 2 - 4), [0.6, 0.58, 0.55]);
+
+    // =========== ARRICCHIMENTI: torce, catene, portoni, cripta con trappole ===========
+    const FLM = G.flameMaterial ? G.flameMaterial() : null; bk.extra = bk.extra || [];
+    const V = (lx, ly, lz) => { const [wx, wz] = W(lx, lz); return new V3(wx, y + ly, wz); };
+    // torcia a muro: staffa di ferro, manico, fiamma viva; (nx,nz) = verso dove guarda la parete
+    const wtorch = (x, ty, z, nx, nz) => {
+      const bx = x + nx * 0.22, bz = z + nz * 0.22;
+      P('iron', BOX(Math.abs(nx) > 0.5 ? 0.4 : 0.08, 0.08, Math.abs(nz) > 0.5 ? 0.4 : 0.08, x + nx * 0.18, ty, z + nz * 0.18), [1, 1, 1], false);
+      P('iron', CYL(0.11, 0.13, 0.12, bx, ty - 0.05, bz, 8), [1, 1, 1], false);
+      P('wood', CYL(0.04, 0.05, 0.55, bx, ty - 0.45, bz, 6), WD);
+      P('glow', CYL(0.09, 0.07, 0.14, bx, ty + 0.05, bz, 8), [1, 1, 1], false);
+      if (FLM) { const f = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.55).translate(0, 0.27, 0), FLM); f.position.copy(V(bx, ty + 0.1, bz)); f.frustumCulled = true; f.renderOrder = 6; bk.extra.push(f); }
+      bk.lights.push(V(bx, ty + 0.35, bz));
+    };
+    // catena: anelli alternati da a a b
+    const _q = new THREE.Quaternion(), _up = new V3(0, 1, 0), _m = new THREE.Matrix4(), _s = new V3(1, 1.7, 1);
+    const chain = (ax, ay, az, bx2, by, bz2) => {
+      const a = new V3(ax, ay, az), d = new V3(bx2 - ax, by - ay, bz2 - az), L = d.length(); d.normalize(); _q.setFromUnitVectors(_up, d);
+      const n = Math.max(2, Math.round(L / 0.2));
+      for (let k = 0; k < n; k++) { const g = new THREE.TorusGeometry(0.06, 0.017, 4, 8); g.scale(1, 1.7, 1); if (k % 2) g.rotateY(Math.PI / 2); g.applyQuaternion(_q); const p = a.clone().addScaledVector(d, (k + 0.5) * (L / n)); g.translate(p.x, p.y, p.z); P('iron', g, [0.9, 0.9, 0.9], false); }
+    };
+    // anta di portone (legno, bande e anello di ferro), incernierata in (hx,hz), aperta lungo (dx,dz)
+    const leaf = (hx, hz, w, h, dx, dz, th) => {
+      const cx = hx + dx * w / 2, cz = hz + dz * w / 2, ang = Math.atan2(-dz, dx), t = th || 0.24;
+      const g = BOX(w, h, t, 0, h / 2, 0); g.rotateY(ang); g.translate(cx, 0, cz); P('wood', g, [0.55, 0.42, 0.3]);
+      for (const by of [0.6, h * 0.5, h - 0.6]) { const bnd = BOX(w * 0.96, 0.16, t + 0.06, 0, by, 0); bnd.rotateY(ang); bnd.translate(cx, 0, cz); P('iron', bnd, [1, 1, 1], false); }
+      for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) { const st = BOX(0.09, 0.09, t + 0.1, -w / 2 + w * (k + 0.5) / 4, h * (0.22 + j * 0.28), 0); st.rotateY(ang); st.translate(cx, 0, cz); P('iron', st, [1, 1, 1], false); }
+      const ring = new THREE.TorusGeometry(0.2, 0.035, 6, 14); ring.translate(w * 0.36, h * 0.45, t / 2 + 0.05); ring.rotateY(ang); ring.translate(cx, 0, cz); P('iron', ring, [0.85, 0.7, 0.4], false);
+    };
+    // portoni aperti verso l'interno: porta grande, porta interna, mastio
+    for (const sx of [-1, 1]) {
+      leaf(sx * GW / 2, HO - 4.7, GW / 2, 7.6, -sx * Math.cos(1.35), -Math.sin(1.35));
+      leaf(sx * IG / 2, HI - 3.7, IG / 2, 6.6, -sx * Math.cos(1.3), -Math.sin(1.3));
+      leaf(sx * DW, fz - KT / 2 - 0.1, DW, 5.8, -sx * Math.cos(1.2), -Math.sin(1.2));
+    }
+    // catene delle saracinesche e argano
+    for (const [gz, dpt, top, gh] of [[HO, 10, OH + 3, 8], [HI, 8, IH + 2, 7]]) for (const sx of [-1, 1]) { chain(sx * 2.2, top, gz + dpt / 2 - 1.6, sx * 2.2, gh + 1.0, gz + dpt / 2 - 0.75); }
+    // torce: porte, mastio, mura interne ed esterne, corte
+    for (const sx of [-1, 1]) { wtorch(sx * (GW / 2 + 0.02), 3.4, HO - 3, -sx, 0); wtorch(sx * (IG / 2 + 0.02), 3.2, HI - 2.6, -sx, 0); wtorch(sx * 3.8, 3.8, kz1 + 0.05, 0, 1); }
+    for (const x of [-22, -10, 10, 22]) wtorch(x, 4.2, -HI + IT / 2, 0, 1);
+    for (const sx of [-1, 1]) for (const z of [13, 22]) wtorch(sx * (HI - IT / 2), 4.2, z, -sx, 0);
+    for (const sx of [-1, 1]) for (const z of [-36, -12, 12, 36]) wtorch(sx * (HO - OT / 2), 4.5, z, -sx, 0);
+    for (const x of [-36, -14, 14, 36]) wtorch(x, 4.5, -HO + OT / 2, 0, 1);
+    // lampadari di ferro nel salone del mastio, appesi a catene
+    for (const lz of [KZ - 4, KZ + 4]) {
+      chain(0, 9.4, lz, 0, 7.4, lz);
+      P('iron', new THREE.TorusGeometry(1.25, 0.06, 6, 24).rotateX(Math.PI / 2).translate(0, 7.3, lz), [1, 1, 1], false);
+      for (let k = 0; k < 4; k++) { const a = k * 1.5708; chain(Math.cos(a) * 1.2, 7.3, lz + Math.sin(a) * 1.2, 0, 8.2, lz); }
+      for (let k = 0; k < 8; k++) { const a = (k / 8) * 6.283, cx = Math.cos(a) * 1.25, cz = lz + Math.sin(a) * 1.25; P('stone', CYL(0.05, 0.05, 0.3, cx, 7.36, cz, 6), [0.95, 0.92, 0.85]); P('glow', BOX(0.06, 0.1, 0.06, cx, 7.72, cz), [1, 1, 1], false); }
+      bk.lights.push(V(0, 7.4, lz));
+    }
+    // arazzi rossi alle pareti del mastio
+    for (const sx of [-1, 1]) for (const lz of [KZ - 6, KZ + 1]) P('cloth', BOX(0.05, 5, 2.2, sx * (KW / 2 - KT - 0.05), 4.6, lz), [0.48, 0.07, 0.09]);
+    // gogna: forca di legno con una gabbia appesa nella corte esterna
+    { const gx = -HO + 16, gz = 30; P('logs', CYL(0.2, 0.18, 6, gx, 0, gz, 8), [0.6, 0.52, 0.45], false); P('wood', BOX(3.2, 0.28, 0.28, gx + 1.4, 5.8, gz), WD); chain(gx + 2.6, 5.7, gz, gx + 2.6, 4.2, gz);
+      for (let k = 0; k < 10; k++) { const a = (k / 10) * 6.283; P('iron', BOX(0.05, 1.8, 0.05, gx + 2.6 + Math.cos(a) * 0.5, 3.2, gz + Math.sin(a) * 0.5), [1, 1, 1], false); }
+      P('iron', CYL(0.55, 0.55, 0.08, gx + 2.6, 2.3, gz, 12), [1, 1, 1], false); P('iron', CYL(0.55, 0.1, 0.4, gx + 2.6, 4.1, gz, 12), [1, 1, 1], false); col(gx - 0.2, 0, gz - 0.2, gx + 0.2, 6, gz + 0.2); }
+    // sala d'armi nel salone ovest: rastrelliere con lance
+    for (let k = 0; k < 6; k++) { const lz = -16 + k * 1.1, lx = -HI + 3.2; P('logs', CYL(0.035, 0.03, 2.6, lx, 0, lz, 5), [0.7, 0.6, 0.5], false); P('iron', CYL(0.06, 0.01, 0.3, lx, 2.6, lz, 4), [1, 1, 1], false); }
+    P('wood', BOX(0.3, 0.12, 7, -HI + 3.2, 1.6, -13.3), WD);
+    // tesoretto sul camminamento delle mura nord (premia chi sale)
+    { const [x, z] = W(-37, -HO); gen.push({ t: 'baule', id: `c:${c.id}:4`, x, y: y + OH + 0.12, z, rot: b.rot, tier: 3 }); }
+    // ---------- CRIPTA sotto la corte interna ----------
+    const FL = -9; // pavimento della cripta (rispetto alla corte)
+    // pozzo della scala: parapetto, ringhiera, rivestimento in pietra, gradini
+    for (const [x0, x1, z0, z1] of [[HOLE[0] - 0.4, HOLE[0], HOLE[2] - 0.4, HOLE[3] + 0.4], [HOLE[1], HOLE[1] + 0.4, HOLE[2] - 0.4, HOLE[3] + 0.4], [HOLE[0], HOLE[1], HOLE[3], HOLE[3] + 0.4]]) {
+      P('stone', BOX(x1 - x0, 4.4, z1 - z0, (x0 + x1) / 2, -2.0, (z0 + z1) / 2), ST2); P('stone', BOX(x1 - x0, 0.9, z1 - z0, (x0 + x1) / 2, 0.45, (z0 + z1) / 2), ST3);
+      col(x0, 0, z0, x1, 0.9, z1);
+    }
+    for (let k = 0; k <= 8; k++) P('iron', BOX(0.05, 0.8, 0.05, HOLE[0] - 0.2, 1.3, HOLE[2] + k * ((HOLE[3] - HOLE[2]) / 8)), [1, 1, 1], false);
+    for (let k = 0; k <= 8; k++) P('iron', BOX(0.05, 0.8, 0.05, HOLE[1] + 0.2, 1.3, HOLE[2] + k * ((HOLE[3] - HOLE[2]) / 8)), [1, 1, 1], false);
+    P('iron', BOX(0.06, 0.06, HOLE[3] - HOLE[2], HOLE[0] - 0.2, 1.7, (HOLE[2] + HOLE[3]) / 2), [1, 1, 1], false); P('iron', BOX(0.06, 0.06, HOLE[3] - HOLE[2], HOLE[1] + 0.2, 1.7, (HOLE[2] + HOLE[3]) / 2), [1, 1, 1], false);
+    const SX = (HOLE[0] + HOLE[1]) / 2, SZ0 = HOLE[3], SZ1 = HOLE[2]; // la scala scende verso -z
+    const nst = 22;
+    for (let k = 0; k < nst; k++) { const t = k / nst, sy = FL * t, sz = SZ0 - (SZ0 - SZ1) * t; P('stone', BOX(3.2, 0.5, (SZ0 - SZ1) / nst + 0.05, SX, sy - 0.25, sz - (SZ0 - SZ1) / nst / 2), k % 2 ? ST2 : ST); }
+    cols.push(wslope(b, HOLE[0], HOLE[1], SZ1, SZ0, y + FL, y + 0.15));
+    // la roccia scavata: scala, corridoio, camera sepolcrale
+    const sph = [];
+    for (let t = 0; t <= 1.0001; t += 0.05) { const lz = SZ0 + 0.6 - (SZ0 + 0.6 - SZ1) * t, fy = FL * t; sph.push([SX, fy + 1.7, lz, 1.95]); }
+    for (let lz = SZ1; lz >= -6; lz -= 0.9) sph.push([SX, FL + 1.55, lz, 1.85]);
+    for (let lx = SX; lx >= 5.5; lx -= 0.9) sph.push([lx, FL + 1.55, -6, 1.85]);
+    for (let lx = -4.5; lx <= 4.5; lx += 2.2) for (let lz = -12.5; lz <= -0.5; lz += 2.2) sph.push([lx, FL + 2.3, lz, 2.7]);
+    if (G.Dig) G.Dig.addGen('castle:' + c.id, sph.map(([lx, ly, lz, r]) => { const [wx, wz] = W(lx, lz); return [wx, y + ly, wz, r]; }));
+    // camera: pilastri, sarcofagi, catene con ceppi, torce, ossa, tesoro
+    for (const sx of [-1, 1]) for (const lz of [-11, -6.5, -2]) { P('stone', CYL(0.42, 0.42, 4.2, sx * 3.2, FL, lz, 10), ST3); P('stone', BOX(1.1, 0.4, 1.1, sx * 3.2, FL + 4.2, lz), ST2); }
+    for (const sx of [-1, 1]) for (const lz of [-10.5, -6, -1.8]) {
+      const cx = sx * 5.2; P('stone', BOX(1.1, 0.9, 2.3, cx, FL + 0.45, lz), ST2); P('stone', BOX(1.25, 0.22, 2.45, cx, FL + 1.0, lz), ST3);
+      P('stone', BOX(0.5, 0.3, 1.3, cx, FL + 1.25, lz + 0.2), ST3); col(cx - 0.6, FL, lz - 1.2, cx + 0.6, FL + 1.1, lz + 1.2);
+    }
+    for (const lx of [-3, 0, 3]) { chain(lx, FL + 3.6, -13.6, lx, FL + 1.6, -13.4); P('iron', new THREE.TorusGeometry(0.16, 0.03, 6, 12).translate(lx, FL + 1.45, -13.35), [1, 1, 1], false); }
+    for (let k = 0; k < 10; k++) { const bx = (rnd() - 0.5) * 7, bz = -12 + rnd() * 10; const g = CYL(0.04, 0.04, 0.45, 0, 0, 0, 5); g.rotateZ(1.57); g.rotateY(rnd() * 3); g.translate(bx, FL + 0.06, bz); P('stone', g, [0.95, 0.93, 0.86]); }
+    P('stone', new THREE.SphereGeometry(0.13, 8, 6).translate(-1.4, FL + 0.12, -9), [0.95, 0.93, 0.86]);
+    P('stone', BOX(3.2, 0.5, 2.4, 0, FL + 0.25, -11.4), ST3); P('stone', BOX(2.4, 0.3, 1.8, 0, FL + 0.65, -11.4), ST2);
+    wtorch(-6.4, FL + 2.6, -7, 1, 0); wtorch(6.4, FL + 2.6, -7, -1, 0); wtorch(-2.5, FL + 2.6, -13.8, 0, 1); wtorch(2.5, FL + 2.6, -13.8, 0, 1);
+    wtorch(SX - 1.55, FL + 2.4, 2, 1, 0); wtorch(SX - 1.55, FL * 0.5 + 2.2, (SZ0 + SZ1) / 2, 1, 0);
+    { const [x, z] = W(0, -11.4); gen.push({ t: 'forziere', id: `c:${c.id}:cripta`, x, y: y + FL + 0.8, z, rot: b.rot + Math.PI, tier: 4 }); }
+    // trappole: lastre a pressione che fanno scattare le punte
+    bk.traps = [];
+    const spikeGeo = (() => { const l = []; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const g = new THREE.ConeGeometry(0.07, 0.75, 5); g.translate(-0.55 + i * 0.37, 0.37, -0.55 + j * 0.37); l.push(g); } return G.MODELS.merge(l); })();
+    for (const [lx, lz] of [[SX, 3.5], [SX, -2.5], [7.6, -6]]) {
+      P('stone', BOX(1.5, 0.06, 1.5, lx, FL + 0.03, lz), [0.62, 0.58, 0.52]);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) P('dark', BOX(0.08, 0.02, 0.08, lx - 0.55 + i * 0.37, FL + 0.065, lz - 0.55 + j * 0.37), [1, 1, 1], false);
+      const sp = new THREE.Mesh(spikeGeo, S.mats().iron); const w = V(lx, FL, lz); sp.position.copy(w).y -= 0.8; sp.rotation.y = b.rot; sp.visible = false; bk.extra.push(sp);
+      bk.traps.push({ x: w.x, z: w.z, y: w.y, mesh: sp, t: 0, cd: 0 });
+    }
     // tesori
     { const [x, z] = W(0, kz0 + 6); gen.push({ t: 'forziere', id: `c:${c.id}:0`, x, y: y + 0.15, z, rot: b.rot, tier: 3 }); }
     { const [x, z] = W(HO - 10, -HO + 16 - 5); gen.push({ t: 'forziere', id: `c:${c.id}:1`, x, y: y + 0.15, z, rot: b.rot, tier: 3 }); }
@@ -971,7 +1085,7 @@
         r.bk.build(group);
         for (const e of r.bk.extra || []) group.add(e);
         S.group.add(group);
-        S.active.set(p.id, { poi: p, group, cols: r.cols, gen: r.gen, lights: r.bk.lights || [], always: !!r.bk.always, spin: r.bk.spin || [], beamAt: r.bk.beamAt, flag: r.bk.flag, near: false });
+        S.active.set(p.id, { poi: p, group, cols: r.cols, gen: r.gen, traps: r.bk.traps || null, lights: r.bk.lights || [], always: !!r.bk.always, spin: r.bk.spin || [], beamAt: r.bk.beamAt, flag: r.bk.flag, near: false });
       }
       // collisioni, casse, letti e abitanti solo per i luoghi vicini
       let changed = false;
@@ -991,6 +1105,18 @@
     S.mats().glow.emissiveIntensity = 0.15 + night * 2.2;
     S.mats().glass.emissiveIntensity = night * 1.4;
     for (const a of S.active.values()) {
+      // trappole a pressione (cripta del castello)
+      if (a.traps && a.near) for (const tr of a.traps) {
+        tr.cd -= dt;
+        if (tr.t > 0) { tr.t -= dt; const k = tr.t > 0.9 ? (1.2 - tr.t) / 0.3 : tr.t > 0.3 ? 1 : tr.t / 0.3; tr.mesh.position.y = tr.y - 0.8 + 0.8 * Math.max(0, Math.min(1, k)); if (tr.t <= 0) tr.mesh.visible = false; }
+        if (tr.cd <= 0 && Math.abs(P.pos.x - tr.x) < 0.8 && Math.abs(P.pos.z - tr.z) < 0.8 && Math.abs(P.pos.y - tr.y) < 0.7 && !P.fly) {
+          tr.cd = 2.5; tr.t = 1.2; tr.mesh.visible = true;
+          if (G.Audio) G.Audio.hit('stone');
+          if (P.hurt) P.hurt(G.creative() ? 0 : 22, false, 'trap');
+          G.FX.burst(tr.x, tr.y + 0.4, tr.z, [0.6, 0.6, 0.62], 12, 2.5);
+          G.UI.toast('Una trappola! Le punte escono dal pavimento', 'warn');
+        }
+      }
       for (const h of a.spin) h.rotation.z += dt * (0.3 + G.WIND.level * 0.12);
       if (a.flag) { const p = a.flag.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i) + 1.1; p.setZ(i, Math.sin(t * 3 + x * 2.2) * 0.12 * x * (0.3 + G.WIND.level * 0.1)); } p.needsUpdate = true; }
       if (a.beamAt) {

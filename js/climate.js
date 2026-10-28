@@ -191,19 +191,22 @@
   C.feltTemp = function () {
     const P = G.Player, x = P.pos.x, z = P.pos.z;
     let T = C.airTemp(x, z, P.pos.y);
-    if (P.swim || P.under) T = Math.min(T, 12 + G.climate(x, z).t * 18 - (G.coldAt ? G.coldAt(x, z) * 14 : 0));
+    const F = (C.factors = []); // cosa ti scalda e cosa ti raffredda (si vede a schermo)
+    { const L = C.localAt(x, z, _loc); if (L.snow > 0.2) F.push(['❄', 'neve', -1]); else if (L.rain > 0.2) F.push(['🌧', 'pioggia', -1]); if (C.windLevel() > 5) F.push(['🌬', 'vento forte', -1]); if (L.heat > 0.3) F.push(['☀', 'caldo torrido', 1]); if (G.sky && G.sky.day < 0.3 && T < 14) F.push(['🌙', 'notte fredda', -1]); }
+    if (P.swim || P.under) { const w = 12 + G.climate(x, z).t * 18 - (G.coldAt ? G.coldAt(x, z) * 14 : 0); if (w < T) { T = w; F.push(['💧', 'acqua fredda', -1]); } }
     // falò vicini
     let fire = 0;
     for (const p of G.Build.pieces) if (p.t === 'falo' || p.t === 'camino' || (p.t === 'fornace' && p.glow > 0.3)) { const d = Math.hypot(p.x - x, p.z - z); if (d < 7) fire = Math.max(fire, 1 - d / 7); }
     if (G.Structures && G.Structures.fireNear) fire = Math.max(fire, G.Structures.fireNear(x, z));
-    T += fire * 18;
-    if (P.heldTorch) T += 2;
+    // il fuoco scalda davvero: vicino al falò si sta bene anche nella neve
+    if (fire > 0) { T = Math.max(T, G.lerp(T, 24, Math.min(1, fire * 2))); F.push(['🔥', 'fuoco vicino', 1]); }
+    if (P.heldTorch) { T += 3; F.push(['🔦', 'torcia', 1]); }
     // sotto un tetto: niente pioggia e vento, al fresco col sole
     const roofed = G.Build.ceilingAt(x, z, P.pos.y + 1.8, 0.2) < P.pos.y + 7;
-    if (roofed) { const L = C.localAt(x, z, _loc); T += (L.rain * 4 + L.snow * 3) * 0.8 + (T < 15 ? 3 : 0) - (T > 28 ? 4 : 0); }
+    if (roofed) { const L = C.localAt(x, z, _loc); T += (L.rain * 4 + L.snow * 3) * 0.8 + (T < 15 ? 3 : 0) - (T > 28 ? 4 : 0); F.push(['⌂', 'al riparo', T < 20 ? 1 : -1]); }
     const cl = C.clothes();
-    if (T < 16) T = Math.min(16, T + cl.warm * 2.6);
-    else if (T > 27) T = Math.max(27, T - cl.cool * 3.5 + cl.warm * 1.2);
+    if (T < 16) { const T0 = T; T = Math.min(16, T + cl.warm * 2.6); if (T > T0 + 0.5) F.push(['🧥', 'vestiti caldi', 1]); }
+    else if (T > 27) { const T0 = T; T = Math.max(27, T - cl.cool * 3.5 + cl.warm * 1.2); if (T < T0 - 0.5) F.push(['👒', 'vestiti leggeri', -1]); else if (cl.warm) F.push(['🧥', 'vestiti troppo caldi', 1]); }
     C._roofed = roofed;
     return T;
   };
@@ -215,7 +218,10 @@
     if (G.creative()) { P.temp = 50; return; }
     const T = C.feltTemp(); C.felt = T;
     const target = T < 12 ? Math.max(0, 50 - (12 - T) * 3.2) : T > 28 ? Math.min(100, 50 + (T - 28) * 3.6) : 50;
-    P.temp += (target - P.temp) * Math.min(1, dt * 0.025);
+    // ci si scalda più in fretta di quanto ci si raffreddi (e il fuoco scalda subito)
+    const warming = target > P.temp, rate = warming ? (C.factors.some((f) => f[1] === 'fuoco vicino') ? 0.12 : 0.05) : 0.014;
+    P.temp += (target - P.temp) * Math.min(1, dt * rate);
+    C.trend = Math.abs(target - P.temp) < 1.5 ? 0 : warming ? 1 : -1; C.target = target;
     // effetti
     if (P.temp < 12) { P.hurt(dt * 0.55, true); if (!C._coldWarn) { C._coldWarn = 1; G.UI.toast('Stai congelando: vicino a un falò o con vestiti di lana (berretto, maglione, stivali)', 'warn'); } }
     else if (P.temp > 30) C._coldWarn = 0;

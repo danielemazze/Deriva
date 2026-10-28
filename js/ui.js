@@ -44,7 +44,8 @@
     const lh = $('lefthand'); if (lh) { const L = P().equip ? P().equip[0] : null; lh.innerHTML = `<div class="slot">${UI.slotHTML(L)}</div><span class="lhkey">F · sinistra</span>`; lh.style.opacity = L ? 1 : 0.55; const r = hb.getBoundingClientRect(); if (r.width) lh.style.left = Math.max(6, r.left - lh.offsetWidth - 10) + 'px'; }
     const it = inv[P().sel];
     const hn = $('heldname');
-    const name = it ? G.ITEMS[it.id].n : '';
+    const wi0 = it ? G.weaponInfo(it.id) : null;
+    const name = it ? G.ITEMS[it.id].n + (wi0 ? ` · danno ${wi0.dmg}` : '') : '';
     if (name !== UI._lastHeld) { UI._lastHeld = name; hn.textContent = name; hn.classList.add('show'); clearTimeout(UI._hnT); UI._hnT = setTimeout(() => hn.classList.remove('show'), 1800); }
     if (UI.open) UI.renderPanel();
   };
@@ -102,7 +103,8 @@
     }
     if (tg.kind === 'piece') {
       const pc = tg.piece; const h = PIECE_HINT[pc.t];
-      return `<div class="tname">${G.ITEMS[pc.t].n}</div><div class="thint">${h ? `${k(G.useKey())} ${h} · ` : ''}${k('Clic sinistro')} smonta</div>`;
+      const nm = G.ITEMS[pc.t] ? G.ITEMS[pc.t].n : pc.t === 'forziere' ? 'Forziere' : pc.t;
+      return `<div class="tname">${nm}</div><div class="thint">${h ? `${k(G.useKey())} ${h}` : ''}${pc.gen ? '' : `${h ? ' · ' : ''}${k('Clic sinistro')} smonta`}</div>`;
     }
     if (tg.kind === 'npc') { const n = tg.npc; return `<div class="tname">${esc(n.def.name)}</div><div class="thint">${k(G.useKey())} ${n.def.role === 'mercante' ? 'commercia' : n.def.role === 'capo' ? 'missioni e voci' : n.def.role === 'locandiere' ? 'mangia e riposa' : 'parla'}</div>`; }
     if (tg.kind === 'boat' && tg.boat.free) {
@@ -132,8 +134,13 @@
       const low = vals[k] < 22; if (m._low !== low) { m._low = low; m.el.classList.toggle('low', low); }
       if (k === 'oxygen') { const h = !(p.under || p.oxygen < 99.5); if (m.el.hidden !== h) m.el.hidden = h; }
     }
+    // temperatura: cosa ti scalda e cosa ti raffredda, e se ti stai scaldando o raffreddando
+    { const ti = $('tempinfo'), C = G.Climate; if (ti && C && C.factors) { const b0 = p.temp === undefined ? 50 : p.temp, tr = C.trend || 0;
+        const show = !G.creative() && (tr !== 0 || b0 < 42 || b0 > 58);
+        const html = show ? `<b class="${tr > 0 ? 'up' : tr < 0 ? 'dn' : ''}">${tr > 0 ? '▲ ti stai scaldando' : tr < 0 ? '▼ ti stai raffreddando' : G.Climate.bodyLabel(b0)}</b>${C.factors.slice(0, 4).map(([ic, n, sg]) => `<span class="${sg > 0 ? 'w' : 'c'}">${ic} ${n}</span>`).join('')}<small>aria ${Math.round(C.felt !== undefined ? C.felt : 0)}°C</small>` : '';
+        if (html !== UI._ti) { UI._ti = html; ti.innerHTML = html; ti.hidden = !show; } } }
     // temperatura corporea: la barra compare quando hai freddo o caldo (blu = freddo, rosso = caldo)
-    { const m = UI.meterEls.temp, b = p.temp === undefined ? 50 : p.temp, show = !G.creative() && (b < 42 || b > 58);
+    { const m = UI.meterEls.temp, b = p.temp === undefined ? 50 : p.temp, show = !G.creative() && (b < 42 || b > 58 || (G.Climate && G.Climate.trend));
       if (m.el.hidden === show) m.el.hidden = !show;
       if (show) { const v = (Math.round(b) / 100); if (m._v !== v) { m._v = v; m.bar.style.transform = `scaleX(${Math.max(0.04, v)})`; m.el.dataset.hot = b > 50 ? 1 : 0; m.el.title = 'Temperatura corporea: ' + G.Climate.bodyLabel(b); } m.el.classList.toggle('low', b < 20 || b > 82); } }
     // bussola e orologio
@@ -147,8 +154,9 @@
       const gt = G.Combat.goldenTarget(); if (gt) marks.push(['★', 'gold', bear(gt.x, gt.z)]);
       const qt = G.MapUI.questTargets(); if (qt.length) { qt.sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z)); marks.push(['◆', 'quest', bear(qt[0].x, qt[0].z)]); }
       const tm = p.inv.find((st) => st && st.id === 'mappa_tesoro' && st.d && !G.state.removed.has('dig:' + st.d.id)); if (tm) marks.push(['✕', 'tx', bear(tm.d.x, tm.d.z)]);
+      if (G.Net && G.Net.on) for (const r of G.Net.remotes.values()) { const d = Math.hypot(r.pos.x - p.pos.x, r.pos.z - p.pos.z); marks.push(['●', 'pl', bear(r.pos.x, r.pos.z), G.Net.COLOR_CSS[r.slot % 4], `${r.name} ${d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km'}`]); }
       const el = $('cmarks');
-      if (el) el.innerHTML = marks.map(([c, cls, b]) => { let dd = ((b - hd + 540) % 360) - 180; const out = Math.abs(dd) > 72; dd = Math.max(-72, Math.min(72, dd)); return `<i class="cm ${cls} ${out ? 'edge' : ''}" style="left:${150 + dd * 2}px">${c}</i>`; }).join('');
+      if (el) el.innerHTML = marks.map(([c, cls, b, colr, lab]) => { let dd = ((b - hd + 540) % 360) - 180; const out = Math.abs(dd) > 72; dd = Math.max(-72, Math.min(72, dd)); if (cls === 'pl') return `<i class="cm pl ${out ? 'edge' : ''}" style="left:${150 + dd * 2}px;color:${colr}">●<b>${esc(lab)}</b></i>`; return `<i class="cm ${cls} ${out ? 'edge' : ''}" style="left:${150 + dd * 2}px">${c}</i>`; }).join('');
     }
     const hours = (G.time % 1) * 24, hh = Math.floor(hours), mm = Math.floor((hours - hh) * 60);
     const nowB = performance.now(); if (!UI._bioT || nowB - UI._bioT > 500) { UI._bioT = nowB; const gh = G.heightAt(p.pos.x, p.pos.z); UI._bio = gh > 0.6 ? G.BIOME_N[G.biomeAt(p.pos.x, p.pos.z)] : gh > -3 ? 'Costa' : 'Mare aperto'; }
@@ -156,6 +164,7 @@
     if (Cl && (!UI._wT || nowB - UI._wT > 1000)) { UI._wT = nowB; const K = Cl.KINDS[Cl.state.kind], snow = Cl.cur.snow > Cl.cur.rain && Cl.cur.snow > 0.3; UI._wx = ` · ${snow ? '❄ Neve' : K.icon + ' ' + K.n} · ${Math.round(Cl.felt !== undefined ? Cl.felt : Cl.airTemp(p.pos.x, p.pos.z, p.pos.y))}°C${G.sky.night > 0.3 ? ' · ' + Cl.PHASE_ICON[Cl.moonIndex()] + ' ' + Cl.moonName() : ''}`; }
     const ck = `Giorno ${Math.floor(G.time) + 1} · ${String(hh).padStart(2, '0')}:${String(mm - (mm % 5)).padStart(2, '0')} · ${UI._bio}${UI._wx || ''}`;
     if (ck !== UI._ck) { UI._ck = ck; $('clock').textContent = ck; }
+    { const cd = $('coordhud'); if (cd) { const show = G.settings.coords !== false; const t = show ? `X ${Math.round(p.pos.x)} · Z ${Math.round(p.pos.z)}` : ''; if (t !== UI._cd) { UI._cd = t; cd.textContent = t; cd.hidden = !show; } } }
     // mirino e bersaglio
     let html = '';
     if (!UI.open && !p.placing && !UI.boatPlacing) html = targetHTML(p.target);
@@ -206,7 +215,7 @@
     if (p.placing) return ['Costruzione', [['Tasto destro', 'posa'], ['R', 'ruota'], ['Esc', 'annulla']]];
     if (p.boat) {
       const T = p.boat.T;
-      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], [G.useKey(), p.inHelmZone() ? 'guida (' + T.helmTxt.toLowerCase() + ')' : 'scendi'], ['Spazio contro la murata', 'tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
+      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
       if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], [G.useKey(), 'lascia i remi']]];
       return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], ...(p.boat.inv ? [['G', 'stiva']] : []), [G.useKey(), 'lascia il timone']]];
     }
@@ -648,7 +657,7 @@
   const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Maiusc', 'correre'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
     ['E · I · Tab', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
-    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['Q (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Q”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
+    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
   UI.CONTROLS = CONTROLS;
 
   /* ---------------- MENU ---------------- */
@@ -752,7 +761,7 @@
         ${(G.Audio ? G.Audio.BUSES : []).map(([k, n, d]) => { const v = S.vols && S.vols[k] !== undefined ? S.vols[k] : 1; return `<div class="opt"><label for="o-av-${k}">${n}<small>${d}</small></label><output id="o-av-${k}-o">${Math.round(v * 100)}%</output><input type="range" id="o-av-${k}" min="0" max="1.5" step="0.05" value="${v}"></div>`; }).join('')}
         </div>`;
       else if (tab === 'voce') body = `<h5>Chat vocale</h5><div class="sgrid">
-        <div class="opt"><label>Microfono<small>si attiva quando sei in partita con altri giocatori</small></label><div class="seg small">${[['open', 'Sempre aperto'], ['ptt', 'Tieni premuto Q'], ['off', 'Spento']].map(([k, n]) => `<button data-voice="${k}" class="${(S.voice && S.voice.mode || 'open') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+        <div class="opt"><label>Microfono<small>si attiva quando sei in partita con altri giocatori</small></label><div class="seg small">${[['open', 'Sempre aperto'], ['ptt', 'Tieni premuto Z'], ['off', 'Spento']].map(([k, n]) => `<button data-voice="${k}" class="${(S.voice && S.voice.mode || 'open') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
         ${opt('o-vvol', 'Volume delle voci', 0, 1.5, 0.05, S.voice ? S.voice.vol : 1, (v) => `${Math.round(v * 100)}%`)}
         ${opt('o-vrange', 'Si sentono fino a', 15, 150, 5, S.voice ? S.voice.range : 60, (v) => `${v} m`)}
         ${opt('o-vsens', 'Sensibilità del microfono', 0, 1, 0.05, S.voice ? S.voice.sens : 0.5, (v) => `${Math.round(v * 100)}%`)}
@@ -762,7 +771,7 @@
         ${opt('o-fov', 'Campo visivo', 60, 100, 1, S.fov, (v) => `${v}°`)}
         </div><h5>Comandi</h5><div class="ctrl2">${CONTROLS.map(([k, v]) => `<div class="kp"><kbd>${k}</kbd><span>${v}</span></div>`).join('')}</div>`;
       else if (tab === 'interfaccia') body = `<h5>A schermo</h5><div class="sgrid">
-        ${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
+        ${chk('o-coord', 'Mostra le coordinate', S.coords !== false, 'sotto la bussola: X e Z, da dare agli amici')}${chk('o-fps', 'Mostra FPS', S.showFps)}${chk('o-ping', 'Mostra ping (multigiocatore)', S.showPing !== false)}${chk('o-hints', 'Comandi a schermo', S.hints !== false, 'tasto H per nasconderli')}
         </div>`;
       else body = `<div class="sgrid">${worldSettingsHTML()}</div>`;
       h += `<div class="swin" role="dialog" aria-label="Impostazioni"><nav class="stabs"><h2>Impostazioni</h2>${TABS.map(([k, ic, n]) => `<button data-stab="${k}" class="${tab === k ? 'on' : ''}">${MICO[ic]}${n}</button>`).join('')}</nav>
@@ -782,12 +791,14 @@
       <div class="opt"><label for="o-wind">Vento<small>${client ? 'lo decide chi ospita' : '0 = mare calmo · 10 = tempesta'}</small></label><output id="o-wind-o">${windName(G.WIND.level)}</output><input type="range" id="o-wind" min="0" max="10" step="1" value="${G.WIND.level}" ${client ? 'disabled' : ''}></div>
       <div class="opt"><label>Modalità${client ? '<small>la decide chi ospita</small>' : ''}</label><div class="seg small">${['sopravvivenza', 'creativa'].map((m) => `<button data-setmode="${m}" class="${G.mode === m ? 'on' : ''}" ${client ? 'disabled' : ''}>${G.Worlds.MODE_N[m]}</button>`).join('')}</div></div>
       <div class="opt"><label>Nemici${client ? '<small>li decide chi ospita</small>' : ''}</label><div class="seg small">${[[1, 'Sì'], [0, 'No']].map(([v, l]) => `<button data-seten="${v}" class="${!G.enemiesOff === !!v ? 'on' : ''}" ${client ? 'disabled' : ''}>${l}</button>`).join('')}</div></div>
+      <div class="opt"><label>Chat vocale${client ? '<small>la decide chi ospita</small>' : '<small>in vicinanza: si sentono solo i giocatori vicini · ovunque: tutti, sempre allo stesso volume</small>'}</label><div class="seg small">${[[0, 'In vicinanza'], [1, 'Ovunque']].map(([v, l]) => `<button data-m="vg" data-v="${v}" class="${(G.voiceGlobal ? 1 : 0) === v ? 'on' : ''}" ${client ? 'disabled' : ''}>${l}</button>`).join('')}</div></div>
       ${G.worldId ? `<div class="opt"><label>Copia del mondo<small>file .deriva da aprire su un altro PC</small></label><button class="mini-btn" data-m="exportCur">Esporta</button></div>` : ''}`;
   }
   function playersHTML() {
     const N = G.Net, S = G.settings;
     const me = `<li><i style="background:${N.COLOR_CSS[N.slot % 4]}"></i>${esc(S.name || 'Tu')} <em>(tu${N.isHost ? ', ospiti' : ''})</em><span>${N.isHost ? '' : N.ping + ' ms'}</span></li>`;
-    const others = [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}<span>${r.ping ? r.ping + ' ms' : ''}</span></li>`).join('');
+    const canTp = G.Cmd && G.Cmd.allowed();
+    const others = [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}${r.op ? ' <em>operatore</em>' : ''}<span>${r.ping ? r.ping + ' ms' : ''}</span>${canTp ? `<button class="mini-btn" data-m="tpda" data-id="${r.id}">Vai da lui</button>` : ''}${N.isHost ? `<button class="mini-btn ${r.op ? 'on' : ''}" data-m="op" data-id="${r.id}">${r.op ? 'Togli operatore' : 'Rendi operatore'}</button>` : ''}</li>`).join('');
     const hi = UI.hostInfo;
     let ips = '';
     if (hi) {
@@ -907,7 +918,10 @@
     else if (m === 'askDel') { UI.delId = b.dataset.w; UI.showMenu('confirmDel'); }
     else if (m === 'delok') { G.Worlds.remove(UI.delId); UI.mpMsg = ''; UI.showMenu(G.Worlds.list().length ? 'worlds' : 'main'); }
     else if (m === 'worlds' || m === 'newWorld') { UI.mpMsg = ''; UI.showMenu(m); }
-    else if (m === 'resume') { UI.hideMenu(); G.requestLock(); }
+    else if (m === 'op') { const r = G.Net.remotes.get(b.dataset.id); if (r) { G.Net.setOp(r.id, !r.op); UI.toast(r.op ? `${r.name} ora è operatore` : `${r.name} non è più operatore`, 'good'); UI.showMenu('main'); } }
+    else if (m === 'tpda') { const r = G.Net.remotes.get(b.dataset.id); if (r) { UI.hideMenu(); UI.toast(G.Cmd.tpTo(r.name)); G._lockTry = 0; G.requestLock(); } }
+    else if (m === 'vg') { G.voiceGlobal = b.dataset.v === '1'; G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; UI.showMenu('settings'); }
+    else if (m === 'resume') { UI.hideMenu(); G._lockTry = 0; G.requestLock(); }
     else if (m === 'savequit') { G.save(); G.toTitle(); }
     else if (m === 'leave') { if (G.Net.isHost) G.save(); UI.hostInfo = null; G.Net.leave(); if (G.started) G.toTitle(); }
     else if (m === 'quit') { G.save(); window.deriva && window.deriva.quit(); }
@@ -943,7 +957,7 @@
     }
     const base = G.PRESETS[S.preset] || G.PRESETS.media;
     const map = { 'o-shadow': ['shadows', v ? (base.shadows || 1024) : 0], 'o-god': ['godrays', v], 'o-fx': ['fx', v], 'o-view': ['view', v], 'o-grass': ['grass', v], 'o-pixel': ['pixel', v], 'o-fov': ['fov', v], 'o-sens': ['sens', v], 'o-vol': ['volume', v],
-      'o-ao': ['ao', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
+      'o-ao': ['ao', v], 'o-coord': ['coords', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
     if (!map[t.id]) return;
     const [k, val] = map[t.id];
     if (['shadows', 'godrays', 'ao', 'view', 'pixel'].includes(k) && G.adaptReset) G.adaptReset();
@@ -962,7 +976,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT') return;
       const k = e.code;
-      if (UI.menu) { if (k === 'Escape' && UI.menu !== 'main') UI.showMenu('main'); else if (k === 'Escape' && G.started) { UI.hideMenu(); G.requestLock(); } return; }
+      if (UI.menu) { if (k === 'Escape' && UI.menu !== 'main') UI.showMenu('main'); else if (k === 'Escape' && G.started) { UI.hideMenu(); G._lockTry = 0; G.requestLock(); } return; }
       if (!G.started) return;
       if (UI.open) {
         if (k === 'Escape' || k === 'Tab' || k === 'KeyI' || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
@@ -992,14 +1006,15 @@
       else if (k === 'F4') { e.preventDefault(); UI.toggleMode(); }
       else if (k === 'KeyT' || k === 'Slash' || k === 'NumpadDivide') { e.preventDefault(); P_.keys = {}; G.Cmd.openConsole(k === 'KeyT' ? '' : '/'); }
       else if (k === 'KeyK') UI.openCustom('strumenti');
-      else if (k === 'KeyQ' && G.Voice) G.Voice.setPTT(true);
+      else if (k === 'KeyZ' && G.Voice) G.Voice.setPTT(true);
+      else if (k === 'KeyQ' && !e.repeat && G.Drops) G.Drops.throwHeld(e.ctrlKey || e.metaKey);
       else if (k === 'KeyR') G.Build.rotStep = (G.Build.rotStep + 1) % 4;
       else if (k === 'KeyV' && P_.boat) P_.cam3 = !P_.cam3;
       else if (k === 'KeyH') { G.settings.hints = G.settings.hints === false; G.store.set('deriva_settings', G.settings); }
       else if (k === 'F11' && window.deriva) { e.preventDefault(); G.settings.fullscreen = !G.settings.fullscreen; G.applySettings('fullscreen'); }
       else if (k === 'Escape') { if (P_.placing) UI.cancelPlace(); else if (UI.boatPlacing) { UI.boatPlacing = null; G.Boats.updateGhost(null); } }
     });
-    document.addEventListener('keyup', (e) => { P().keys[e.code] = false; if (e.code === 'KeyQ' && G.Voice) G.Voice.setPTT(false); });
+    document.addEventListener('keyup', (e) => { P().keys[e.code] = false; if (e.code === 'KeyZ' && G.Voice) G.Voice.setPTT(false); });
     window.addEventListener('blur', () => { P().keys = {}; P().mouse.l = false; });
     canvas.addEventListener('mousedown', (e) => {
       if (!G.started || UI.open || UI.menu) return;
@@ -1018,7 +1033,8 @@
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('mousemove', (e) => {
       if (G.locked && G.started && !UI.open) {
-        const s = 0.0022 * G.settings.sens;
+        // col cannocchiale: più ingrandisce, più la visuale si muove piano
+        const s = 0.0022 * G.settings.sens * (G.Combat && G.Combat.zoom > 0.05 ? 1 / (1 + G.Combat.zoom * (G.Combat.mag - 1)) : 1);
         P().yaw -= e.movementX * s; P().pitch = G.clamp(P().pitch - e.movementY * s, -1.5, 1.5);
       }
       if (UI.open) { const c = $('cursorItem'); c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; const tt = $('tooltip'); tt.style.left = e.clientX + 16 + 'px'; tt.style.top = e.clientY + 14 + 'px'; }
@@ -1030,6 +1046,8 @@
     pw.addEventListener('mousedown', (e) => {
       const cu = UI.custom[UI.open];
       if (cu) { if (e.target.closest('[data-act=close]') || e.target === pw) { UI.close(); return; } if (cu.click && cu.click(e)) return; return; }
+      // clic fuori dal pannello con un oggetto preso: lo butti a terra (in creativa lo cancelli)
+      if (UI.cursor && e.target === pw && UI.open === 'inv') { const st = UI.cursor; UI.cursor = null; if (!G.creative() && G.Drops) { const n = e.button === 2 ? 1 : st.n; if (n < st.n) UI.cursor = Object.assign({}, st, { n: st.n - n }); G.Drops.throwStack(Object.assign({}, st, { n })); } UI.renderPanel(); e.preventDefault(); return; }
       const s = e.target.closest('.slot[data-src]');
       if (s) { e.preventDefault(); slotClick(s.dataset.src, +s.dataset.i, e.button, e.shiftKey); UI.syncShared(); UI.renderPanel(); return; }
       const r = e.target.closest('[data-rec]'); if (r) { fillRecipe(+r.dataset.rec, e.shiftKey); UI.renderPanel(); return; }
@@ -1056,7 +1074,8 @@
       if (!st) { tt.hidden = true; return; }
       const d = G.ITEMS[st.id];
       const f = [d.food ? `+${d.food} fame` : '', d.water ? `+${d.water} sete` : '', G.COOK[st.id] ? 'si cuoce sul falò' : ''].filter(Boolean).join(' · ');
-      tt.innerHTML = `<div class="tn">${esc(d.n)}</div>${d.d ? `<div class="td">${esc(d.d)}</div>` : ''}${f ? `<div class="tf">${f}</div>` : ''}`;
+      const wi = G.weaponInfo(st.id);
+      tt.innerHTML = `<div class="tn">${esc(d.n)}</div>${d.d ? `<div class="td">${esc(d.d)}</div>` : ''}${wi ? `<div class="tw">⚔ ${wi.text}</div>` : ''}${f ? `<div class="tf">${f}</div>` : ''}`;
       tt.hidden = false;
     });
     $('bookWrap').addEventListener('click', (e) => {

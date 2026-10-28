@@ -13,7 +13,7 @@
     G.nC = G.makeNoise(seed + 202);
     G.nD = G.makeNoise(seed + 303);
     G.hCache = new Map();
-    VOLC.clear(); LAKES.clear();
+    VOLC.clear(); LAKES.clear(); CASTLES.clear();
   };
 
   function fbm(n, x, z, oct) {
@@ -78,9 +78,10 @@
   // banchisa: dove fa molto freddo il mare gela, con qualche canale d'acqua libera
   G.ICE_Y = 0.42;
   G.iceAt = function (x, z) {
-    const cold = G.coldAt(x, z); if (cold < 0.6) return false;
+    // meno ghiaccio: solo dove fa freddissimo, a lastre sparse con tanta acqua libera
+    const cold = G.coldAt(x, z); if (cold < 0.85) return false;
     const n = G.nA(x * 0.021 + 5, z * 0.021 - 3) * 0.5 + G.nC(x * 0.07, z * 0.07) * 0.18;
-    return n + (cold - 0.9) * 1.5 > 0.06;
+    return n + (cold - 0.97) * 1.2 > 0.2;
   };
 
   /* ---------- laghetti di montagna (con cascata dove trabocca) ---------- */
@@ -117,15 +118,45 @@
     const d = Math.hypot(x - L.x, z - L.z); return d < L.R * 1.6 ? { L, d } : null;
   };
   G.lakes = function (x, z, rad) { const out = []; for (let cz = Math.floor((z - rad) / LC); cz <= Math.floor((z + rad) / LC); cz++) for (let cx = Math.floor((x - rad) / LC); cx <= Math.floor((x + rad) / LC); cx++) { const L = lakeSite(cx, cz); if (L) out.push(L); } return out; };
+  /* ---------- castelli: solo in cima alle montagne alte, su un altopiano spianato ---------- */
+  const CC = 1536, CASTLES = new Map();
+  function castleSite(cx, cz) {
+    const k = cx + ',' + cz; if (CASTLES.has(k)) return CASTLES.get(k);
+    CASTLES.set(k, null);
+    const r = G.mulberry32(hashI(cx, cz, (G.seed | 0) + 4127));
+    let best = null;
+    if (r() < 0.85) for (let i = 0; i < 70; i++) {
+      const x = cx * CC + 220 + r() * (CC - 440), z = cz * CC + 220 + r() * (CC - 440);
+      if (Math.hypot(x, z) < 900) continue;
+      const cl = G.climate(x, z); if (cl.mt < 0.4) continue;
+      const h = baseHeight(x, z); if (h < 20) continue;
+      if (G.volcanoNear(x, z) || G.volcanoNear(x + 120, z) || G.volcanoNear(x - 120, z)) continue;
+      let sum = 0, n = 0, mn = 1e9; for (let a2 = -2; a2 <= 2; a2++) for (let c2 = -2; c2 <= 2; c2++) { const g = baseHeight(x + a2 * 25, z + c2 * 25); sum += g; n++; mn = Math.min(mn, g); }
+      if (mn < -4 || sum / n < 9) continue;
+      const score = h - (h - sum / n) * 0.6 + r() * 2;
+      if (!best || score > best.score) best = { x, z, h, mean: sum / n, score };
+    }
+    let C = null;
+    if (best) {
+      const lk = lakeSite(Math.floor(best.x / LC), Math.floor(best.z / LC));
+      if (!lk || Math.hypot(lk.x - best.x, lk.z - best.z) > 260) C = { id: 'c:' + k, x: best.x, z: best.z, level: Math.round((best.mean * 0.55 + best.h * 0.45) * 10) / 10, R: 84, R2: 150, rotR: r() };
+    }
+    CASTLES.set(k, C); return C;
+  }
+  G.castleNear = function (x, z) {
+    const C = castleSite(Math.floor(x / CC), Math.floor(z / CC)); if (!C) return null;
+    const d = Math.hypot(x - C.x, z - C.z); return d < C.R2 ? { C, d } : null;
+  };
+  G.castleSites = function (x0, z0, size) { const out = []; for (let cz = Math.floor(z0 / CC); cz <= Math.floor((z0 + size) / CC); cz++) for (let cx = Math.floor(x0 / CC); cx <= Math.floor((x0 + size) / CC); cx++) { const C = castleSite(cx, cz); if (C && C.x >= x0 && C.x < x0 + size && C.z >= z0 && C.z < z0 + size) out.push(C); } return out; };
   // livello dell'acqua dolce nel punto (null se fuori dai laghi)
   G.lakeLevelAt = function (x, z) { const n = G.lakeNear(x, z); if (!n || n.d > n.L.R * 1.12) return null; return n.L.level; };
   const _cl = { t: 0, w: 0, mt: 0 };
   G.climate = function (x, z, out) {
     out = out || _cl;
     const r = Math.sqrt(x * x + z * z), home = 1 - G.smooth(110, 220, r);
-    out.t = (G.nB(x * 0.0024 + 300, z * 0.0024 - 200) * 0.85 + G.nA(x * 0.009 - 40, z * 0.009 + 70) * 0.15) * (1 - home * 0.85);
-    out.w = G.nD(x * 0.0027 - 500, z * 0.0027 + 800) * 0.85 + G.nC(x * 0.01 + 33, z * 0.01 - 12) * 0.15;
-    out.mt = G.smooth(0.3, 0.56, G.nC(x * 0.0017 + 900, z * 0.0017 - 400)) * (1 - home);
+    out.t = (G.nB(x * 0.0012 + 300, z * 0.0012 - 200) * 0.85 + G.nA(x * 0.0048 - 40, z * 0.0048 + 70) * 0.15) * (1 - home * 0.85);
+    out.w = G.nD(x * 0.00135 - 500, z * 0.00135 + 800) * 0.85 + G.nC(x * 0.0052 + 33, z * 0.0052 - 12) * 0.15; // biomi grandi
+    out.mt = G.smooth(0.3, 0.56, G.nC(x * 0.0011 + 900, z * 0.0011 - 400)) * (1 - home);
     return out;
   };
   // pesi continui (per i colori del terreno): deserto, rigoglioso, prateria secca, montagna
@@ -147,6 +178,9 @@
   };
   G.heightAt = function (x, z) {
     let h = baseHeight(x, z);
+    // altopiano del castello: la cima viene spianata, i fianchi raccordati dolcemente
+    const cn = G.castleNear(x, z);
+    if (cn) { const k = 1 - G.smooth(cn.C.R, cn.C.R2, cn.d); h = G.lerp(h, cn.C.level, k * k * (3 - 2 * k)); }
     // laghetti: conca sotto il livello dell'acqua
     const ln = G.lakeNear(x, z);
     if (ln) {

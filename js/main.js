@@ -184,7 +184,7 @@
   G.creative = () => G.mode === 'creativa';
   G.serializeAll = () => ({
     v: 3, name: G.worldName, mode: G.mode, seed: G.seed, time: G.time, player: G.Player.serialize(), builds: G.Build.serialize(), boats: G.Boats.serialize(),
-    removed: [...G.state.removed], killed: [...(G.state.killed || [])], wind: G.Boats.wind.dir, lv: G.WIND.level, chests: G.state.chests, enemies: !G.enemiesOff,
+    removed: [...G.state.removed], killed: [...(G.state.killed || [])], wind: G.Boats.wind.dir, lv: G.WIND.level, chests: G.state.chests, enemies: !G.enemiesOff, ops: G.state.ops || [], vg: G.voiceGlobal ? 1 : 0,
     weather: G.Climate ? G.Climate.serialize() : null, digs: G.Dig ? G.Dig.serialize() : [], pets: G.Pets ? G.Pets.serialize() : [],
   });
   G.save = function () {
@@ -224,24 +224,28 @@
   G.requestLock = function () {
     if (!G.started || G.UI.open || G.UI.menu) return;
     if (G.isTouch) { G.locked = true; $('resume').hidden = true; return; } // sul telefono non c'è il puntatore da bloccare
+    // niente schermata "clicca per riprendere": se il browser rifiuta subito il blocco del
+    // puntatore (succede per un attimo dopo Esc), si riprova da soli; il primo clic lo blocca comunque
+    const tries = (G._lockTry = (G._lockTry || 0) + 1);
+    const retry = () => { if (!G.locked && tries < 10 && G.started && !G.UI.open && !G.UI.menu) setTimeout(() => G.requestLock(), 250); };
     try {
       const r = canvas.requestPointerLock && canvas.requestPointerLock();
-      if (r && r.catch) r.catch(() => { $('resume').hidden = false; });
-    } catch (e) { $('resume').hidden = false; }
+      if (r && r.catch) r.catch(() => {});
+    } catch (e) { retry(); }
   };
   document.addEventListener('pointerlockchange', () => {
     G.locked = document.pointerLockElement === canvas;
-    if (G.locked) $('resume').hidden = true;
+    if (G.locked) { $('resume').hidden = true; G._lockTry = 0; }
     else if (G.started && !G.UI.open && !G.UI.menu) { G.UI.showMenu('main'); G.save(); }
   });
-  document.addEventListener('pointerlockerror', () => { $('resume').hidden = false; });
+  document.addEventListener('pointerlockerror', () => { if (G._lockTry && G._lockTry < 10 && G.started && !G.UI.open && !G.UI.menu) setTimeout(() => G.requestLock(), 250); });
 
   /* ---------------- MONDO ---------------- */
   function resetWorld(seed) {
     for (const ch of [...G.World.chunks.values()]) G.World.unload(ch);
     G.World.rebuild();
     G.initWorldGen(seed);
-    G.state = { removed: new Set(), chests: {} };
+    G.state = { removed: new Set(), chests: {}, ops: [] }; G.voiceGlobal = false; if (G.Drops) G.Drops.clear(); if (G.Sea) G.Sea.clear();
     if (G.POI) G.POI.reset();
     if (G.Structures && G.Structures.group) G.Structures.clear();
     if (G.MapUI) G.MapUI.reset();
@@ -279,7 +283,7 @@
     if (save) {
       G.state.removed = new Set(save.removed || []);
       G.state.killed = new Set(save.killed || []);
-      G.state.chests = save.chests || {};
+      G.state.chests = save.chests || {}; G.state.ops = save.ops || []; G.voiceGlobal = !!save.vg;
       G.time = save.time; G.Boats.wind.dir = save.wind || 0.6;
       if (G.Climate) G.Climate.load(save.weather);
       if (G.Dig) G.Dig.load(save.digs);
@@ -321,10 +325,10 @@
     G.Player.vel.set(0, 0, 0);
   };
   // istantanea del mondo per il server multigiocatore
-  G.netSnapshot = () => ({ seed: G.seed, time: G.time, weather: G.Climate ? G.Climate.serialize() : null, digs: G.Dig ? G.Dig.serialize() : [], pets: G.Pets ? G.Pets.serialize() : [], wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, enemies: !G.enemiesOff, chests: G.state.chests, removed: [...G.state.removed], killed: [...(G.state.killed || [])], builds: G.Build.serialize(), boats: G.Boats.serialize() });
+  G.netSnapshot = () => ({ seed: G.seed, time: G.time, weather: G.Climate ? G.Climate.serialize() : null, digs: G.Dig ? G.Dig.serialize() : [], pets: G.Pets ? G.Pets.serialize() : [], wind: G.Boats.wind.dir, lv: G.WIND.level, mode: G.mode, enemies: !G.enemiesOff, vg: G.voiceGlobal ? 1 : 0, chests: G.state.chests, removed: [...G.state.removed], killed: [...(G.state.killed || [])], builds: G.Build.serialize(), boats: G.Boats.serialize() });
   // ingresso in una partita altrui
   G.startFromSnapshot = function (snap, you) {
-    G.enemiesOff = snap.enemies === false;
+    G.enemiesOff = snap.enemies === false; G.voiceGlobal = !!snap.vg;
     resetWorld(snap.seed);
     G.state.removed = new Set(snap.removed || []);
     G.state.killed = new Set(snap.killed || []);
@@ -367,6 +371,7 @@
     $('loadText').textContent = 'Carico le texture fotografiche…';
     G.PHOTO = await G.TEX.loadPhotos('assets/');
     try { G.SCAN = await G.TEX.loadScans('assets/models/'); } catch (e) { G.SCAN = null; console.warn('modelli scansionati non disponibili', e); }
+    try { if (G.AnimLib) await G.AnimLib.load('assets/models/animali/'); } catch (e) { console.warn('animali animati non disponibili', e); }
     $('loadText').textContent = 'Faccio crescere le foreste…';
     await new Promise((r) => setTimeout(r, 0));
     G.createMaterials(G.TEX, S);
@@ -473,6 +478,8 @@
       G.MapUI.track(dt);
       if ((G._rareT = (G._rareT || 0) - dt) <= 0) { G._rareT = 1; G.Combat.noteRares(); }
       G.Build.update(dt, P, t);
+      if (G.Drops) G.Drops.update(dt, P);
+      if (G.Sea) G.Sea.update(dt);
       if (G.Features) G.Features.update(dt, P, t);
       if (G.Dig) G.Dig.update();
       G.FX.update(dt, P, t);
@@ -528,7 +535,7 @@
     wu.uNear.value = camera.near; wu.uFar.value = camera.far; wu.uCam.value.copy(camera.position);
     wu.uSunDir.value.copy(S.sun); wu.uSunCol.value.copy(S.sunCol); wu.uZen.value.copy(S.zen); wu.uHor.value.copy(S.hor); wu.uAmb.value.copy(S.amb);
     wu.uFogDen.value = fogDen * 0.85 * (1 - spyK * 0.45); wu.uUnder.value = P.under ? 1 : 0;
-    wu.uWaveAmp.value = G.waveAmp; wu.uWindLv.value = (G.Climate ? G.Climate.windLevel() : G.WIND.level) / 10;
+    wu.uWaveAmp.value = G.waveAmp; wu.uWaveRot.value.set(G.waveRot[0], G.waveRot[1]); wu.uWindLv.value = (G.Climate ? G.Climate.windLevel() : G.WIND.level) / 10;
     if (G.Climate) G.Climate.vortexUniforms(wu.uVort.value);
     // riflessi in spazio schermo solo su Alta/Ultra (e non quando la grafica adattiva ha tolto gli effetti)
     wu.uSSR.value = G.hiQ() && G.settings.godrays !== false ? 1 : 0;

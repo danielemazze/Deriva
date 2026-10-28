@@ -380,6 +380,16 @@
     }
     return null;
   };
+  // scala a pioli vicina (senza dover guardare dritto la scala)
+  B.ladderAt = function (p, rad, height) {
+    for (const b of B.boxes) {
+      if (!b.ladder) continue;
+      if (p.y > b.y1 + 0.1 || p.y + height < b.y0) continue;
+      const cx = G.clamp(p.x, b.x0, b.x1), cz = G.clamp(p.z, b.z0, b.z1);
+      if (Math.hypot(cx - p.x, cz - p.z) <= rad + 0.35) return b;
+    }
+    return null;
+  };
   // carro di fieno: chi ci cade dentro non si fa male
   B.inHay = function (x, y, z) { for (const b of B.boxes) if (b.hay && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && y < b.y1 + 0.6) return true; return false; };
   function rayBox(o, d, b) {

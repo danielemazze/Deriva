@@ -162,8 +162,10 @@
     const wave = Math.pow(Math.max(0, Math.sin(t * 0.85) * 0.5 + 0.5), 1.6) * (0.75 + 0.25 * Math.sin(t * 0.23));
     A.sea.g.gain.setTargetAtTime((0.022 + shore * 0.085 + env.boat * 0.03) * (0.3 + 0.7 * wave), n, 0.35);
     A.sea.f.frequency.setTargetAtTime(240 + wave * 420, n, 0.35);
-    A.wind.g.gain.setTargetAtTime((0.006 + wind * 0.012 + Math.min(0.02, Math.max(0, P.pos.y - 8) * 0.0012) + (S.bi === G.BIOME.NEVE ? 0.01 : 0)) * (0.6 + 0.4 * Math.sin(t * 0.21) * Math.sin(t * 0.53)), n, 0.8);
-    A.wind.f.frequency.setTargetAtTime(600 + Math.sin(t * 0.3) * 250, n, 0.5);
+    // col vento forte l'ululato cresce davvero (raffiche più lunghe e più acute)
+    const wl = Math.max(0, Math.min(1, (wind - 0.08) / 1.9)), gust = 0.6 + 0.4 * Math.sin(t * (0.21 + wl * 0.3)) * Math.sin(t * (0.53 + wl * 0.4));
+    A.wind.g.gain.setTargetAtTime((0.005 + wl * 0.01 + wl * wl * 0.055 + Math.min(0.02, Math.max(0, P.pos.y - 8) * 0.0012) + (S.bi === G.BIOME.NEVE ? 0.01 : 0)) * gust, n, 0.8);
+    A.wind.f.frequency.setTargetAtTime(520 + wl * 650 + Math.sin(t * 0.3) * (250 + wl * 300), n, 0.5);
     A.leaves.g.gain.setTargetAtTime(S.forest * (0.0018 + wind * 0.003) * (0.35 + 0.65 * Math.max(0, Math.sin(t * 0.9) * Math.sin(t * 0.37 + 2) * 0.5 + 0.5)), n, 0.8); // fruscio a raffiche
     const hot = G.Climate && G.Climate.airTemp ? G.clamp((G.Climate.airTemp(P.pos.x, P.pos.z) - 24) / 8, 0, 1) : 0;
     const cic = G.sky.day > 0.6 ? hot * (S.forest || S.bi === G.BIOME.DESERTO || S.bi === G.BIOME.PIANURA ? 1 : 0.3) : 0;
@@ -231,13 +233,37 @@
 
   /* ---------------- effetti ---------------- */
   const U = () => A.bus.ui;
-  A.hit = (k) => { if (k === 'wood') { noise(0.12, 'bandpass', 900, 3, 0.5); tone('triangle', 220, 120, 0.1, 0.25); } else if (k === 'stone') { noise(0.08, 'highpass', 2200, 1, 0.45); tone('square', 1400, 900, 0.05, 0.06); } else if (k === 'leaf') noise(0.22, 'highpass', 3000, 0.5, 0.25); else { noise(0.12, 'lowpass', 600, 1, 0.4); tone('sine', 140, 60, 0.12, 0.25); } };
-  A.thud = () => { noise(0.5, 'lowpass', 220, 1, 0.9); tone('sine', 90, 40, 0.45, 0.5); };
-  A.creak = () => { tone('sawtooth', 140 + Math.random() * 40, 105, 0.7, 0.035); tone('sawtooth', 210, 170, 0.4, 0.015, 0.25); };
-  A.place = () => { tone('triangle', 180, 90, 0.12, 0.3); noise(0.08, 'lowpass', 900, 1, 0.3); };
-  A.door = () => { tone('sawtooth', 300, 180, 0.35, 0.05); noise(0.1, 'lowpass', 500, 1, 0.3, 0.3); };
-  A.eat = () => { for (let i = 0; i < 3; i++) noise(0.06, 'bandpass', 1800, 2, 0.3, i * 0.13); };
-  A.splash = () => { noise(0.45, 'lowpass', 1600, 0.6, 0.5); noise(0.25, 'highpass', 4000, 0.5, 0.15, 0.05); };
+  // risonanza "modale": il corpo colpito vibra su poche frequenze non armoniche che si spengono
+  //  (legno: basse e brevi; pietra: medie e secche; metallo: alte e lunghe). Ogni colpo varia un po'.
+  const MODES = {
+    wood: { f: [1, 2.32, 3.9, 5.6], d: [0.16, 0.09, 0.06, 0.04], g: [1, 0.5, 0.3, 0.15], base: [170, 260], n: ['bandpass', 1100, 1.6, 0.05] },
+    stone: { f: [1, 1.73, 2.61, 3.48], d: [0.05, 0.04, 0.03, 0.02], g: [1, 0.6, 0.4, 0.3], base: [900, 1500], n: ['highpass', 2600, 0.8, 0.04] },
+    metal: { f: [1, 2.76, 5.4, 8.93], d: [0.9, 0.6, 0.4, 0.25], g: [1, 0.55, 0.35, 0.2], base: [520, 900], n: ['highpass', 4200, 0.7, 0.02] },
+    flesh: { f: [1, 1.5], d: [0.08, 0.05], g: [1, 0.4], base: [90, 140], n: ['lowpass', 700, 0.9, 0.12] },
+  };
+  function modal(kind, peak, delay, dest, pitch) {
+    if (!A.ctx) return; const M = MODES[kind], b0 = rnd(M.base[0], M.base[1]) * (pitch || 1);
+    for (let i = 0; i < M.f.length; i++) { const f = b0 * M.f[i] * rnd(0.97, 1.03); tone('sine', f, f * 0.985, M.d[i] * rnd(0.8, 1.2), peak * M.g[i] * 0.35, delay, dest); }
+    const [t, fq, q, dur] = M.n; noise(dur * rnd(0.8, 1.3), t, fq * rnd(0.85, 1.15), q, peak * 0.8, delay, dest, A.white);
+  }
+  A.modal = modal;
+  A.hit = (k) => {
+    if (k === 'wood') { modal('wood', 0.55); noise(0.05, 'lowpass', 500, 1, 0.35); }
+    else if (k === 'stone') { modal('stone', 0.4); for (let i = 0; i < 3; i++) noise(0.02, 'bandpass', rnd(2500, 5000), 2, 0.12, 0.03 + i * rnd(0.02, 0.05), undefined, A.white); }
+    else if (k === 'metal') modal('metal', 0.3);
+    else if (k === 'leaf') { noise(0.25, 'highpass', rnd(2600, 3600), 0.5, 0.22, 0, undefined, A.white); noise(0.18, 'bandpass', 1400, 0.8, 0.1, 0.04); }
+    else { modal('flesh', 0.5); }
+  };
+  A.thud = () => { noise(0.5, 'lowpass', 220, 1, 0.9); tone('sine', 90, 40, 0.45, 0.5); modal('wood', 0.25, 0.01, undefined, 0.6); for (let i = 0; i < 4; i++) noise(0.05, 'bandpass', rnd(600, 1400), 1.5, 0.12, 0.12 + i * rnd(0.05, 0.12)); };
+  A.creak = () => { const f = rnd(120, 180); tone('sawtooth', f, f * 0.75, rnd(0.5, 0.8), 0.03); tone('sawtooth', f * 1.5, f * 1.2, 0.4, 0.012, rnd(0.15, 0.3)); };
+  A.place = () => { modal('wood', 0.4, 0, undefined, 0.8); noise(0.06, 'lowpass', 700, 1, 0.3); noise(0.12, 'bandpass', 1600, 0.6, 0.06, 0.04, undefined, A.white); };
+  A.door = () => { const f = rnd(260, 340); tone('sawtooth', f, f * 0.6, 0.45, 0.035); tone('sawtooth', f * 1.33, f * 0.9, 0.3, 0.012, 0.08); modal('wood', 0.35, 0.42, undefined, 0.7); };
+  A.eat = () => { for (let i = 0; i < 4; i++) { const t = i * rnd(0.11, 0.16); noise(0.05, 'bandpass', rnd(1400, 2600), 1.6, 0.28, t, undefined, A.white); noise(0.07, 'lowpass', 500, 1, 0.12, t + 0.01); } tone('sine', 300, 180, 0.12, 0.04, 0.6); };
+  A.splash = () => {
+    noise(0.5, 'lowpass', rnd(1300, 1900), 0.6, 0.5); noise(0.3, 'highpass', 4000, 0.5, 0.15, 0.05, undefined, A.white); tone('sine', 220, 70, 0.25, 0.12);
+    // bollicine e gocce che ricadono
+    for (let i = 0; i < 6; i++) { const f = rnd(700, 1800), d = 0.12 + i * rnd(0.04, 0.09); tone('sine', f, f * 1.8, 0.04, 0.03, d); }
+  };
   // passi: il terreno sotto i piedi cambia il suono
   A.surface = function (P) {
     const x = P.pos.x, z = P.pos.z, th = G.World.groundAt(x, z), bh = G.Build.groundAt(x, z, P.pos.y, 0.05);
@@ -252,26 +278,31 @@
     if (th > 26 || (G.normalAt && G.normalAt(x, z)[1] < 0.78)) return 'stone';
     return 'grass';
   };
+  // passi: tallone e punta, granuli per neve, ghiaia e sabbia
   A.step = (k) => {
-    const v = 1 + (Math.random() - 0.5) * 0.3;
-    if (k === 'water') noise(0.18, 'lowpass', 1200, 0.6, 0.18 * v);
-    else if (k === 'sand') noise(0.1, 'highpass', 1800, 0.4, 0.07 * v);
-    else if (k === 'wood') { noise(0.06, 'bandpass', 700, 2, 0.12 * v); tone('triangle', 160, 110, 0.06, 0.05 * v); }
-    else if (k === 'stone') { noise(0.05, 'bandpass', 2400, 1.4, 0.09 * v); noise(0.04, 'highpass', 4500, 0.7, 0.03 * v, 0.02); }
-    else if (k === 'snow') { noise(0.16, 'bandpass', 900, 0.9, 0.1 * v); noise(0.1, 'highpass', 3500, 0.5, 0.025 * v, 0.04); }
-    else if (k === 'ice') { noise(0.04, 'highpass', 3000, 0.8, 0.06 * v); tone('sine', 2200, 1800, 0.05, 0.012 * v); }
-    else if (k === 'gravel') { for (let i = 0; i < 3; i++) noise(0.03, 'bandpass', 2000 + Math.random() * 1500, 1.5, 0.05 * v, i * 0.025); }
-    else noise(0.09, 'bandpass', 1300, 0.8, 0.08 * v);
+    const v = 1 + (Math.random() - 0.5) * 0.35, W = A.white;
+    if (k === 'water') { noise(0.2, 'lowpass', rnd(900, 1400), 0.6, 0.18 * v); noise(0.12, 'highpass', 3000, 0.5, 0.03 * v, 0.05, undefined, W); }
+    else if (k === 'sand') { noise(0.1, 'highpass', rnd(1500, 2100), 0.4, 0.06 * v, 0, undefined, W); noise(0.08, 'lowpass', 600, 0.7, 0.05 * v, 0.03); }
+    else if (k === 'wood') { modal('wood', 0.13 * v, 0, undefined, 0.75); noise(0.05, 'lowpass', 400, 1, 0.08 * v, 0.06); if (Math.random() < 0.12) A.creak(); }
+    else if (k === 'stone') { noise(0.04, 'bandpass', rnd(2000, 2800), 1.4, 0.08 * v); noise(0.05, 'lowpass', 350, 1, 0.08 * v); noise(0.03, 'highpass', 4500, 0.7, 0.025 * v, 0.05, undefined, W); }
+    else if (k === 'snow') { for (let i = 0; i < 4; i++) noise(0.05, 'bandpass', rnd(700, 1400), 1, 0.05 * v, i * 0.035); noise(0.1, 'lowpass', 400, 0.7, 0.05 * v); }
+    else if (k === 'ice') { noise(0.035, 'highpass', 3000, 0.8, 0.06 * v, 0, undefined, W); tone('sine', rnd(1900, 2500), 1700, 0.06, 0.012 * v); }
+    else if (k === 'gravel') { for (let i = 0; i < 5; i++) noise(0.025, 'bandpass', rnd(1600, 3800), 1.5, 0.045 * v, i * rnd(0.015, 0.03), undefined, W); noise(0.06, 'lowpass', 400, 1, 0.05 * v); }
+    else { noise(0.08, 'lowpass', 500, 0.8, 0.07 * v); noise(0.1, 'bandpass', rnd(1100, 1600), 0.8, 0.05 * v, 0.03); noise(0.09, 'highpass', 3200, 0.5, 0.015 * v, 0.05, undefined, W); }
   };
-  A.pickup = () => { tone('sine', 660, 990, 0.08, 0.08, 0, U()); };
-  A.craft = () => { tone('triangle', 330, 330, 0.08, 0.2, 0, U()); tone('triangle', 495, 495, 0.1, 0.18, 0.08, U()); };
+  A.pickup = () => { const f = rnd(560, 700); tone('sine', f, f * 1.5, 0.07, 0.08, 0, U()); tone('triangle', f * 2, f * 2.4, 0.05, 0.025, 0.03, U()); };
+  A.craft = () => { modal('wood', 0.3, 0, undefined, 1.2); modal('wood', 0.25, 0.14, undefined, 1.4); tone('triangle', 523, 523, 0.12, 0.08, 0.22, U()); tone('triangle', 784, 784, 0.18, 0.07, 0.3, U()); };
   A.click = () => tone('sine', 900, 700, 0.04, 0.05, 0, U());
   A.coins = () => { for (let i = 0; i < 5; i++) tone('triangle', 1800 + Math.random() * 900, 1500, 0.08, 0.05, i * 0.06, U()); };
-  A.bow = () => { tone('triangle', 260, 520, 0.08, 0.15); noise(0.12, 'highpass', 2600, 0.6, 0.12, 0.02); };
+  A.bow = () => { const f = rnd(180, 230); tone('triangle', f, f * 0.98, 0.35, 0.14); tone('sine', f * 2.01, f * 2, 0.25, 0.05); noise(0.04, 'bandpass', 900, 2, 0.2); noise(0.35, 'bandpass', 2400, 0.8, 0.05, 0.03, undefined, A.white); };
   A.draw = () => { tone('sawtooth', 120, 180, 0.4, 0.015); };
-  A.gun = () => { noise(0.55, 'lowpass', 900, 0.7, 1.0); noise(0.12, 'highpass', 2500, 0.6, 0.6); tone('sine', 120, 40, 0.4, 0.6); };
-  A.dig = () => { noise(0.18, 'lowpass', 700, 0.8, 0.45); noise(0.08, 'highpass', 2000, 0.5, 0.15, 0.08); };
-  A.chest = () => { tone('sawtooth', 160, 120, 0.4, 0.04); noise(0.15, 'lowpass', 700, 1, 0.3, 0.25); };
+  A.gun = () => { noise(0.6, 'lowpass', 900, 0.7, 1.0); noise(0.1, 'highpass', 2500, 0.6, 0.6, 0, undefined, A.white); tone('sine', 120, 40, 0.4, 0.6); noise(1.6, 'lowpass', 300, 0.5, 0.18, 0.08); modal('metal', 0.05, 0.6, undefined, 1.6); };
+  A.dig = () => { noise(0.18, 'lowpass', rnd(550, 800), 0.8, 0.45); for (let i = 0; i < 4; i++) noise(0.03, 'bandpass', rnd(1500, 3000), 1.5, 0.08, 0.06 + i * rnd(0.03, 0.07), undefined, A.white); noise(0.25, 'lowpass', 300, 0.7, 0.12, 0.12); };
+  A.chest = () => { modal('metal', 0.12, 0, undefined, 1.3); const f = rnd(140, 180); tone('sawtooth', f, f * 0.7, 0.5, 0.03, 0.06); modal('wood', 0.35, 0.5, undefined, 0.65); };
+  // cannonata: boato basso, attenuato con la distanza
+  A.cannon = (d) => { const k = Math.max(0.12, Math.min(1, 30 / Math.max(10, d || 10))); noise(1.4, 'lowpass', 420 * (0.6 + k * 0.4), 0.8, 1.1 * k); noise(0.25, 'bandpass', 1600, 0.8, 0.5 * k); tone('sine', 70, 28, 1.1, 0.9 * k); noise(2.2, 'lowpass', 260, 0.5, 0.25 * k, 0.15); };
+  // il ruggito del Kraken: gorgoglio profondo che sale
+  A.roar = () => { tone('sawtooth', 55, 38, 2.6, 0.35); tone('sawtooth', 82, 50, 2.4, 0.22, 0.1); noise(2.8, 'lowpass', 380, 3, 0.5); noise(2.2, 'bandpass', 160, 6, 0.4, 0.3); };
   A.bell = () => { for (const [f, d] of [[660, 0], [880, 0.02], [1320, 0.04]]) tone('sine', f, f * 0.995, 2.2, 0.06, d); };
 
   /* ---------------- stanze, grotte, fuoco, acqua ---------------- */

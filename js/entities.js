@@ -30,6 +30,8 @@
   E.SPECIES = SPECIES;
 
   function buildAnimal(sp) {
+    // modelli veri (animati) quando ci sono
+    if (G.AnimLib && G.AnimLib.has(sp)) { const k = G.AnimLib.make(sp); return { root: k.root, body: k.inner, legs: [], head: new THREE.Group(), woolMesh: null, rig: k }; }
     const MAT = G.MAT, root = new THREE.Group(), body = new THREE.Group(); root.add(body);
     const legs = [];
     const mkLeg = (geo, x, y, z, mat) => { const piv = new THREE.Group(); piv.position.set(x, y, z); const m = new THREE.Mesh(geo, mat || MAT.anim); m.castShadow = true; piv.add(m); body.add(piv); legs.push(piv); };
@@ -210,6 +212,20 @@
       return;
     }
     if (st.scale !== a.scale) { a.scale = st.scale; a.root.scale.setScalar(st.scale); }
+    if (a.rig) {
+      // animazioni vere: fermo, passo, corsa
+      const rg = a.rig, sp = st.speed;
+      rg.act(sp < 0.12 ? 'Idle' : sp > 2.2 && rg.acts.Run ? 'Run' : sp > 0.9 || !rg.acts.WalkSlow ? 'Walk' : 'WalkSlow');
+      const cur = sp < 0.12 ? 1 : sp > 2.2 ? sp / 3.2 : sp / (sp > 0.9 ? 1.3 : 0.8);
+      rg.mixer.timeScale = G.clamp(cur, 0.5, 1.8);
+      if (dP < 90) rg.mixer.update(dt);
+      a.pos.set(st.x, gh + (st.hurt > 0 ? Math.sin(st.hurt * 40) * 0.02 : 0), st.z);
+      a.root.rotation.y = st.yaw;
+      const n = G.normalAt(st.x, st.z);
+      rg.inner.rotation.x = G.lerp(rg.inner.rotation.x, -Math.atan2(n[2] * Math.cos(st.yaw) + n[0] * Math.sin(st.yaw), n[1]) * 0.8, 0.1);
+      if (dP < 40 && Math.random() < dt * 0.05 && G.Audio) G.Audio.animal(a.sp, dP, a.pos);
+      return;
+    }
     a.phase += st.speed * dt * (def.hop ? 9 : 7) / Math.max(a.scale, 0.5);
     const bob = def.hop ? Math.abs(Math.sin(a.phase)) * 0.12 * Math.min(st.speed, 1) : 0;
     a.pos.set(st.x, gh + bob + (st.hurt > 0 ? Math.sin(st.hurt * 40) * 0.02 : 0), st.z);
@@ -270,7 +286,7 @@
     if (a.remote) { a.st.hurt = 0.35; G.Net.send({ t: 'ahit', id: a.id, dmg }); return; }
     const r = G.animalHit(a.st, dmg, p.x, p.z, 'local');
     if (r.dead) {
-      for (const [id, n] of r.drops) G.Player.give(id, n);
+      G.Player._popPos = { x: a.pos.x, y: a.pos.y + 0.3, z: a.pos.z }; for (const [id, n] of r.drops) G.Player.give(id, n); G.Player._popPos = null;
       E.killFx(a); E.removeAnimal(a);
       (G.state.killed = G.state.killed || new Set()).add(a.id);
       E.onKill(a.sp);

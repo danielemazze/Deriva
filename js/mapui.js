@@ -123,7 +123,18 @@
     // barche
     for (const b of G.Boats.list) { const [sx, sy] = toS(b.x, b.z); x.save(); x.translate(sx, sy); x.rotate(-b.yaw + Math.PI); x.fillStyle = '#c99558'; x.strokeStyle = '#2a170a'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(0, -7); x.lineTo(4, 5); x.lineTo(-4, 5); x.closePath(); x.fill(); x.stroke(); x.restore(); }
     // altri giocatori
-    if (G.Net && G.Net.on) for (const r of G.Net.remotes.values()) { const [sx, sy] = toS(r.pos.x, r.pos.z); x.fillStyle = G.Net.COLOR_CSS[r.slot % 4]; x.beginPath(); x.arc(sx, sy, 5, 0, 7); x.fill(); x.font = '600 11px Signika'; x.fillStyle = '#fff'; x.fillText(r.name, sx, sy - 11); }
+    if (G.Net && G.Net.on) for (const r of G.Net.remotes.values()) {
+      // amici ben visibili: alone pulsante, freccia della direzione, nome e distanza su un'etichetta
+      const [sx, sy] = toS(r.pos.x, r.pos.z), col = G.Net.COLOR_CSS[r.slot % 4], me = G.Player.pos, d = Math.hypot(r.pos.x - me.x, r.pos.z - me.z);
+      const pulse = 14 + Math.sin(performance.now() / 260) * 4;
+      x.globalAlpha = 0.35; x.fillStyle = col; x.beginPath(); x.arc(sx, sy, pulse, 0, 7); x.fill(); x.globalAlpha = 1;
+      x.save(); x.translate(sx, sy); x.rotate(-(r.yaw || 0)); x.fillStyle = col; x.strokeStyle = '#fff'; x.lineWidth = 2.5;
+      x.beginPath(); x.moveTo(0, -13); x.lineTo(9, 9); x.lineTo(0, 4); x.lineTo(-9, 9); x.closePath(); x.fill(); x.stroke(); x.restore();
+      const lab = `${r.name} · ${d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km'}`;
+      x.font = '700 13px Signika'; const tw = x.measureText(lab).width;
+      x.fillStyle = 'rgba(6,18,23,.85)'; x.fillRect(sx - tw / 2 - 7, sy - 40, tw + 14, 20); x.fillStyle = col; x.fillRect(sx - tw / 2 - 7, sy - 40, 4, 20);
+      x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText(lab, sx, sy - 25);
+    }
     // punto di rinascita
     if (P().spawn) { const [sx, sy] = toS(P().spawn.x, P().spawn.z); x.font = '15px serif'; x.fillStyle = '#c9f0ff'; x.fillText('⛺', sx, sy); }
     // tu
