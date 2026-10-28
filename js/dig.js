@@ -20,7 +20,7 @@
       const k = ck(ix, iz); let l = D.cells.get(k); if (!l) D.cells.set(k, (l = [])); l.push(i); D.dirty.add(k);
     }
   }
-  D.reset = function () { for (const m of D.meshes.values()) { G.scene.remove(m); m.geometry.dispose(); } D.list = []; D.cells.clear(); D.meshes.clear(); D.dirty.clear(); D.uniformDirty = true; if (D.genKeys) D.genKeys.clear(); D.extraVeins = []; };
+  D.reset = function () { for (const m of D.meshes.values()) { G.scene.remove(m); m.geometry.dispose(); } D.list = []; D.cells.clear(); D.meshes.clear(); D.dirty.clear(); D.uniformDirty = true; if (D.genKeys) D.genKeys.clear(); D.extraVeins = []; if (D.clearGems) D.clearGems(); };
   D.load = function (arr) { D.reset(); for (const s of arr || []) D.add(s, true); };
   // le gallerie delle miniere (gen) nascono dal mondo stesso: non si salvano
   D.serialize = () => D.list.filter((s) => !s[4]).map((s) => s.slice(0, 4).map((v) => +v.toFixed(2)));
@@ -177,6 +177,7 @@
     // un colpo non fa una sfera perfetta: un grappolo di cavità più piccole, diverso ogni volta
     D.add([c[0], c[1], c[2], r * 0.78]);
     if (G.Caves && G.Caves.onDig) G.Caves.onDig(c[0], c[1], c[2]);
+    D.gemsDirtyNear(c[0], c[1], c[2]); D._gt = 11;
     const nSat = 2 + ((Math.random() * 3) | 0);
     for (let k = 0; k < nSat; k++) {
       const a = Math.random() * 6.283, e = (Math.random() - 0.5) * 1.6, rr = r * (0.38 + Math.random() * 0.3), off = r * (0.35 + Math.random() * 0.35);
@@ -225,9 +226,9 @@
           diffuseColor *= tc;
           for (int i = 0; i < 16; i++) { if (i >= uVeinN) break; vec4 V = uVein[i]; float vr = floor(V.w); float vt = fract(V.w) * 10.0;
             float d = length(vWp - V.xyz) / vr; if (d > 1.15) continue;
-            float sp = step(0.62, vh(vWp * 5.0)) * smoothstep(1.15, 0.7, d);
-            vec3 oc = vt < 1.5 ? vec3(0.05) : vt < 2.5 ? vec3(0.62, 0.3, 0.17) : vec3(1.0, 0.78, 0.22);
-            diffuseColor.rgb = mix(diffuseColor.rgb, oc, sp * 0.9); }`)
+            float sp = smoothstep(1.15, 0.55, d) * (0.55 + 0.45 * vh(vWp * 1.7));
+            vec3 oc = vt < 1.5 ? vec3(0.22, 0.2, 0.19) : vt < 2.5 ? vec3(0.55, 0.34, 0.24) : vec3(0.62, 0.52, 0.36);
+            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * oc * 1.6, sp * 0.45); }`)
         .replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;', 'vec3 mapN = (texture2D(normalMap, vWp.xz * 0.3).xyz * bw.y + texture2D(normalMap, vWp.zy * 0.3).xyz * bw.x + texture2D(normalMap, vWp.xy * 0.3).xyz * bw.z) * 2.0 - 1.0;')
         // al buio sottoterra: sole e cielo non arrivano in fondo alle gallerie, le torce sì
         .replace('#include <lights_fragment_begin>', 'float caveK = mix(1.0, 0.04, smoothstep(0.6, 4.5, vDepth));\n' + THREE.ShaderChunk.lights_fragment_begin
@@ -311,6 +312,7 @@
       }
     }
     if (D.uniformDirty || (D._ut = (D._ut || 0) + 1) % 30 === 0) updateUniforms();
+    if ((D._gt = (D._gt || 0) + 1) % 12 === 0) updateGems();
   };
   // il terreno normale si "buca" dentro le sfere scavate più vicine (fino a 64)
   D.U = { uVein: { value: Array.from({ length: 16 }, () => new THREE.Vector4(0, -999, 0, 1)) }, uVeinN: { value: 0 }, uDig: { value: Array.from({ length: 64 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigN: { value: 0 },
@@ -331,6 +333,86 @@
     vs.forEach((v, i) => D.U.uVein.value[i].set(v.x, v.y, v.z, Math.floor(v.r + 0.5) + v.type / 10 + 0.001));
     D.U.uVeinN.value = vs.length;
   }
+  /* ---------------- minerali che sporgono dalla roccia ----------------
+     Dove una vena affiora su una parete scavata spuntano grappoli di cristalli:
+     carbone nero lucido a scaglie, ferro (ematite) rosso-bruno metallico, oro in pepite e
+     cristalli dorati che luccicano alla luce della torcia. Si estraggono col piccone. */
+  const GEMS = { group: null, list: new Map(), mats: null };
+  function gemMats() {
+    if (GEMS.mats) return GEMS.mats;
+    const cv = (m, k) => (G.Caves && G.Caves.caveify ? G.Caves.caveify(m, k) : m);
+    GEMS.mats = {
+      1: cv(new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.18, metalness: 0.35, flatShading: true }), 'gem1'),
+      2: cv(new THREE.MeshStandardMaterial({ color: 0x9a3e24, roughness: 0.32, metalness: 0.55, flatShading: true, emissive: 0x2a0a04 }), 'gem2'),
+      3: cv(new THREE.MeshStandardMaterial({ color: 0xffd04a, roughness: 0.28, metalness: 0.6, flatShading: true, emissive: 0x7a5000, emissiveIntensity: 0.55 }), 'gem3'),
+    };
+    return GEMS.mats;
+  }
+  const _gn = new V3(), _gq = new THREE.Quaternion(), _gup = new V3(0, 1, 0);
+  function gemCluster(type, p, n, rnd, out) {
+    _gq.setFromUnitVectors(_gup, n);
+    const k = type === 3 ? 4 + ((rnd() * 4) | 0) : 4 + ((rnd() * 4) | 0);
+    for (let i = 0; i < k; i++) {
+      let g;
+      if (type === 1) { g = new THREE.OctahedronGeometry(0.07 + rnd() * 0.09, 0); g.scale(1 + rnd() * 0.6, 0.7 + rnd() * 0.6, 1 + rnd() * 0.5); }
+      else if (type === 2) { if (rnd() < 0.5) { g = new THREE.OctahedronGeometry(0.08 + rnd() * 0.06, 0); g.scale(0.7, 1.6 + rnd(), 0.7); } else { g = new THREE.DodecahedronGeometry(0.09 + rnd() * 0.08, 0); g.scale(1, 0.9 + rnd() * 0.5, 1); } } // ematite: punte e grumi
+      else if (rnd() < 0.6) { g = new THREE.OctahedronGeometry(0.06 + rnd() * 0.05, 0); g.scale(0.6, 2.2 + rnd() * 1.4, 0.6); } // cristallo d'oro
+      else { g = new THREE.DodecahedronGeometry(0.06 + rnd() * 0.05, 0); }
+      // inclinato a ventaglio, fuori dalla parete
+      g.rotateZ((rnd() - 0.5) * 1.1); g.rotateX((rnd() - 0.5) * 1.1); g.rotateY(rnd() * 6.28);
+      const a = rnd() * 6.28, d = rnd() * 0.16;
+      g.translate(Math.cos(a) * d, 0.06 + rnd() * 0.07, Math.sin(a) * d);
+      g.applyQuaternion(_gq); g.translate(p.x, p.y, p.z);
+      out.push(g);
+    }
+  }
+  function veinKey(v) { return v.type + ':' + v.x.toFixed(1) + ',' + v.y.toFixed(1) + ',' + v.z.toFixed(1); }
+  function buildGems(v) {
+    const key = veinKey(v), old = GEMS.list.get(key);
+    if (old) { GEMS.group.remove(old.m); old.m.geometry.dispose(); }
+    const rnd = G.mulberry32((Math.abs(v.x * 131 + v.y * 977 + v.z * 59) | 0) + 7), parts = [], spots = [];
+    const N = 46;
+    for (let i = 0; i < N; i++) {
+      // direzioni distribuite sulla sfera: dal centro della vena verso fuori fino all'aria
+      const y = 1 - (i + 0.5) / N * 2, rr = Math.sqrt(1 - y * y), ph = i * 2.39996, dx = Math.cos(ph) * rr, dz = Math.sin(ph) * rr;
+      let hit = null;
+      for (let t = 0.2; t < v.r + 0.9; t += 0.12) { const x = v.x + dx * t, yy = v.y + y * t, z = v.z + dz * t; if (!D.solidAt(x, yy, z)) { hit = { x, y: yy, z, t }; break; } }
+      if (!hit || hit.t > v.r + 0.35) continue;
+      if (spots.some((q) => Math.hypot(q.x - hit.x, q.y - hit.y, q.z - hit.z) < 0.42)) continue;
+      // normale della parete dal gradiente della densità
+      const e = 0.2; _gn.set(D.density(hit.x - e, hit.y, hit.z) - D.density(hit.x + e, hit.y, hit.z), D.density(hit.x, hit.y - e, hit.z) - D.density(hit.x, hit.y + e, hit.z), D.density(hit.x, hit.y, hit.z - e) - D.density(hit.x, hit.y, hit.z + e)).normalize();
+      if (!isFinite(_gn.x)) _gn.set(-dx, -y, -dz);
+      spots.push(hit);
+      gemCluster(v.type, new V3(hit.x - _gn.x * 0.02, hit.y - _gn.y * 0.02, hit.z - _gn.z * 0.02), _gn.clone(), rnd, parts);
+      if (spots.length >= (v.type === 3 ? 7 : 10)) break;
+    }
+    if (!parts.length) { GEMS.list.set(key, { m: new THREE.Object3D(), v }); return; }
+    const g = G.MODELS.merge(parts);
+    if (G.Caves && G.Caves.withDepth) G.Caves.withDepth(g);
+    const m = new THREE.Mesh(g, gemMats()[v.type]); m.castShadow = true; m.receiveShadow = true;
+    if (!GEMS.group) { GEMS.group = new THREE.Group(); G.scene.add(GEMS.group); }
+    GEMS.group.add(m); GEMS.list.set(key, { m, v });
+  }
+  D.gemsDirtyNear = function (x, y, z) { for (const [k, g] of GEMS.list) if (Math.hypot(g.v.x - x, g.v.y - y, g.v.z - z) < g.v.r + 3) g.dirty = true; };
+  function updateGems() {
+    const P = G.Player;
+    if (!GEMS.group) { GEMS.group = new THREE.Group(); G.scene.add(GEMS.group); }
+    // via quelle lontane
+    for (const [k, g] of GEMS.list) if (Math.hypot(g.v.x - P.pos.x, g.v.y - P.pos.y, g.v.z - P.pos.z) > 34) { GEMS.group.remove(g.m); if (g.m.geometry) g.m.geometry.dispose(); GEMS.list.delete(k); }
+    if (!D.list.length) return;
+    // una vena per volta (le più vicine prima), solo dove la roccia è scavata
+    const vs = D.veinsNear(P.pos.x, P.pos.y, P.pos.z, 22);
+    let n = 0;
+    for (const v of vs) {
+      if (!near(v.x, v.z)) continue;
+      const g = GEMS.list.get(veinKey(v));
+      if (g && !g.dirty) continue;
+      buildGems(v); if (++n >= 2) break;
+    }
+  }
+  D.gemsInfo = () => [...GEMS.list.values()].filter((g) => g.m.isMesh).map((g) => ({ v: g.v, c: g.m.geometry.boundingSphere ? g.m.geometry.boundingSphere.center : null }));
+  D.clearGems = function () { if (GEMS.group) { G.scene.remove(GEMS.group); GEMS.group = null; } GEMS.list.clear(); };
+
   // un punto dentro uno scavo sotto terra ferma: niente mare (anche se è sotto il livello del mare)
   D.dryAt = function (x, y, z) {
     const l = near(x, z); if (!l || G.heightAt(x, z) <= G.SEA + 1) return false;

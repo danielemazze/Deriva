@@ -200,7 +200,7 @@
       moss: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }), 'moss'),
       plant: caveify(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }), 'plant'),
       glow: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.9, emissiveMap: null }),
-      ice: caveify(new THREE.MeshStandardMaterial({ color: 0xbfe6ff, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82, emissive: 0x0a1a24 }), 'ice'),
+      ice: caveify(new THREE.MeshStandardMaterial({ color: 0xa8d4ec, roughness: 0.08, metalness: 0.05, transparent: true, opacity: 0.9, emissive: 0x04090c }), 'ice'),
       water: caveify(new THREE.MeshStandardMaterial({ color: 0x0d2a33, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.82, emissive: 0x03161c, depthWrite: false, side: THREE.DoubleSide }), 'water'),
       bat: new THREE.MeshStandardMaterial({ color: 0x15110f, roughness: 0.9, side: THREE.DoubleSide }),
     };
