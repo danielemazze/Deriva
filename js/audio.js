@@ -30,7 +30,9 @@
     // sul telefono il suono parte solo dopo un tocco
     const resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
     document.addEventListener('touchend', resume, { passive: true }); document.addEventListener('mousedown', resume); document.addEventListener('keydown', resume);
-    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25; comp.connect(ctx.destination);
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
+    // limitatore finale: i suoni fortissimi (Kraken, tuoni, cannoni) non gracchiano
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -2.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.12; comp.connect(lim); lim.connect(ctx.destination);
     A.master = ctx.createGain(); A.master.gain.value = vol === undefined ? 0.6 : vol; A.master.connect(comp);
     // i suoni "di fuori" (ambiente e meteo) passano da un filtro che si chiude al chiuso, in grotta e sott'acqua
     A.outside = ctx.createBiquadFilter(); A.outside.type = 'lowpass'; A.outside.frequency.value = 18000; A.outside.Q.value = 0.5;
@@ -454,10 +456,13 @@
   // un suono registrato in un punto del mondo (gruppo, posizione, opzioni: bus, vol); restituisce false se non c'è
   A.at = function (grp, pos, o) { if (!A.ctx || !hasS(grp)) return false; o = o || {}; return playS(grp, spot(o.bus || 'sfx', pos, o.dist, lenS(grp) + 0.5), o); };
   A.pirateAttack = (pos) => { if (A.ctx && !A.at('pirata_attacco', pos, { bus: 'ani' })) CALLS.pirata(spot('ani', pos, undefined, 2), false); };
+  A.KRAKEN_DB = 11;
   A.kraken = function (kind, pos) {
     if (!A.ctx) return;
     const grp = { voce: 'kraken', breve: 'kraken_breve', ferito: 'kraken_ferito', morte: 'kraken_morte', tonfo: 'splash' }[kind] || 'kraken';
-    if (!A.at(grp, pos, { bus: kind === 'tonfo' ? 'sfx' : 'ani', vol: kind === 'tonfo' ? 1.1 : 1.4 })) { if (kind === 'tonfo') A.splash(); else A.roar(); }
+    // il Kraken si sente forte: +10 dB rispetto agli altri versi (×3,16)
+    const k = Math.pow(10, A.KRAKEN_DB / 20);
+    if (!A.at(grp, pos, { bus: kind === 'tonfo' ? 'sfx' : 'ani', vol: (kind === 'tonfo' ? 1.1 : 1.4) * k })) { if (kind === 'tonfo') A.splash(); else A.roar(); }
   };
   A.growl = (dist, pos) => { if (A.ctx) CALLS.lupo(spot('ani', pos, dist, 3), false, 0); };
 })();
