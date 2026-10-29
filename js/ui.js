@@ -12,16 +12,17 @@
 
   /* ---------------- HUD ---------------- */
   const ICONS = {
+    stamina: '<svg viewBox="0 0 24 24"><path fill="rgba(217,224,122,.3)" stroke="#d9e07a" stroke-width="2" stroke-linejoin="round" d="M13 2 L5 13 h6 l-1 9 8-12 h-6 z"/></svg>',
     health: '<svg viewBox="0 0 24 24"><path fill="#ec7a5c" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.5.7-1.3 2.2-2.5 4.3-2.5 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>',
     hunger: '<svg viewBox="0 0 24 24"><path fill="#e0b062" d="M15.5 3.5c2.8 0 5 2.2 5 5 0 3.4-3 6.2-6.5 6.2-.6 0-1.2-.1-1.7-.2l-3.6 3.6.6.6c.6.6.6 1.5 0 2.1s-1.5.6-2.1 0l-.8-.8-.8.8c-.6.6-1.5.6-2.1 0s-.6-1.5 0-2.1l.8-.8-.6-.6c-.6-.6-.6-1.5 0-2.1s1.5-.6 2.1 0l.6.6 3.6-3.6c-.1-.5-.2-1.1-.2-1.7 0-3.5 2.8-6.5 6.2-6.5z"/><path fill="#fff" opacity=".85" d="M5 18.4l.6.6M3.6 17l1.2-1.2"/></svg>',
     thirst: '<svg viewBox="0 0 24 24"><path fill="#7cc6e0" d="M12 2.5S5 10.2 5 14.6C5 18.4 8.1 21.5 12 21.5s7-3.1 7-6.9C19 10.2 12 2.5 12 2.5z"/><path fill="#fff" opacity=".5" d="M9 14.5c0 1.8 1.1 3.2 2.6 3.6-.3.6-1.9-.2-2.4-1.4-.4-.8-.4-1.5-.2-2.2z"/></svg>',
     temp: '<svg viewBox="0 0 24 24"><path fill="none" stroke="#f0e6d6" stroke-width="2" d="M10 4.5a2 2 0 0 1 4 0v9.3a4 4 0 1 1-4 0z"/><circle cx="12" cy="17" r="2.2" fill="#e8735a"/><path stroke="#e8735a" stroke-width="2" d="M12 9v7"/></svg>',
     oxygen: '<svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5" fill="none" stroke="#e8f6fb" stroke-width="2"/><circle cx="16.5" cy="8.5" r="3" fill="none" stroke="#e8f6fb" stroke-width="2"/><circle cx="17" cy="17.5" r="2" fill="none" stroke="#e8f6fb" stroke-width="1.6"/></svg>',
   };
-  const LABEL = { health: 'Salute', hunger: 'Fame', thirst: 'Sete', oxygen: 'Ossigeno', temp: 'Temperatura corporea' };
+  const LABEL = { stamina: 'Stamina (corsa: Ctrl)', health: 'Salute', hunger: 'Fame', thirst: 'Sete', oxygen: 'Ossigeno', temp: 'Temperatura corporea' };
   UI.init = function () {
     const m = $('meters');
-    m.innerHTML = ['health', 'hunger', 'thirst', 'temp', 'oxygen'].map((k) => `<div class="meter" data-k="${k}" title="${LABEL[k]}">${ICONS[k]}<div class="bar" role="meter" aria-label="${LABEL[k]}"><i></i></div></div>`).join('');
+    m.innerHTML = ['stamina', 'health', 'hunger', 'thirst', 'temp', 'oxygen'].map((k) => `<div class="meter" data-k="${k}" title="${LABEL[k]}">${ICONS[k]}<div class="bar" role="meter" aria-label="${LABEL[k]}"><i></i></div></div>`).join('');
     UI.meterEls = {}; for (const el of m.children) UI.meterEls[el.dataset.k] = { el, bar: el.querySelector('i') };
     const hb = $('hotbar');
     hb.innerHTML = Array.from({ length: 9 }, (_, i) => `<div class="slot" data-src="hot" data-i="${i}"><span class="key">${i + 1}</span></div>`).join('');
@@ -32,6 +33,12 @@
     $('compassStrip').innerHTML = s;
     bindInput();
     UI.refreshHotbar();
+    // sul sito si corre con Ctrl: Ctrl+W chiuderebbe la scheda. A schermo intero il gioco si prende i tasti,
+    // altrimenti il browser chiede conferma prima di chiudere (e intanto si salva)
+    if (!window.deriva) {
+      window.addEventListener('beforeunload', (e) => { if (G.started) { try { G.save(); } catch (err) { } e.preventDefault(); e.returnValue = ''; } });
+      document.addEventListener('fullscreenchange', () => { try { if (document.fullscreenElement && navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyT', 'KeyN', 'Tab']); else if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); } catch (err) { } });
+    }
   };
   UI.slotHTML = function (st, extra) {
     if (!st) return extra || '';
@@ -134,6 +141,8 @@
       const low = vals[k] < 22; if (m._low !== low) { m._low = low; m.el.classList.toggle('low', low); }
       if (k === 'oxygen') { const h = !(p.under || p.oxygen < 99.5); if (m.el.hidden !== h) m.el.hidden = h; }
     }
+    { const m = UI.meterEls.stamina, mx = p.staminaMax || 100, v = Math.round(Math.max(0, Math.min(1, (p.stamina === undefined ? mx : p.stamina) / mx)) * 100) / 100, hide = G.creative();
+      if (m.el.hidden !== hide) m.el.hidden = hide; if (m._v !== v) { m._v = v; m.bar.style.transform = `scaleX(${v})`; } const low = v < 0.2; if (m._low !== low) { m._low = low; m.el.classList.toggle('low', low); } }
     // temperatura: cosa ti scalda e cosa ti raffredda, e se ti stai scaldando o raffreddando
     { const ti = $('tempinfo'), C = G.Climate; if (ti && C && C.factors) { const b0 = p.temp === undefined ? 50 : p.temp, tr = C.trend || 0;
         const show = !G.creative() && (tr !== 0 || b0 < 42 || b0 > 58);
@@ -169,8 +178,12 @@
     if (f3 && (!UI._f3T || nowB - UI._f3T > 250)) { UI._f3T = nowB; $('f3').innerHTML = f3HTML(p, ck); }
     // mirino e bersaglio
     let html = '';
-    if (!UI.open && !p.placing && !UI.boatPlacing) html = targetHTML(p.target);
-    if (!UI.open && p.boat && !p.helm && p.inHelmZone() && !html) html = `<div class="tname">${esc(p.boat.T.helmTxt)}</div><div class="thint"><kbd>${G.useKey()}</kbd> ${p.boat.T.oars ? 'siediti ai remi' : 'prendi il timone'}</div>`;
+    const stl = !UI.open && G.Stealth && p.crouch ? G.Stealth.target(p) : null;
+    if (G.Sea && G.Sea.station) html = '';
+    else if (stl) html = `<div class="tname">${esc(stl.name)}</div><div class="thint"><kbd>${G.isTouch ? 'Usa' : 'E'}</kbd> <b class="steal">Ruba</b> · ${G.Stealth.seen || (stl.kind === 'pocket' && !stl.behind) ? '<span class="steal">ti vedranno: ti attaccheranno</span>' : 'nessuno ti vede'}</div>`;
+    else if (!UI.open && !p.placing && !UI.boatPlacing) html = targetHTML(p.target);
+    if (!html && !UI.open && G.Sea && !G.Sea.station && p.boat && !p.helm && G.Sea.nearCannon(p)) html = `<div class="tname">Cannone</div><div class="thint"><kbd>${G.useKey()}</kbd> usa il cannone</div>`;
+    if (!UI.open && p.boat && !p.helm && p.inHelmZone() && !html && !(G.Sea && G.Sea.station)) html = `<div class="tname">${esc(p.boat.T.helmTxt)}</div><div class="thint"><kbd>${G.useKey()}</kbd> ${p.boat.T.oars ? 'siediti ai remi' : 'prendi il timone'}</div>`;
     if (html !== UI._tHTML) { UI._tHTML = html; $('target').innerHTML = html; }
     $('cross').classList.toggle('hot', !!p.target && !UI.open);
     // barca
@@ -250,9 +263,9 @@
     else if (['pala', 'piccone'].includes(G.toolClass(id))) k.push(['Clic sinistro sul terreno', G.toolClass(id) === 'pala' ? 'scava (o scava sulla X)' : 'scava nella roccia']);
     else if (id === 'cannocchiale') { k.push([G.isTouch ? 'Guarda' : 'Tieni premuto tasto destro', 'guarda lontano']); k.push([G.isTouch ? 'Zoom' : 'Rotella', 'ingrandimento ×2–×8']); }
     const use = id === 'mappa_tesoro' ? 'leggi la mappa' : d && d.cat === 'blueprint' ? 'impara il progetto' : id === 'libro' ? 'apri il libro' : id === 'canna' ? (p.fish ? 'tira su la lenza' : 'lancia la lenza') : id === 'ciotola' ? 'raccogli acqua' : id === 'terra' ? 'rimetti la terra nel buco' : d && G.Build.isPlaceable(id) ? 'posiziona' : d && (d.food || d.water) ? 'mangia / bevi' : null;
-    if (p.fly) k.push(['W A S D', 'vola'], ['Spazio / C', 'sali / scendi'], ['Spazio ×2', 'atterra']);
-    else if (p.swim) k.push(['W A S D', 'nuota'], ['Spazio', 'risali'], ['C', 'immergiti']);
-    else k.push(['W A S D', 'muoviti'], ['Spazio', 'salta'], ['Maiusc', 'corri']);
+    if (p.fly) k.push(['W A S D', 'vola'], ['Spazio / Maiusc', 'sali / scendi'], ['Ctrl', 'veloce'], ['Spazio ×2', 'atterra']);
+    else if (p.swim) k.push(['W A S D', 'nuota'], ['Spazio', 'risali'], ['Maiusc / C', 'immergiti']);
+    else k.push(['W A S D', 'muoviti'], ['Spazio', 'salta'], ['Ctrl', 'corri'], ['Maiusc', p.crouch ? 'accovacciato: E ruba' : 'accovacciati']);
     if (G.creative() && !p.fly) k.push(['Spazio ×2', 'vola']);
     k.push(['Clic sinistro', 'colpisci / raccogli']);
     if (use) k.push(['Tasto destro', use]);
@@ -329,6 +342,7 @@
     npc: { render: () => G.Quests.render(), click: (e) => G.Quests.click(e), close: () => G.Quests.close() },
     map: { render: () => G.MapUI.render(), mount: () => G.MapUI.mount(), click: (e) => { if (e.target.closest('[data-act=center]')) { const p = P().pos; G.MapUI.view.x = p.x; G.MapUI.view.z = p.z; G.MapUI.draw(); return true; } return !!e.target.closest('#mapc'); }, close: () => { window.onmousemove = null; window.onmouseup = null; }, wide: true },
     diario: { render: () => G.MapUI.renderJournal(), click: (e) => G.MapUI.clickJournal(e) },
+    abilita: { render: () => G.Skills.render(), click: (e) => { if (e.target.closest('[data-act=tabinv]')) { UI.openInventory(3); return true; } return false; } },
     mappa: { render: () => G.Treasure.render(), mount: () => G.Treasure.draw() },
   };
   UI.openCustom = function (mode) { showPanel(mode); };
@@ -396,6 +410,7 @@
     pn.classList.toggle('wide', !!(cu && cu.wide));
     if (cu) { pn.style.gridTemplateColumns = 'auto'; pn.innerHTML = html + cu.render(); if (cu.mount) cu.mount(); return; }
     if (UI.open === 'inv') {
+      html += '<div class="sktabs intab"><button class="sktab on">Inventario</button><button class="sktab" data-act="tababil">Abilità <kbd>L</kbd></button></div>';
       const N = UI.craftN;
       const r = G.matchRecipe(UI.craft, N);
       let g = ''; for (let i = 0; i < N * N; i++) g += slot('craft', i, UI.craft[i]);
@@ -695,7 +710,7 @@
     ui: SV('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/>'), globe: SV('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>'),
     swap: SV('<path d="M4 8h13l-3-3M20 16H7l3 3"/>'), tools: SV('<path d="M14 6l4 4-9 9H5v-4z"/><path d="M13 7l4 4"/>'),
   };
-  const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Maiusc', 'correre'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
+  const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Ctrl', 'correre (consuma stamina)'], ['Maiusc', 'accovacciarsi · rubare (E) se nessuno ti vede'], ['L', 'abilità'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
     ['E · I', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
     ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
@@ -1023,8 +1038,9 @@
       if (k === 'F3' && G.started) { e.preventDefault(); G.settings.f3 = !G.settings.f3; G.store.set('deriva_settings', G.settings); UI._f3T = 0; return; }
       if (UI.menu) { if (k === 'Escape' && UI.menu !== 'main') UI.showMenu('main'); else if (k === 'Escape' && G.started) { UI.hideMenu(); G._lockTry = 0; G.requestLock(); } return; }
       if (!G.started) return;
+      if ((e.ctrlKey || e.metaKey) && !UI.open && /^Key[A-Z]$/.test(k)) e.preventDefault(); // si corre con Ctrl: niente scorciatoie del browser
       if (UI.open) {
-        if (k === 'Escape' || k === 'KeyI' || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
+        if (k === 'Escape' || k === 'KeyI' || (k === 'KeyL' && UI.open === 'abilita') || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
         else if (/^Digit[1-8]$/.test(k) && !UI.hoverSlot && UI.open === 'inv' && G.creative()) UI.applyKit(+k.slice(5) - 1);
         else if (/^Digit[1-9]$/.test(k) && UI.hoverSlot && UI.open !== 'book') {
           // tasto numerico sopra uno slot: scambia con la barra rapida
@@ -1036,7 +1052,7 @@
       if (k === 'Tab') e.preventDefault();
       if (k === 'Space' && !e.repeat && G.creative() && !P_.boat) {
         const now = performance.now();
-        if (now - (UI._spaceT || 0) < 320) { P_.fly = !P_.fly; P_.vel.set(0, 0, 0); UI.toast(P_.fly ? 'Volo attivo · Spazio sali · C scendi · doppio Spazio per atterrare' : 'Volo disattivato'); UI._spaceT = 0; }
+        if (now - (UI._spaceT || 0) < 320) { P_.fly = !P_.fly; P_.vel.set(0, 0, 0); UI.toast(P_.fly ? 'Volo attivo · Spazio sali · Maiusc scendi · Ctrl veloce · doppio Spazio per atterrare' : 'Volo disattivato'); UI._spaceT = 0; }
         else UI._spaceT = now;
       }
       P_.keys[k] = true;
@@ -1045,7 +1061,8 @@
       else if (k === 'KeyB') UI.openBook();
       else if (k === 'KeyM') G.MapUI.open();
       else if (k === 'KeyJ') G.MapUI.openJournal();
-      else if (k === 'KeyE') { if (P_.placing) UI.cancelPlace(); else UI.openInventory(3); }
+      else if (k === 'KeyE') { if (P_.placing) UI.cancelPlace(); else if (P_.crouch && G.Stealth && G.Stealth.steal(P_)) {} else UI.openInventory(3); }
+      else if (k === 'KeyL') UI.openCustom('abilita');
       else if (k === 'KeyF') P_.swapHands();
       else if (k === 'KeyG') { if (P_.boat && P_.boat.inv) UI.openChest(P_.boat.inv, 'Stiva', { boat: P_.boat }); else { const tg = P_.target; if (tg && tg.kind === 'boat' && !G.Boats.isComplete(tg.boat)) UI.openBoatBuild(tg.boat); } }
       else if (k === 'F4') { e.preventDefault(); UI.toggleMode(); }
@@ -1094,6 +1111,7 @@
       if (cu) { if (e.target.closest('[data-act=close]') || e.target === pw) { UI.close(); return; } if (cu.click && cu.click(e)) return; return; }
       // clic fuori dal pannello con un oggetto preso: lo butti a terra (in creativa lo cancelli)
       if (UI.cursor && e.target === pw && UI.open === 'inv') { const st = UI.cursor; UI.cursor = null; if (!G.creative() && G.Drops) { const n = e.button === 2 ? 1 : st.n; if (n < st.n) UI.cursor = Object.assign({}, st, { n: st.n - n }); G.Drops.throwStack(Object.assign({}, st, { n })); } UI.renderPanel(); e.preventDefault(); return; }
+      if (e.target.closest('[data-act=tababil]')) { UI.openCustom('abilita'); return; }
       const s = e.target.closest('.slot[data-src]');
       if (s) { e.preventDefault(); slotClick(s.dataset.src, +s.dataset.i, e.button, e.shiftKey); UI.syncShared(); UI.renderPanel(); return; }
       const r = e.target.closest('[data-rec]'); if (r) { fillRecipe(+r.dataset.rec, e.shiftKey); UI.renderPanel(); return; }

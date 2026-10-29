@@ -304,7 +304,7 @@
     if (!a.st.wool) { G.UI.toast('La lana deve ricrescere'); return true; }
     G.FX.burst(a.pos.x, a.pos.y + 0.7, a.pos.z, [1, 1, 0.96], 14, 2);
     if (a.remote) { G.Net.send({ t: 'shear', id: a.id }); return true; }
-    const n = G.animalShear(a.st); if (n) G.Player.give('lana', n);
+    const n = G.animalShear(a.st); if (n) { G.Player.give('lana', n + (G.Skills.chance('allevatore', 0.02) ? 1 : 0)); G.Skills.add('allevatore', 4); }
     return true;
   };
   E.raycast = function (o, d, maxDist, pad) {

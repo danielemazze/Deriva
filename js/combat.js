@@ -43,7 +43,7 @@
     C.reload = Math.max(0, C.reload - dt);
     // arco: tieni premuto per tendere, rilascia per scoccare
     if (id === 'arco' && !G.UI.open && !(P.boat && P.helm)) {
-      if (P.mouse.l) { if (C.charge === 0 && G.Audio) G.Audio.draw(); C.charge = Math.min(1.5, C.charge + dt); }
+      if (P.mouse.l) { if (C.charge === 0 && G.Audio) G.Audio.draw(); C.charge = Math.min(1.5, C.charge + dt / G.Skills.less('arco', 0.008, 0.6)); }
       else if (C.charge > 0) {
         const k = Math.min(1, C.charge / 1.5); C.charge = 0;
         if (k > 0.12) {
@@ -53,8 +53,8 @@
             P.lookDir(_d);
             _o.copy(P.cam.position).addScaledVector(_d, 0.5); _o.y -= 0.05;
             // più è tesa, più la freccia va veloce (gittata) e fa male: danno 4–36
-            const v = _d.clone().multiplyScalar(12 + 46 * k);
-            C.shootArrow(_o, v, 1 + 8 * Math.pow(k, 1.5), false);
+            const v = _d.clone().multiplyScalar((12 + 46 * k) * G.Skills.mul('arco', 0.006));
+            C.shootArrow(_o, v, (1 + 8 * Math.pow(k, 1.5)) * G.Skills.mul('arco', 0.015), false);
             if (G.Net && G.Net.on) G.Net.send({ t: 'fx', k: 'arrow', o: [+_o.x.toFixed(2), +_o.y.toFixed(2), +_o.z.toFixed(2)], v: [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)] });
             if (G.Audio) G.Audio.bow();
           }
@@ -98,6 +98,7 @@
       const h = a.remote ? null : hitTest(a, from, a.pos);
       if (a.remote) { const gy = G.World.groundAt(a.pos.x, a.pos.z); if (a.pos.y < gy) { a.pos.y = gy + 0.05; a.stuck = true; a.life = 0; } }
       if (h) {
+        if (!a.remote && (h.kind === 'animal' || h.kind === 'remote' || h.kind === 'sea')) G.Skills.add('arco', 3);
         if (h.kind === 'animal') { G.Entities.hit(h.ent, a.dmg, P); G.scene.remove(a.m); C.arrows.splice(i, 1); continue; }
         if (h.kind === 'remote') { G.Net.hit(h.r, Math.round(a.dmg * 4)); G.scene.remove(a.m); C.arrows.splice(i, 1); continue; }
         if (h.kind === 'sea') { G.Sea.hitEnc(h.enc, a.dmg * 4, a.pos); G.scene.remove(a.m); C.arrows.splice(i, 1); continue; }
@@ -152,7 +153,7 @@
     if (P.count('munizioni') <= 0) { G.UI.toast('Servono munizioni (dai mercanti o nei forzieri)', 'warn'); C.reload = 0.5; return; }
     P.take('munizioni', 1);
     const cap = id === 'pistola_capitano';
-    C.reload = cap ? 1.3 : 2.2;
+    C.reload = (cap ? 1.3 : 2.2) * G.Skills.less('fuoco', 0.01, 0.5); G.Skills.add('fuoco', 1);
     P.swingT = 0.35;
     P.lookDir(_d);
     const o = P.cam.position.clone();
@@ -163,6 +164,7 @@
     for (const b of G.Build.boxes) { if (b.soft || b.roof || b.slope) continue; const t = G.Build.rayBox(o, _d, b); if (t >= 0 && t < bt) { bt = t; best = null; } }
     const th = G.Build.terrainHit(o, _d, bt); if (th >= 0 && th < bt) { bt = th; best = null; }
     const dmg = cap ? 14 : 10;
+    if (best) G.Skills.add('fuoco', 3);
     if (best && best.kind === 'animal') G.Entities.hit(best.ent, dmg, P);
     else if (best && best.kind === 'remote') G.Net.hit(best.r, dmg * 4);
     else if (best && best.kind === 'sea') G.Sea.hitEnc(best.enc, dmg * 4, o.clone().addScaledVector(_d, bt));

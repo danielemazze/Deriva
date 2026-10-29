@@ -245,6 +245,7 @@
     for (const ch of [...G.World.chunks.values()]) G.World.unload(ch);
     G.World.rebuild();
     G.initWorldGen(seed);
+    if (G.Sea && G.Sea.station) G.Sea.stationLeave(null); if (G.Stealth) G.Stealth.reset();
     G.state = { removed: new Set(), chests: {}, ops: [] }; G.voiceGlobal = false; G.keepInv = false; if (G.Drops) G.Drops.clear(); if (G.Sea) G.Sea.clear(); if (G.Caves && G.Caves.resetHidden) G.Caves.resetHidden();
     if (G.POI) G.POI.reset();
     if (G.Structures && G.Structures.group) G.Structures.clear();
@@ -292,7 +293,7 @@
       if (G.Climate) G.Climate.reset(); G.time = 0.31; G.Player.inv = new Array(36).fill(null); G.Player.equip = [null, null, null, null]; G.Player.temp = 50; }
     G.Build.load(save ? save.builds : []);
     G.Boats.load(save ? save.boats : []);
-    G.Player.resetProgress();
+    G.Player.resetProgress(); G.Skills.load(null); G.Player.stamina = undefined;
     if (save) G.Player.load(save.player);
     else {
       const sp = G.findSpawn();
@@ -333,7 +334,7 @@
     G.state.removed = new Set(snap.removed || []);
     G.state.killed = new Set(snap.killed || []);
     G.state.chests = snap.chests || {};
-    G.Player.resetProgress();
+    G.Player.resetProgress(); G.Skills.load(null); G.Player.stamina = undefined;
     G.time = snap.time || 0.3; G.Boats.wind.dir = snap.wind || 0.6;
     if (G.Climate) G.Climate.load(snap.weather);
     if (G.Dig) G.Dig.load(snap.digs);
@@ -475,6 +476,7 @@
       if (P.keys.ArrowUp) P.pitch = Math.min(1.5, P.pitch + dt * 1.5); if (P.keys.ArrowDown) P.pitch = Math.max(-1.5, P.pitch - dt * 1.5);
       P.update(dt, t);
       G.Combat.update(dt, P);
+      if (G.Stealth) G.Stealth.update(dt, P); if (G.Skills) G.Skills.update(dt);
       G.Entities.update(dt, P, t);
       G.Structures.update(dt, P);
       G.MapUI.track(dt);

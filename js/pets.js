@@ -34,6 +34,7 @@
     spawn(st);
     G.FX.burst(o.x, G.World.groundAt(o.x, o.z) + 0.6, o.z, [1, 0.55, 0.7], 16, 1.6);
     G.UI.toast(`È nato un cucciolo di ${G.SPECIES[o.sp].n.toLowerCase()}!`, 'good');
+    G.Skills.add('allevatore', 8);
     if (G.Audio) G.Audio.animal(o.sp, 2);
     G.saveSoon();
   };
@@ -59,7 +60,7 @@
     if (r === 'baby') { G.UI.toast('È un cucciolo: deve crescere prima di avere piccoli'); }
     else if (r === 'tired') { G.UI.toast('Ha appena avuto un cucciolo: riprova più tardi'); }
     else {
-      P.take(it.id, 1);
+      if (!G.Skills.chance('allevatore', 0.008)) P.take(it.id, 1); G.Skills.add('allevatore', 4);
       if (r === 'freed') G.UI.toast(`Animale liberato: ora è tuo e ti segue se tieni in mano ${G.ITEMS[foods[0]].n.toLowerCase()}`, 'good');
       else { G.UI.toast(`${G.SPECIES[a.sp].n}: in amore ❤ Nutrine un altro esemplare vicino per avere un cucciolo`, 'good'); G.FX.burst(a.pos.x, a.pos.y + 1, a.pos.z, [1, 0.4, 0.6], 14, 1.4); }
       if (G.Audio) G.Audio.eat();

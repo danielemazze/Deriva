@@ -148,7 +148,7 @@
     const k = P.keys;
     P.refreshHeld();
     const waterY = G.waterLevelAt ? G.waterLevelAt(P.pos.x, P.pos.z, t, P.pos.y + 0.5) : G.waveHeight(P.pos.x, P.pos.z, t);
-    if (P.boat) updateBoatRide(dt, t);
+    if (P.boat) { P.crouch = false; P.sprinting = false; updateBoatRide(dt, t); }
     else {
       const ground = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.22));
       const px0 = P.pos.x, pz0 = P.pos.z;
@@ -158,10 +158,14 @@
       _f.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); _r.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
       _dir.set(0, 0, 0).addScaledVector(_f, inputF).addScaledVector(_r, inputR);
       if (_dir.lengthSq() > 0) _dir.normalize();
-      const sprint = (k.ShiftLeft || k.ShiftRight) && P.hunger > 5;
+      const runK = !!(k.ControlLeft || k.ControlRight), down = !!(k.KeyC || k.ShiftLeft || k.ShiftRight);
+      P.crouch = !P.fly && !P.swim && !!(k.ShiftLeft || k.ShiftRight);
+      if (!runK || P.stamina <= 0) P._runOK = P.stamina > 15; // senza fiato: si riparte solo dopo aver recuperato un po'
+      const sprint = runK && P.hunger > 5 && !P.crouch && (P._runOK !== false) && (P.stamina > 0 || G.creative());
+      P.sprinting = sprint && _dir.lengthSq() > 0 && !P.fly;
       if (P.fly) {
-        const sp = sprint || k.ShiftLeft || k.ShiftRight ? 24 : 10;
-        const want = new V3(_dir.x * sp, (k.Space ? 1 : 0) * sp * 0.7 - (k.KeyC || k.ControlLeft ? 1 : 0) * sp * 0.7, _dir.z * sp);
+        const sp = runK ? 24 : 10;
+        const want = new V3(_dir.x * sp, (k.Space ? 1 : 0) * sp * 0.7 - (down ? 1 : 0) * sp * 0.7, _dir.z * sp);
         P.vel.lerp(want, Math.min(1, dt * 6));
         P.pos.addScaledVector(P.vel, dt);
         if (P.pos.y < ground) { P.pos.y = ground; P.vel.y = Math.max(0, P.vel.y); }
@@ -171,10 +175,10 @@
         const wantV = new V3(_dir.x * sp, 0, _dir.z * sp);
         if (P.under && inputF) wantV.y += Math.sin(P.pitch) * sp * inputF;
         if (k.Space) wantV.y += 2.6;
-        if (k.KeyC || k.ControlLeft) wantV.y -= 2.6;
+        if (down) wantV.y -= 2.6;
         // galleggiamento verso la superficie se non si scende
         const surf = waterY - EYE + 0.15;
-        if (!k.KeyC && !k.ControlLeft && !(P.under && inputF && P.pitch < -0.2)) wantV.y += G.clamp((surf - P.pos.y) * 2.5, -1.5, 1.8);
+        if (!down && !(P.under && inputF && P.pitch < -0.2)) wantV.y += G.clamp((surf - P.pos.y) * 2.5, -1.5, 1.8);
         P.vel.lerp(wantV, Math.min(1, dt * 3));
         P.pos.addScaledVector(P.vel, dt);
         // la corrente di un gorgo trascina anche chi nuota
@@ -185,17 +189,17 @@
         if (Math.random() < dt * 2 && P.under) G.FX.bubble(P.pos.x + _f.x * 0.3, P.pos.y + EYE - 0.1, P.pos.z + _f.z * 0.3);
       } else {
         const wading = depth > 0.4;
-        const sp = (sprint ? 6.4 : 4.2) * (wading ? 0.6 : 1) * (G.Climate ? G.Climate.speedMul() : 1);
+        const sp = (sprint ? 6.4 * G.Skills.mul('corsa', 0.004) : P.crouch ? 2.1 : 4.2) * (wading ? 0.6 : 1) * (G.Climate ? G.Climate.speedMul() : 1);
         const acc = P.onGround ? 14 : 3;
         P.vel.x += (_dir.x * sp - P.vel.x) * Math.min(1, dt * acc);
         P.vel.z += (_dir.z * sp - P.vel.z) * Math.min(1, dt * acc);
         // arrampicata: scale a pioli con W, muri con W + Spazio
         // scale a pioli: Spazio tenuto premuto = sali, C = scendi, nient'altro = resti aggrappato
         const lad = G.Build.ladderAt(P.pos, RAD, HEIGHT);
-        if (lad && (k.Space || k.KeyC || k.ControlLeft || (!P.onGround && P.onLadder))) {
+        if (lad && (k.Space || down || (!P.onGround && P.onLadder))) {
           P.climbing = true; P.onLadder = true;
           P.vel.x *= 0.25; P.vel.z *= 0.25;
-          P.vel.y = k.Space ? 3.2 : k.KeyC || k.ControlLeft ? -2.8 : 0;
+          P.vel.y = k.Space ? 3.2 : down ? -2.8 : 0;
           if (k.Space && P.pos.y > lad.y1 - 0.9) { P.vel.x += _f.x * 3; P.vel.z += _f.z * 3; } // in cima: scendi sul pavimento
           P.fallFrom = P.pos.y;
         } else {
@@ -258,7 +262,8 @@
         }
       }
     }
-    P.eye.set(P.pos.x, P.pos.y + (P.boat && P.helm && P.boat.T.sit ? 0.95 : EYE), P.pos.z);
+    P.crouchK = G.lerp(P.crouchK || 0, P.crouch && !P.boat ? 1 : 0, Math.min(1, dt * 10));
+    P.eye.set(P.pos.x, P.pos.y + (P.boat && P.helm && P.boat.T.sit ? 0.95 : EYE - 0.55 * P.crouchK), P.pos.z);
     P.under = P.eye.y < (G.waterLevelAt ? G.waterLevelAt(P.eye.x, P.eye.z, t, P.eye.y) : G.waveHeight(P.eye.x, P.eye.z, t)) - 0.05;
     P.inLake = P.under && G.lakeLevelAt && G.lakeLevelAt(P.eye.x, P.eye.z) !== null;
     P.underground = !!(G.Dig && G.Dig.activeAt(P.pos.x, P.pos.z) && G.heightAt(P.pos.x, P.pos.z) - P.eye.y > 1.2);
@@ -283,6 +288,7 @@
       cam.position.set(P.eye.x, P.eye.y + bobY, P.eye.z);
       cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
       P.vm.visible = true;
+      if (G.Sea && G.Sea.station && G.Sea.stationEye(P, cam)) P.vm.visible = false;
     }
     // viewmodel: oscillazione e colpo
     P.swingT = Math.max(0, P.swingT - dt * 3.2);
@@ -322,6 +328,8 @@
     P.swim = false; P.onGround = true;
     if (P.helm) {
       P.local.set(T.helm[0], (T.free ? G.FreeBoat.topAt(b, T.helm[0], T.helm[1]) || T.deck : T.deck) + (T.sit || 0), T.helm[1]); P.lvy = 0;
+    } else if (G.Sea && G.Sea.station) {
+      G.Sea.stationUpdate(dt, P); P.lvy = 0;
     } else if (T.free) {
       // barca libera: si cammina sopra i pezzi; oltre il bordo, saltando, si finisce in mare
       const FB = G.FreeBoat;
@@ -329,7 +337,7 @@
       const wx = -Math.sin(P.yaw) * inputF + Math.cos(P.yaw) * inputR, wz = -Math.cos(P.yaw) * inputF - Math.sin(P.yaw) * inputR;
       const c = Math.cos(b.yaw), s = Math.sin(b.yaw);
       let lx = wx * c - wz * s, lz = wx * s + wz * c; const l = Math.hypot(lx, lz); if (l > 0) { lx /= l; lz /= l; }
-      const sp = (k.ShiftLeft || k.ShiftRight) ? 4.4 : 2.9;
+      const sp = (k.ControlLeft || k.ControlRight) ? 4.4 : 2.9;
       const cur = FB.topAt(b, P.local.x, P.local.z);
       for (const [ax, az] of [[lx, lz], [lx, 0], [0, lz]]) {
         if (!ax && !az) continue;
@@ -350,7 +358,7 @@
       const c = Math.cos(b.yaw), s = Math.sin(b.yaw);
       let lx = wx * c - wz * s, lz = wx * s + wz * c;
       const l = Math.hypot(lx, lz); if (l > 0) { lx /= l; lz /= l; }
-      const sp = (k.ShiftLeft || k.ShiftRight) ? 4.4 : 2.9;
+      const sp = (k.ControlLeft || k.ControlRight) ? 4.4 : 2.9;
       P.local.x += lx * sp * dt; P.local.z += lz * sp * dt;
       // salto sul ponte
       if (k.Space && P.local.y <= T.deck + 0.001) P.lvy = 5.2;
@@ -387,9 +395,15 @@
 
   /* ---------------- STATISTICHE ---------------- */
   function updateStats(dt) {
+    // stamina: correre la consuma, fermarsi la ricarica; la Corsa ne dà sempre di più
+    P.staminaMax = 100 + (G.Skills.lv('corsa') - 1) * 4;
+    if (P.stamina === undefined) P.stamina = P.staminaMax;
+    if (G.creative()) P.stamina = P.staminaMax;
+    else if (P.sprinting) { P.stamina = Math.max(0, P.stamina - dt * 11); P._stRest = 0.9; P._runXP = (P._runXP || 0) + dt; if (P._runXP >= 2) { P._runXP = 0; G.Skills.add('corsa', 1); } }
+    else { P._stRest = Math.max(0, (P._stRest || 0) - dt); if (P._stRest <= 0) P.stamina = Math.min(P.staminaMax, P.stamina + dt * 14 * G.Skills.mul('corsa', 0.012) * (P.hunger > 20 ? 1 : 0.4)); }
     if (G.creative()) { P.health = P.hunger = P.thirst = P.oxygen = 100; return; }
     const moving = P.vel.lengthSq() > 1;
-    const sprint = (P.keys.ShiftLeft || P.keys.ShiftRight) && moving && !P.swim;
+    const sprint = !!P.sprinting && moving && !P.swim;
     const Cl = G.Climate;
     P.hunger = Math.max(0, P.hunger - dt * 0.021 * (sprint ? 1.7 : P.swim ? 1.35 : 1) * (Cl ? Cl.hungerMul() : 1));
     P.thirst = Math.max(0, P.thirst - dt * 0.029 * (sprint ? 1.6 : 1) * (G.sky.day > 0.5 ? 1.1 : 0.85) * (Cl ? Cl.thirstMul() : 1));
@@ -401,7 +415,7 @@
   P.hurt = function (n, quiet, kind) {
     if (G.creative()) return;
     // parata con lo scudo: assorbe il 75% dei colpi (non le cadute né la fame)
-    if (P.blocking && !quiet && kind !== 'fall') { n *= 0.25; if (G.Audio) G.Audio.hit('wood'); G.FX.burst(P.pos.x - Math.sin(P.yaw) * 0.6, P.pos.y + 1.2, P.pos.z - Math.cos(P.yaw) * 0.6, [0.85, 0.75, 0.5], 6, 1.5); if (!P._blockTip) { P._blockTip = 1; G.UI.toast('Parato con lo scudo!', 'good'); } }
+    if (P.blocking && !quiet && kind !== 'fall') { const ab = Math.min(0.95, 0.75 + (G.Skills.lv('parata') - 1) * 0.004); n *= 1 - ab; if ((P._parT || 0) < performance.now()) { P._parT = performance.now() + 300; G.Skills.add('parata', 3); } if (G.Audio) G.Audio.hit('wood'); G.FX.burst(P.pos.x - Math.sin(P.yaw) * 0.6, P.pos.y + 1.2, P.pos.z - Math.cos(P.yaw) * 0.6, [0.85, 0.75, 0.5], 6, 1.5); if (!P._blockTip) { P._blockTip = 1; G.UI.toast('Parato con lo scudo!', 'good'); } }
     P.health -= n; if (!quiet) P.dmgFlash = 1; else P.dmgFlash = Math.max(P.dmgFlash, 0.25);
     if (P.health <= 0) P.die();
   };
@@ -497,23 +511,25 @@
   /* ---------------- AZIONE PRIMARIA (colpire) ---------------- */
   P.primary = function () {
     const it = P.held(), toolId = it ? it.id : null, tool = G.toolClass(toolId), pow = G.toolPower(toolId);
+    if (G.Sea && G.Sea.station) { G.Sea.stationFire(P); P.actionCd = 0.3; return; }
     if (P.boat && P.helm && G.Sea && G.Sea.broadside(P)) { P.actionCd = 0.4; return; }
     if (P.boat && !P.helm && G.Sea && (!P.held() || P.held().id === 'munizioni') && G.Sea.fireCannonNear(P)) { P.actionCd = 0.4; return; }
     if (tool === 'arco') return; // l'arco si tende tenendo premuto (vedi combat.js)
     if (tool === 'pistola' || tool === 'pistola_capitano') { if (!P.boat || !P.helm) G.Combat.fire(P, tool); P.actionCd = 0.3; return; }
     const W = G.ITEMS[toolId] || {};
-    P.swingT = 1; P.actionCd = W.cd || (tool === 'ascia' || tool === 'piccone' || tool === 'coltello' ? 0.42 : 0.55);
+    P.swingT = 1; P.actionCd = (W.cd || (tool === 'ascia' || tool === 'piccone' || tool === 'coltello' ? 0.42 : 0.55)) * (W.dmg ? G.Skills.less('spada', 0.006) : 1);
     if (tool === 'pala' && G.Treasure && G.Treasure.dig()) return;
     const tg = P.target;
     // piccone e pala sul terreno (senza bersagli davanti): si scava
     if ((tool === 'piccone' || tool === 'pala') && (!tg || tg.kind === 'piece' && false) && G.Dig) { if (G.Dig.dig(P, tool, pow)) { P.actionCd = (tool === 'pala' ? 0.5 : 0.45) / Math.sqrt(pow); return; } }
-    const melee = W.dmg || (tool === 'coltello' ? 2.5 : tool === 'ascia' ? 2 : tool === 'piccone' ? 1.5 : 1);
+    const melee = (W.dmg || (tool === 'coltello' ? 2.5 : tool === 'ascia' ? 2 : tool === 'piccone' ? 1.5 : 1)) * (W.dmg ? G.Skills.mul('spada', 0.02) : 1);
+    const swordXP = () => { if (W.dmg) G.Skills.add('spada', 2); };
     // tentacoli del Kraken o fiancata pirata a portata di spada
-    if (G.Sea && G.Sea.enc.length) { P.lookDir(_dir); const sh = G.Sea.raycast(P.cam.position, _dir, 4); if (sh && (!tg || sh.t < (tg.t || 9))) { G.Sea.hitEnc(sh.enc, melee * 4, P.cam.position.clone().addScaledVector(_dir, sh.t)); return; } }
+    if (G.Sea && G.Sea.enc.length) { P.lookDir(_dir); const sh = G.Sea.raycast(P.cam.position, _dir, 4); if (sh && (!tg || sh.t < (tg.t || 9))) { G.Sea.hitEnc(sh.enc, melee * 4, P.cam.position.clone().addScaledVector(_dir, sh.t)); swordXP(); return; } }
     if (!tg) return;
     if (tg.kind === 'res') hitResource(tg.res, tool, pow);
-    else if (tg.kind === 'remote') { G.Net.hit(tg.remote, Math.round(melee * 4)); }
-    else if (tg.kind === 'animal') { G.Entities.hit(tg.ent, melee, P); if (G.Audio && W.dmg) G.Audio.hit('soft'); }
+    else if (tg.kind === 'remote') { G.Net.hit(tg.remote, Math.round(melee * 4)); swordXP(); }
+    else if (tg.kind === 'animal') { G.Entities.hit(tg.ent, melee, P); swordXP(); if (G.Audio && W.dmg) G.Audio.hit('soft'); }
     else if (tg.kind === 'npc') { G.UI.toast(`${tg.npc.def.name}: «Ehi! Metti giù quell’arma!»`); }
     else if (tg.kind === 'boat' && tg.boat.free && !tg.boat.sunk) { G.FreeBoat.hit(P, tg.boat); }
     else if (tg.kind === 'piece') {
@@ -565,11 +581,12 @@
     } else if (res.type === 'bush') {
       G.FX.burst(hitPos.x, res.y + 0.6, hitPos.z, [0.3, 0.5, 0.2], 10, 2);
       if (G.Audio) G.Audio.hit('leaf');
-      G.World.removeResource(res); P.give('fibra', 2 + ((Math.random() * 2) | 0)); P.give('foglie', 2); P.give('bastone', 1);
-      if (res.berry) P.give('bacche', 3 + ((Math.random() * 3) | 0));
+      G.World.removeResource(res); P.give('fibra', 2 + ((Math.random() * 2) | 0) + (G.Skills.chance('contadino', 0.02) ? 1 : 0)); P.give('foglie', 2); P.give('bastone', 1);
+      if (res.berry) P.give('bacche', 3 + ((Math.random() * 3) | 0) + (G.Skills.chance('contadino', 0.03) ? 2 : 0));
+      G.Skills.add('contadino', res.berry ? 3 : 2);
     } else if (res.type === 'grass') {
       G.FX.burst(res.x, res.y + 0.3, res.z, [0.4, 0.55, 0.2], 5, 1.5);
-      G.World.removeResource(res); if (Math.random() < (tool === 'coltello' ? 1 : 0.7)) P.give('fibra', 1);
+      G.World.removeResource(res); if (Math.random() < (tool === 'coltello' ? 1 : 0.7)) P.give('fibra', 1 + (G.Skills.chance('contadino', 0.02) ? 1 : 0)); G.Skills.add('contadino', 1);
     } else if (res.type === 'shell') { G.World.removeResource(res); P.give('conchiglia', 1); }
     else if (res.type === 'wood') {
       // tronchi caduti, ceppi e legni portati dal mare
@@ -585,6 +602,7 @@
       else if (res.sub === 'cactus') { P.give('polpa_cactus', 2); P.give('fibra', 1); if (tool !== 'coltello' && tool !== 'ascia') { P.hurt(3); G.UI.toast('Ahi, le spine! Con il coltello è meglio', 'warn'); } }
       else if (res.sub === 'reed') { P.give('fibra', 2); if (Math.random() < 0.5) P.give('bastone', 1); }
       else { P.give('foglie', 2); P.give('fibra', 1); }
+      G.Skills.add('contadino', 2); if (G.Skills.chance('contadino', 0.02)) P.give(res.sub === 'mush' ? 'funghi' : 'fibra', 1);
     }
   }
   function fellTree(res) {
@@ -618,6 +636,8 @@
   P.secondary = function () {
     const it = P.held(), id = it ? it.id : null, tg = P.target;
     if (P.placing) { G.UI.placeConfirm(); return; }
+    if (G.Stealth && P.crouch && G.Stealth.steal(P)) return;
+    if (G.Sea && P.boat && !P.helm && (!P.held() || P.held().id === 'munizioni' || !G.Build.isPlaceable(P.held().id)) && G.Sea.stationToggle(P)) return;
     if (G.FreeBoat && G.FreeBoat.cur && G.FreeBoat.tryPlace(P)) return;
     if (P.wantsInteract()) { P.interact(); return; }
     if (tg && tg.kind === 'boat' && !G.Boats.isComplete(tg.boat)) { G.UI.openBoatBuild(tg.boat); return; }
@@ -794,7 +814,7 @@
   }
 
   P.serialize = () => ({ pos: [P.pos.x, P.pos.y, P.pos.z], yaw: P.yaw, pitch: P.pitch, health: P.health, hunger: P.hunger, thirst: P.thirst, inv: P.inv, sel: P.sel, spawn: P.spawn,
-    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp });
+    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina });
   P.resetProgress = function () { P.quests = []; P.questsDone = {}; P.discovered = {}; P.revealed = {}; P.explored = new Set(); P.kills = {}; P.rareFound = {}; P.stats = {}; P.known = {}; };
   P.load = function (d) {
     if (!d) return;
@@ -804,6 +824,7 @@
     P.explored = new Set(d.explored || []); P.kills = d.kills || {}; P.rareFound = d.rareFound || {}; P.stats = d.stats || {}; P.known = d.known || {};
     P.equip = Array.isArray(d.equip) ? d.equip.slice(0, 4).concat([null, null, null, null]).slice(0, 4) : [null, null, null, null];
     if (typeof d.temp === 'number') P.temp = d.temp;
+    G.Skills.load(d.skills); if (typeof d.stamina === 'number') P.stamina = d.stamina;
     // il libro non sta più nell'inventario: si apre con B
     P.inv = P.inv.map((st) => (st && st.id === 'libro' ? null : st)); P.equip = P.equip.map((st) => (st && st.id === 'libro' ? null : st));
     P.vmLId = undefined; P.vmId = undefined;

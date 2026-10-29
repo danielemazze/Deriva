@@ -36,6 +36,7 @@
     ['t-hold', 'Stiva', 'KeyG', () => P().boat && P().boat.inv],
     ['t-view', 'Vista', 'KeyV', () => P().boat],
     ['t-sprint', 'Corri', 'sprint', () => !P().boat && !P().fly],
+    ['t-crouch', 'Abbassati', 'crouch', () => !P().boat && !P().fly && !P().swim],
     ['t-drop', 'Lascia', 'drop', () => !!(P().held() && !G.UI.open && !P().boat)],
     ['t-spy', 'Guarda', 'spy', () => G.Combat && G.Combat.hasSpy],
     ['t-zoom', 'Zoom', 'spyzoom', () => G.Combat && G.Combat._spyOn],
@@ -134,7 +135,8 @@
       b.addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (code === 'menu') { P().keys = {}; P().ax.f = P().ax.r = 0; G.UI.showMenu('main'); G.save(); return; }
-        if (code === 'sprint') { T.sprint = !T.sprint; P().keys.ShiftLeft = T.sprint; b.classList.toggle('on', T.sprint); return; }
+        if (code === 'sprint') { T.sprint = !T.sprint; P().keys.ControlLeft = T.sprint; b.classList.toggle('on', T.sprint); if (T.sprint && T.crouch) { T.crouch = false; P().keys.ShiftLeft = false; $('t-crouch').classList.remove('on'); } return; }
+        if (code === 'crouch') { T.crouch = !T.crouch; P().keys.ShiftLeft = T.crouch; b.classList.toggle('on', T.crouch); if (T.crouch && T.sprint) { T.sprint = false; P().keys.ControlLeft = false; $('t-sprint').classList.remove('on'); } return; }
         if (code === 'talk') { G.Voice.setPTT(true); b.classList.add('on'); return; }
         if (code === 'drop') { G.Drops && G.Drops.throwHeld(false); return; }
         if (code === 'spy') { G.Combat.touchSpy = !G.Combat.touchSpy; b.classList.toggle('on', G.Combat.touchSpy); return; }
@@ -185,7 +187,8 @@
       for (const [id, , , show] of CONTEXT) { const b = $(id), v = !!show(); if (b.hidden === v) b.hidden = !v; }
       const p = P(), dn = $('t-down'), need = !!(p.swim || p.fly || p.under);
       if (dn.hidden === need) dn.hidden = !need;
-      if (T.sprint && (p.boat || p.fly)) { T.sprint = false; p.keys.ShiftLeft = false; $('t-sprint').classList.remove('on'); }
+      if (T.sprint && (p.boat || p.fly)) { T.sprint = false; p.keys.ControlLeft = false; $('t-sprint').classList.remove('on'); }
+      if (T.crouch && (p.boat || p.fly || p.swim)) { T.crouch = false; p.keys.ShiftLeft = false; $('t-crouch').classList.remove('on'); }
     }
     const port = innerHeight > innerWidth * 1.05;
     const rot = $('rotate'); if (rot && rot.hidden === (port && !!G.started && !G.UI.menu)) rot.hidden = !(port && G.started && !G.UI.menu);

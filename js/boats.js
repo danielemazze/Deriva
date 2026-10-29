@@ -227,7 +227,7 @@
         if (key === 'galeone') {
           add('Cassero di poppa', 'assi', 20, M.merge([box(W * 0.8, 2.6, L * 0.14, 0, deckY + 1.3, -L * 0.43), box(W * 0.86, 0.16, L * 0.16, 0, deckY + 2.68, -L * 0.43), box(W * 0.7, 0.9, 0.08, 0, deckY + 3.2, -L * 0.36), box(0.8, 1.8, 0.06, 0, deckY + 0.9, -L * 0.36 + 0.02)]), 'planks');
           add('Castello di prua', 'assi', 12, M.merge([box(W * 0.72, 1.8, L * 0.16, 0, deckY + 0.9, L * 0.42), box(W * 0.76, 0.14, L * 0.17, 0, deckY + 1.85, L * 0.42)]), 'planks');
-          const cannons = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const t = 0.28 + i * 0.1, z = (t - 0.5) * L, x = sd * (H.hw(t) - 0.35); const c = cyl(0.13, 0.17, 1.4, x, deckY + 0.55, z, 0, Math.PI / 2); c.translate(0, 0, 0); cannons.push(M.colorize(c, 0.07, 0.07, 0.075)); cannons.push(M.colorize(new THREE.BoxGeometry(0.5, 0.35, 0.6).translate(x - sd * 0.4, deckY + 0.2, z), 0.32, 0.2, 0.11)); }
+          const cannons = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const t = 0.28 + i * 0.1, z = (t - 0.5) * L, x = sd * (H.hw(t) - 0.35); const c = cyl(0.13, 0.17, 1.4, x, deckY + 0.55, z, 0, -sd * Math.PI / 2); c.translate(0, 0, 0); cannons.push(M.colorize(c, 0.07, 0.07, 0.075)); cannons.push(M.colorize(new THREE.BoxGeometry(0.5, 0.35, 0.6).translate(x - sd * 0.4, deckY + 0.2, z), 0.32, 0.2, 0.11)); }
           add('Cannoni', 'cannone', 6, M.merge(cannons), 'cannon');
           const fl = new THREE.PlaneGeometry(2.2, 1.4); fl.translate(1.1, deckY + 15.5 + 0.6, (0.5 - 0.5) * L); add('Bandiera', 'stoffa', 2, M.colorize(fl, 0.12, 0.12, 0.12), 'cloth');
         }

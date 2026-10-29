@@ -61,6 +61,13 @@
 
   /* ---------------- palle di cannone ---------------- */
   let ballGeo = null, ballMat = null;
+  S.fireBallV = function (from, v, owner) {
+    if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.4, metalness: 0.6 }); }
+    const m = new THREE.Mesh(ballGeo, ballMat); m.position.copy(from); m.castShadow = true; G.scene.add(m);
+    S.balls.push({ m, pos: from.clone(), vel: v.clone(), owner, t: 0 });
+    G.FX.burst(from.x, from.y, from.z, [0.75, 0.72, 0.7], 16, 2.8, { size: 1.7 });
+    if (G.Audio) { const dist = from.distanceTo(G.Player.pos); G.Audio.cannon ? G.Audio.cannon(dist) : G.Audio.hit('stone'); }
+  };
   S.fireBall = function (from, to, owner, spread) {
     if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.4, metalness: 0.6 }); }
     const d = _a.subVectors(to, from), hd = Math.hypot(d.x, d.z), T = Math.max(0.6, hd / 42);
@@ -82,10 +89,10 @@
         if (!!bo.pirate === (b.owner === 'pirate') || bo.sunk) continue;
         const bp = S.boatPos(bo, _b), fx = Math.sin(bo.yaw), fz = Math.cos(bo.yaw), dx = b.pos.x - bp.x, dz = b.pos.z - bp.z;
         const along = dx * fx + dz * fz, side = dx * fz - dz * fx;
-        if (Math.abs(along) < bo.T.L * 0.5 && Math.abs(side) < Math.max(1.1, bo.T.W * 0.55) && b.pos.y < bp.y + 3 && b.pos.y > bp.y - 2.2) { S.damageBoat(bo, b.owner === 'pirate' ? 14 + Math.random() * 8 : 26 + Math.random() * 10, b.pos.x, b.pos.y, b.pos.z); hit = true; break; }
+        if (Math.abs(along) < bo.T.L * 0.5 && Math.abs(side) < Math.max(1.1, bo.T.W * 0.55) && b.pos.y < bp.y + 3 && b.pos.y > bp.y - 2.2) { S.damageBoat(bo, b.owner === 'pirate' ? 14 + Math.random() * 8 : 26 + Math.random() * 10, b.pos.x, b.pos.y, b.pos.z); hit = true; if (b.owner === 'player') G.Skills.add('fuoco', 5); break; }
       }
       if (!hit && b.owner === 'pirate' && Math.hypot(b.pos.x - P.pos.x, b.pos.y - (P.pos.y + 1), b.pos.z - P.pos.z) < 1.3) { P.hurt(26); hit = true; }
-      if (!hit && b.owner !== 'pirate') for (const e of S.enc) { if (e.type !== 'kraken' || e.dead) continue; const h = krakenRay(e, b.pos, null, 0); if (h) { S.hitEnc(e, 55, b.pos); hit = true; break; } }
+      if (!hit && b.owner !== 'pirate') for (const e of S.enc) { if (e.type !== 'kraken' || e.dead) continue; const h = krakenRay(e, b.pos, null, 0); if (h) { S.hitEnc(e, 55, b.pos); hit = true; if (b.owner === 'player') G.Skills.add('fuoco', 5); break; } }
       const wy = G.waveHeight(b.pos.x, b.pos.z, G.clock);
       if (!hit && b.pos.y < wy) { G.FX.burst(b.pos.x, wy + 0.2, b.pos.z, [0.85, 0.93, 0.97], 18, 4, { size: 1.4 }); if (G.Audio) G.Audio.splash(); hit = true; }
       if (!hit && b.pos.y < G.World.groundAt(b.pos.x, b.pos.z)) { G.FX.burst(b.pos.x, b.pos.y + 0.3, b.pos.z, [0.5, 0.45, 0.4], 14, 3); hit = true; }
@@ -109,7 +116,7 @@
     if ((S.gunCd1 || 0) > 0) return true;
     if (!G.creative() && P.count('munizioni') <= 0) { G.UI.toast('Per sparare col cannone serve una munizione', 'warn'); S.gunCd1 = 1; return true; }
     if (!G.creative()) P.take('munizioni', 1);
-    S.gunCd1 = 1.6;
+    S.gunCd1 = 1.6 * G.Skills.less('fuoco', 0.01, 0.5); G.Skills.add('fuoco', 1);
     const cy = Math.cos(b.yaw), sy = Math.sin(b.yaw), wx = b.root.position.x + best.x * cy + best.z * sy, wz = b.root.position.z - best.x * sy + best.z * cy;
     const ox = best.sd * cy, oz = -best.sd * sy, look = P.lookDir(_c);
     const from = new V3(wx + ox * 0.9, b.root.position.y + (b.T.deck || 1) + 0.55, wz + oz * 0.9);
@@ -117,13 +124,147 @@
     S.fireBall(from, new V3(from.x + ox * aim + look.x * 8, G.SEA, from.z + oz * aim + look.z * 8), 'player', 2.5);
     return true;
   };
+  /* ---------------- postazione al cannone ----------------
+     Tasto destro vicino a un cannone del galeone: ti metti dietro la canna.
+     A D (o il mouse) la girano, W S la alzano e abbassano, clic sinistro spara. */
+  const ST_V = 38; // velocità della palla (m/s)
+  S.station = null;
+  S.stationToggle = function (P) {
+    if (S.station) { S.stationLeave(P); return true; }
+    const c = S.nearCannon(P); if (!c) return false;
+    const b = P.boat, ci = b.parts.findIndex((p) => p.name === 'Cannoni'); if (ci < 0) return false;
+    const mesh = b.meshes[ci], geo = mesh.geometry, pos = geo.attributes.position, col = geo.attributes.color;
+    // si trovano i vertici della canna (scuri) di questo cannone e si nascondono: al loro posto una canna che si muove
+    const idx = []; let cx = 0, cy = 0, cz = 0;
+    for (let i = 0; i < pos.count; i++) {
+      if (col && col.getX(i) > 0.12) continue;
+      const x = pos.getX(i), z = pos.getZ(i);
+      if (Math.abs(z - c.z) < 1.0 && Math.abs(x - c.x) < 1.2 && Math.sign(x || 1) === c.sd) { idx.push(i); cx += x; cy += pos.getY(i); cz += z; }
+    }
+    if (!idx.length) return false;
+    cx /= idx.length; cy /= idx.length; cz /= idx.length;
+    const orig = idx.map((i) => [pos.getX(i), pos.getY(i), pos.getZ(i)]);
+    for (const i of idx) pos.setXYZ(i, cx, cy, cz);
+    pos.needsUpdate = true;
+    const piv = new THREE.Group(); piv.position.set(cx, cy, cz); b.inner.add(piv);
+    const bg = new THREE.CylinderGeometry(0.13, 0.17, 1.4, 14).rotateX(Math.PI / 2).translate(0, 0, 0.25);
+    const ring = new THREE.TorusGeometry(0.15, 0.035, 6, 14).translate(0, 0, 0.93);
+    const barrel = new THREE.Mesh(bg, G.MAT.cannon || mesh.material), lip = new THREE.Mesh(ring, G.MAT.cannon || mesh.material);
+    barrel.castShadow = true; piv.add(barrel); piv.add(lip);
+    S.station = { b, c, mesh, idx, orig, piv, barrel, yo: 0, pi: 0.12, cd: 0, kick: 0, y0: P.yaw, p0: P.pitch };
+    P.local.set(cx - c.sd * 1.25, b.T.deck, cz);
+    S.stationAim(P, 0); P._stYaw = P.yaw; P._stPit = P.pitch;
+    if (G.UI) G.UI.toast('Al cannone · A D ruota · W S alza · clic sinistro fuoco · tasto destro per lasciarlo');
+    document.body.classList.add('atcannon');
+    return true;
+  };
+  S.stationLeave = function (P) {
+    const st = S.station; if (!st) return;
+    const pos = st.mesh.geometry.attributes.position;
+    st.idx.forEach((i, k) => pos.setXYZ(i, st.orig[k][0], st.orig[k][1], st.orig[k][2])); pos.needsUpdate = true;
+    st.b.inner.remove(st.piv); st.barrel.geometry.dispose();
+    S.station = null; document.body.classList.remove('atcannon');
+    const h = document.getElementById('cannhud'); if (h) h.hidden = true;
+    if (P) { P.pitch = Math.max(-0.3, Math.min(0.3, P.pitch)); }
+  };
+  // direzione della canna nella barca e nel mondo
+  function stDir(st, out) {
+    const sd = st.c.sd, cy = Math.cos(st.yo), sy = Math.sin(st.yo), cp = Math.cos(st.pi), sp = Math.sin(st.pi);
+    out.set(sd * cy * cp, sp, sd * sy * cp); // fuori = (sd,0,0), destra = (0,0,sd)
+    return out;
+  }
+  const _sq = new THREE.Quaternion(), _sv = new V3(), _sw = new V3(), _sp = new V3(), _up = new V3(0, 1, 0), _z = new V3(0, 0, 1);
+  S.stationAim = function (P, dt) {
+    const st = S.station; if (!st) return;
+    stDir(st, _sv); st.piv.quaternion.setFromUnitVectors(_z, _sv);
+    st.kick = Math.max(0, st.kick - dt * 3); st.barrel.position.z = -st.kick * 0.35;
+    st.piv.updateWorldMatrix(true, false);
+    st.piv.getWorldPosition(_sp); st.b.inner.getWorldQuaternion(_sq);
+    _sw.copy(_sv).applyQuaternion(_sq);
+    P.yaw = Math.atan2(-_sw.x, -_sw.z); P.pitch = Math.asin(G.clamp(_sw.y, -1, 1));
+    st.world = _sw; st.muzzle = _sp.clone().addScaledVector(_sw, 1.0);
+  };
+  S.stationUpdate = function (dt, P) {
+    const st = S.station; if (!st) return false;
+    if (!P.boat || P.boat !== st.b || P.helm || st.b.sunk || P.health <= 0) { S.stationLeave(P); return false; }
+    const k = P.keys;
+    if (st.byaw !== undefined && P._stYaw !== undefined) P._stYaw += G.angleDiff(st.byaw, st.b.yaw); st.byaw = st.b.yaw;
+    // il mouse muove la canna come lo sguardo
+    if (P._stYaw !== undefined) { let dy = P._stYaw - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yo += dy; st.pi += P.pitch - P._stPit; }
+    st.yo += ((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0)) * dt * 0.6;
+    st.pi += ((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0)) * dt * 0.35;
+    st.yo = G.clamp(st.yo, -0.62, 0.62); st.pi = G.clamp(st.pi, -0.09, 0.44);
+    st.cd = Math.max(0, st.cd - dt);
+    S.stationAim(P, dt); P._stYaw = P.yaw; P._stPit = P.pitch;
+    S.stationHud(P);
+    return true;
+  };
+  // posizione della visuale: dietro e sopra la canna
+  S.stationEye = function (P, cam) {
+    const st = S.station; if (!st || !st.world) return false;
+    const w = st.world, fl = Math.hypot(w.x, w.z) || 1;
+    cam.position.set(_sp.x - w.x / fl * 1.45, _sp.y + 0.62, _sp.z - w.z / fl * 1.45);
+    cam.rotation.set(P.pitch - 0.05, P.yaw, 0, 'YXZ');
+    return true;
+  };
+  S.stationRange = function () {
+    const st = S.station; if (!st || !st.muzzle) return 0;
+    const y0 = Math.max(0, st.muzzle.y - G.SEA), vy = Math.sin(st.pi) * ST_V, vh = Math.cos(st.pi) * ST_V, g = 9.8;
+    return vh * (vy + Math.sqrt(vy * vy + 2 * g * y0)) / g;
+  };
+  S.stationFire = function (P) {
+    const st = S.station; if (!st) return false;
+    if (st.cd > 0) return true;
+    if (!G.creative() && P.count('munizioni') <= 0) { G.UI.toast('Per sparare col cannone serve una munizione', 'warn'); st.cd = 0.8; return true; }
+    if (!G.creative()) P.take('munizioni', 1);
+    st.cd = 3.2 * G.Skills.less('fuoco', 0.012, 0.45); st.kick = 1;
+    const spread = 0.9 * G.Skills.less('fuoco', 0.015, 0.25);
+    const v = st.world.clone().multiplyScalar(ST_V); v.x += (Math.random() - 0.5) * spread; v.y += (Math.random() - 0.5) * spread * 0.5; v.z += (Math.random() - 0.5) * spread;
+    S.fireBallV(st.muzzle.clone(), v, 'player');
+    G.Skills.add('fuoco', 2);
+    if (P.shake !== undefined) P.shake = 0.25;
+    G.UI.refreshHotbar();
+    return true;
+  };
+  // mirino: anello al centro, scale di rotazione e alzo, pannello coi dati
+  let cHud = null, cCv = null;
+  S.stationHud = function (P) {
+    const st = S.station;
+    if (!cHud) {
+      cHud = document.createElement('div'); cHud.id = 'cannhud';
+      cHud.innerHTML = '<canvas></canvas><div class="chkeys"><kbd>A</kbd><kbd>D</kbd> ruota · <kbd>W</kbd><kbd>S</kbd> alza / abbassa · <kbd>Clic sinistro</kbd> fuoco · <kbd>Tasto destro</kbd> lascia il cannone</div><div class="chpanel"><div><small>ALZO</small><b data-k="a"></b></div><div><small>ROTAZIONE</small><b data-k="r"></b></div><div><small>GITTATA</small><b data-k="g"></b></div><div><small>MUNIZIONI</small><b data-k="m"></b></div><div class="chrel"><small data-k="s">PRONTO</small><i><u></u></i></div></div>';
+      (document.getElementById('cHud') || document.body).appendChild(cHud); cCv = cHud.querySelector('canvas');
+    }
+    cHud.hidden = false;
+    const W = innerWidth, H = innerHeight; if (cCv.width !== W || cCv.height !== H) { cCv.width = W; cCv.height = H; }
+    const x = cCv.getContext('2d'); x.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2 + Math.tan(0.05) * (H / 2) / Math.tan((G.Player.cam.fov || 75) * Math.PI / 360);
+    x.strokeStyle = 'rgba(236,208,153,.95)'; x.fillStyle = '#ecd099'; x.lineWidth = 2; x.shadowColor = 'rgba(0,0,0,.7)'; x.shadowBlur = 3;
+    x.beginPath(); x.arc(cx, cy, 22, 0, 7); x.stroke();
+    x.beginPath(); for (const [a, b, c, d] of [[-38, 0, -26, 0], [26, 0, 38, 0], [0, -38, 0, -26], [0, 26, 0, 38]]) { x.moveTo(cx + a, cy + b); x.lineTo(cx + c, cy + d); } x.stroke();
+    x.beginPath(); x.arc(cx, cy, 2.5, 0, 7); x.fill();
+    const el = Math.round(st.pi * 57.3), ro = Math.round(st.yo * 57.3);
+    x.font = '13px Signika, sans-serif'; x.textBaseline = 'middle'; x.lineWidth = 1.5;
+    const sx = cx + 150;
+    for (let e = -5; e <= 25; e += 5) { const yy = cy - (e - el) * 9; if (yy < cy - 150 || yy > cy + 150) continue; x.globalAlpha = 0.75; x.beginPath(); x.moveTo(sx, yy); x.lineTo(sx + (e % 10 === 0 ? 16 : 10), yy); x.stroke(); if (e % 10 === 0 || e === -5 || e === 25) x.fillText(e + '°', sx + 22, yy); }
+    x.globalAlpha = 1; x.beginPath(); x.moveTo(sx - 4, cy); x.lineTo(sx - 14, cy - 7); x.lineTo(sx - 14, cy + 7); x.closePath(); x.fill();
+    const ty = cy - 150; x.textAlign = 'center';
+    for (let r = -35; r <= 35; r += 5) { const xx = cx + (r - ro) * 9; if (Math.abs(xx - cx) > 300) continue; x.globalAlpha = r === 0 ? 1 : 0.7; x.beginPath(); x.moveTo(xx, ty); x.lineTo(xx, ty - (r % 15 === 0 ? 14 : 8)); x.stroke(); if (r % 15 === 0) x.fillText((r > 0 ? '+' : '') + r + '°', xx, ty - 24); }
+    x.globalAlpha = 1; x.beginPath(); x.moveTo(cx, ty + 4); x.lineTo(cx - 7, ty + 14); x.lineTo(cx + 7, ty + 14); x.closePath(); x.fill(); x.textAlign = 'left';
+    const q = (k) => cHud.querySelector(`[data-k=${k}]`);
+    q('a').textContent = (el >= 0 ? '+' : '') + el + '°'; q('r').textContent = (ro > 0 ? '+' : '') + ro + '°';
+    q('g').textContent = Math.round(S.stationRange()) + ' m'; q('m').textContent = G.creative() ? '∞' : P.count('munizioni');
+    const maxCd = 3.2 * G.Skills.less('fuoco', 0.012, 0.45), f = 1 - st.cd / maxCd;
+    cHud.querySelector('.chrel u').style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%';
+    q('s').textContent = st.cd > 0 ? 'RICARICA' : 'PRONTO';
+  };
   S.broadside = function (P) {
     const b = P.boat; if (!b || b.free) return false;
     if (!S.hasCannons(b)) return false;
     if ((S.gunCd || 0) > 0) return true;
     if (!G.creative() && P.count('munizioni') <= 0) { G.UI.toast('Per i cannoni servono munizioni', 'warn'); S.gunCd = 1; return true; }
     if (!G.creative()) P.take('munizioni', 1);
-    S.gunCd = 3.5;
+    S.gunCd = 3.5 * G.Skills.less('fuoco', 0.01, 0.5); G.Skills.add('fuoco', 2);
     const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw), look = P.lookDir(_c), side = (look.x * fz - look.z * fx) > 0 ? 1 : -1; // destra = (cos, -sin)
     const rx = Math.cos(b.yaw) * side, rz = -Math.sin(b.yaw) * side;
     for (let k = 0; k < 5; k++) {

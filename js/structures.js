@@ -7,7 +7,7 @@
    ========================================================== */
 (function () {
   const G = globalThis.G;
-  const S = (G.Structures = { active: new Map(), timer: 0, npcs: [], lights: [] });
+  const S = (G.Structures = { active: new Map(), timer: 0, npcs: [], lights: [], stalls: new Map() });
   const V3 = THREE.Vector3;
   const M = () => G.MODELS;
 
@@ -394,6 +394,7 @@
       put(bk, 'wood', BOX(1.8, 0.2, 0.25, 0, 2.6, 0), mtx, [0.75, 0.35, 0.2]);
       cols.push({ x0: p.x - 0.35, x1: p.x + 0.35, y0: p.y, y1: p.y + 3.2, z0: p.z - 0.35, z1: p.z + 0.35 });
     } else if (p.k === 'bancarella') {
+      S.stalls.set((v.id || v.x + ',' + v.z) + ':' + Math.round(p.x) + ':' + Math.round(p.z), { x: p.x, y: p.y, z: p.z, rot: p.rot || 0, v });
       for (const [px, pz] of [[-1.1, -0.6], [1.1, -0.6], [-1.1, 0.6], [1.1, 0.6]]) put(bk, 'wood', BOX(0.1, 2.3, 0.1, px, 1.15, pz), mtx, [0.5, 0.38, 0.26]);
       put(bk, 'wood', BOX(2.3, 0.1, 1.2, 0, 0.9, 0), mtx, [0.62, 0.46, 0.3]);
       const aw = BOX(2.7, 0.04, 1.7, 0, 2.35, 0.1); aw.rotateX(0.18); put(bk, 'cloth', aw, mtx, [[0.85, 0.3, 0.22], [0.25, 0.55, 0.45], [0.9, 0.75, 0.3], [0.3, 0.45, 0.7], [0.6, 0.3, 0.55], [0.9, 0.9, 0.85]][p.col || 0]);
@@ -1320,7 +1321,19 @@
     for (const n of S.npcs) {
       let speed = 0, state = 'idle';
       const d = n.def;
-      if (n.way && n.len > 0) {
+      if (n.angry > 0) {
+        // derubati: inseguono il ladro e lo colpiscono
+        n.angry -= dt; n.atkT = Math.max(0, (n.atkT || 0) - dt);
+        const dx = P.pos.x - n.x, dz = P.pos.z - n.z, dist = Math.hypot(dx, dz);
+        n.yaw += G.angleDiff(n.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 6);
+        if (dist > 1.3 && dist < 60) { const sp = 3.7; n.x += dx / dist * sp * dt; n.z += dz / dist * sp * dt; speed = sp; }
+        n.y = Math.max(G.World.groundAt(n.x, n.z), G.Build.groundAt(n.x, n.z, G.World.groundAt(n.x, n.z) + 1.5, 0.05));
+        if (dist < 1.8 && n.atkT <= 0 && Math.abs(P.pos.y - n.y) < 2 && !P.boat) { n.atkT = 1.3; n.hitT = 0.45; P.hurt(7, false, 'npc'); if (G.Audio) G.Audio.hit('soft'); }
+        if (n.hitT > 0) { n.hitT -= dt; state = 'attack'; }
+        if (dist > 55 || P.health <= 0) n.angry = 0;
+        if (n.angry <= 0) { n.angry = 0; if (n.home0) { n.x = n.home0[0]; n.z = n.home0[1]; } }
+        n.p.root.visible = true;
+      } else if (n.way && n.len > 0) {
         // percorso in funzione del tempo: uguale per tutti i giocatori
         let s = ((G.clock * d.speed + d.ph * 10) % n.len + n.len) % n.len;
         for (let i = 0; i < n.way.length; i++) {
@@ -1332,7 +1345,8 @@
         n.p.root.visible = !night;
       } else {
         const dx = P.pos.x - n.x, dz = P.pos.z - n.z, dist = Math.hypot(dx, dz);
-        if (dist < 6) n.yaw += G.angleDiff(n.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 3);
+        // si girano verso di te quando ti avvicini, ma non se sei accovacciato e non ti hanno visto
+        if (dist < 6 && !(P.crouch && !(G.Stealth && G.Stealth.seen))) n.yaw += G.angleDiff(n.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 3);
         n.p.root.visible = true;
       }
       if (n.talking > 0) { n.talking -= dt; state = 'talk'; speed = 0; const dx = P.pos.x - n.x, dz = P.pos.z - n.z; n.yaw += G.angleDiff(n.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 5); }
@@ -1340,7 +1354,7 @@
       const far = Math.hypot(P.pos.x - n.x, P.pos.z - n.z) > (G.lowQ() ? 45 : 85);
       if (far) { n.p.root.visible = false; continue; }
       n.p.root.position.set(n.x, n.y, n.z); n.p.root.rotation.y = n.yaw;
-      G.People.animate(n.p, dt, speed, state, 0);
+      G.People.animate(n.p, dt, speed, state, n.hitT > 0 ? 1 - n.hitT / 0.45 : 0);
       const wantSh = Math.hypot(P.pos.x - n.x, P.pos.z - n.z) < 22;
       if (n._sh !== wantSh) { n._sh = wantSh; n.p.root.traverse((o) => { if (o.isMesh) o.castShadow = wantSh; }); }
       const dn = Math.hypot(P.pos.x - n.x, P.pos.z - n.z); n.tag.visible = dn < 10 && dn > 2.2;

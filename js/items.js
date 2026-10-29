@@ -20,6 +20,8 @@
     conchiglia: { n: 'Conchiglia', d: 'Un ricordo della spiaggia.', cat: 'res' },
     cocco: { n: 'Noce di cocco', d: 'Dissetante e nutriente.', cat: 'food', food: 6, water: 20 },
     bacche: { n: 'Bacche', d: 'Raccolte dai cespugli.', cat: 'food', food: 6, water: 3 },
+    mela: { n: 'Mela', d: 'Croccante: dal banco di un mercante.', cat: 'food', food: 8, water: 5 },
+    arancia: { n: 'Arancia', d: 'Succosa: disseta e sfama.', cat: 'food', food: 6, water: 10 },
     polpa_cactus: { n: 'Polpa di cactus', d: 'Amara ma piena d’acqua: salva la vita nel deserto.', cat: 'food', food: 3, water: 16 },
     funghi: { n: 'Funghi', d: 'Crescono all’ombra dei boschi. Meglio cuocerli.', cat: 'food', food: 4, water: 1 },
     funghi_cotti: { n: 'Funghi arrosto', d: 'Saporiti e sicuri.', cat: 'food', food: 12, water: 0 },
@@ -376,6 +378,12 @@
     piume(c) { c.save(); c.translate(32, 32); c.rotate(0.6); c.beginPath(); c.moveTo(0, 26); c.quadraticCurveTo(14, 0, 0, -26); c.quadraticCurveTo(-14, 0, 0, 26); c.fillStyle = lg(c, -10, 0, 10, 0, ['#f6f2ea', '#d8d0c2']); c.fill(); outline(c, 1.5); c.strokeStyle = '#9a8f80'; c.beginPath(); c.moveTo(0, 28); c.lineTo(0, -24); c.stroke(); c.restore(); },
     conchiglia(c) { c.beginPath(); c.moveTo(32, 52); for (let a = -1.3; a <= 1.3; a += 0.26) c.lineTo(32 + Math.sin(a) * 24, 48 - Math.cos(a) * 34); c.closePath(); c.fillStyle = lg(c, 0, 14, 0, 52, ['#fbe1cf', '#f0b494', '#d98c6a']); c.fill(); outline(c);
       c.strokeStyle = 'rgba(150,80,50,0.5)'; for (let a = -1.0; a <= 1.0; a += 0.26) { c.beginPath(); c.moveTo(32, 52); c.lineTo(32 + Math.sin(a) * 22, 48 - Math.cos(a) * 31); c.stroke(); } },
+    mela(c) { c.beginPath(); c.arc(25, 36, 15, 0, 7); c.arc(39, 36, 15, 0, 7); c.fillStyle = rg(c, 30, 34, 22, ['#ff8a70', '#d8321e', '#7a1408']); c.fill(); outline(c);
+      c.strokeStyle = '#5a3a1e'; c.lineWidth = 3; c.beginPath(); c.moveTo(32, 24); c.quadraticCurveTo(33, 16, 36, 12); c.stroke();
+      c.beginPath(); c.moveTo(34, 16); c.quadraticCurveTo(44, 10, 48, 16); c.quadraticCurveTo(40, 20, 34, 16); c.fillStyle = '#5c9a32'; c.fill(); },
+    arancia(c) { c.beginPath(); c.arc(32, 35, 20, 0, 7); c.fillStyle = rg(c, 32, 35, 20, ['#ffd08a', '#f08a1a', '#9a4a06']); c.fill(); outline(c);
+      c.fillStyle = 'rgba(120,60,0,0.35)'; for (let i = 0; i < 14; i++) { c.beginPath(); c.arc(22 + (i * 37 % 20), 26 + (i * 23 % 20), 1, 0, 7); c.fill(); }
+      c.beginPath(); c.moveTo(32, 16); c.quadraticCurveTo(42, 8, 46, 14); c.quadraticCurveTo(38, 19, 32, 16); c.fillStyle = '#4f8a2e'; c.fill(); },
     cocco(c) { c.beginPath(); c.arc(32, 34, 20, 0, 7); c.fillStyle = rg(c, 32, 34, 20, ['#8a6238', '#5a3a1e', '#3a2410']); c.fill(); outline(c);
       c.strokeStyle = 'rgba(30,18,8,0.5)'; c.lineWidth = 1; for (let i = 0; i < 10; i++) { c.beginPath(); c.arc(32, 34, 18, i * 0.6, i * 0.6 + 0.35); c.stroke(); }
       for (const [x, y] of [[26, 26], [34, 24], [30, 31]]) { c.beginPath(); c.arc(x, y, 2.4, 0, 7); c.fillStyle = '#26170a'; c.fill(); } },

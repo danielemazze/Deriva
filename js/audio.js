@@ -318,6 +318,7 @@
   };
   A.pickup = () => { const f = rnd(560, 700); tone('sine', f, f * 1.5, 0.07, 0.08, 0, U()); tone('triangle', f * 2, f * 2.4, 0.05, 0.025, 0.03, U()); };
   A.craft = () => { modal('wood', 0.3, 0, undefined, 1.2); modal('wood', 0.25, 0.14, undefined, 1.4); tone('triangle', 523, 523, 0.12, 0.08, 0.22, U()); tone('triangle', 784, 784, 0.18, 0.07, 0.3, U()); };
+  A.levelUp = () => { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f, 0.32, 0.06, i * 0.09, U())); };
   A.click = () => tone('sine', 900, 700, 0.04, 0.05, 0, U());
   A.coins = () => { for (let i = 0; i < 5; i++) tone('triangle', 1800 + Math.random() * 900, 1500, 0.08, 0.05, i * 0.06, U()); };
   A.bow = () => { if (A.ctx && playS('arco_scocca', A.bus.sfx, { vol: 0.9 })) return; A.bow0(); };
@@ -492,7 +493,7 @@
     const hp = P.health === undefined ? 100 : P.health;
     loopTo('cuore', 'battito_loop', dead ? 0 : G.clamp((35 - hp) / 25, 0, 1) * 0.75);
     // respiro affannato: dopo una lunga corsa o tornando a galla senz'aria
-    const moving = P.vel && P.vel.lengthSq() > 9, run = P.keys && (P.keys.ShiftLeft || P.keys.ShiftRight) && moving && !P.swim;
+    const moving = P.vel && P.vel.lengthSq() > 9, run = !!P.sprinting && moving && !P.swim;
     fat = G.clamp(fat + (run ? dt / 10 : -dt / 7), 0, 1.6);
     if (!P.under && lastOx < 45 && (P.oxygen === undefined || P.oxygen >= lastOx)) gasp = 1;
     lastOx = P.under ? (P.oxygen === undefined ? 100 : P.oxygen) : 100;
