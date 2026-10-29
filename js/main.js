@@ -181,7 +181,7 @@
 
   /* ---------------- SALVATAGGI ---------------- */
   G.mode = 'sopravvivenza';
-  G.creative = () => G.mode === 'creativa';
+  G.creative = () => G.mode === 'creativa' || !!(G.Player && G.Player.pcreative); // anche creativa data a un solo giocatore (menu Giocatori)
   G.serializeAll = () => ({
     v: 3, name: G.worldName, mode: G.mode, seed: G.seed, time: G.time, player: G.Player.serialize(), builds: G.Build.serialize(), boats: G.Boats.serialize(),
     removed: [...G.state.removed], killed: [...(G.state.killed || [])], wind: G.Boats.wind.dir, lv: G.WIND.level, chests: G.state.chests, enemies: !G.enemiesOff, ops: G.state.ops || [], vg: G.voiceGlobal ? 1 : 0, ki: G.keepInv ? 1 : 0,
@@ -476,7 +476,7 @@
       if (P.keys.ArrowUp) P.pitch = Math.min(1.5, P.pitch + dt * 1.5); if (P.keys.ArrowDown) P.pitch = Math.max(-1.5, P.pitch - dt * 1.5);
       P.update(dt, t);
       G.Combat.update(dt, P);
-      if (G.Stealth) G.Stealth.update(dt, P); if (G.Skills) G.Skills.update(dt);
+      if (G.Stealth) G.Stealth.update(dt, P); if (G.Skills) G.Skills.update(dt); if (G.Admin) G.Admin.update(dt);
       G.Entities.update(dt, P, t);
       G.Structures.update(dt, P);
       G.MapUI.track(dt);

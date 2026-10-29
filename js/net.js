@@ -7,7 +7,7 @@
   const G = globalThis.G;
   const V3 = THREE.Vector3;
   const N = (G.Net = { on: false, isHost: false, ws: null, id: null, slot: 0, ff: true, remotes: new Map(), ping: 0, stT: 0, pingT: 0, pdT: 0, timeT: 0, boatT: 0 });
-  N.PROTOCOL = 5; // 1.8: chat vocale e barca libera
+  N.PROTOCOL = 6; // 1.19.1: menu Giocatori (operatori)
   Object.defineProperty(N, 'online', { get: () => N.on });
   N.animalSeen = new Map();
   N.COLORS = [0xd9583b, 0x3b8fd9, 0x4fae5a, 0xe0b23a];
@@ -54,7 +54,7 @@
     if (!isHost) G.startFromSnapshot(m.snap, m.you);
     // mappa comune: si riceve quella della partita e si manda la propria
     if (G.MapUI) { G.MapUI.merge(m.snap && m.snap.mapEx, m.snap && m.snap.mapDisc); setTimeout(() => { if (N.on) G.MapUI.flush(true); }, 1500); }
-    for (const p of m.players) N.addRemote(p.id, p.name, p.slot, p.st);
+    for (const p of m.players) { N.addRemote(p.id, p.name, p.slot, p.st); const r = N.remotes.get(p.id); if (r) { r.host = !!p.host; r.op = !!p.op; } }
     G.UI.refreshPlayers();
     G.UI.toast(isHost ? 'Partita aperta: gli amici possono unirsi' : 'Sei nella partita!', 'good');
   };
@@ -81,7 +81,7 @@
       case 'bhull': { const b = G.Boats.byId(m.id); if (b) b.hull = m.h; break; }
       case 'bdelboat': { const b = G.Boats.byId(m.id); if (b) G.Boats.remove(b); break; }
       case 'vsig': if (G.Voice) G.Voice.onSignal(m); break;
-      case 'join': N.addRemote(m.id, m.name, m.slot); if (N.isHost && G.state.ops && G.state.ops.includes(String(m.name).toLowerCase())) setTimeout(() => N.setOp(m.id, true), 800); G.UI.toast(`${m.name} si è unito alla partita`, 'good'); G.UI.refreshPlayers(); break;
+      case 'join': N.addRemote(m.id, m.name, m.slot); { const r = N.remotes.get(m.id); if (r) r.host = !!m.host; } if (N.isHost && G.state.ops && G.state.ops.includes(String(m.name).toLowerCase())) setTimeout(() => N.setOp(m.id, true), 800); G.UI.toast(`${m.name} si è unito alla partita`, 'good'); G.UI.refreshPlayers(); break;
       case 'leave': N.removeRemote(m.id); G.UI.toast(`${m.name} ha lasciato la partita`); G.UI.refreshPlayers(); break;
       case 'st': { const r = N.remotes.get(m.id); if (r) N.applyState(r, m); break; }
       case 'pong': N.ping = Math.round(performance.now() - m.c); break;
@@ -109,6 +109,10 @@
       }
       case 'time': if (!N.isHost) { N.targetTime = m.time; if (m.vg !== undefined) G.voiceGlobal = !!m.vg; if (m.ki !== undefined) G.keepInv = !!m.ki; if (m.wind !== undefined) G.Boats.wind.dir = m.wind; if (m.lv !== undefined && m.lv !== G.WIND.level) G.setWind(m.lv); if (m.mode && m.mode !== G.mode) G.setMode(m.mode); if (m.en !== undefined && !!m.en === !!G.enemiesOff) G.setEnemies(!!m.en); if (m.wx && G.Climate) { const C = G.Climate; if (m.wx.kind !== C.state.kind) C.setWeather(m.wx.kind, m.wx.lock, false); C.state.t = m.wx.t; C.state.lock = !!m.wx.lock; G.moonOffset = m.wx.moon || 0; } } break;
       case 'chat': G.UI.toast(`${m.from}: ${m.text}`); break;
+      case 'padm': if (G.Admin) G.Admin.onCmd(m); break;
+      case 'kicked': G.UI.toast(`Sei stato espulso dalla partita da ${m.by}`, 'warn'); setTimeout(() => N.leave(true), 300); break;
+      case 'pinfo': if (G.Admin) G.Admin.onInfo(m.id, m.d); break;
+      case 'oplog': if (G.Admin) G.Admin.log(m.text); break;
       case 'drop': case 'dpick': if (G.Drops) G.Drops.onNet(m); break;
       case 'opset': N.op = !!m.on; G.UI.toast(m.on ? 'Ora sei operatore: puoi usare i comandi (T) e gli strumenti (K)' : 'Non sei più operatore', m.on ? 'good' : ''); if (G.UI.menu) G.UI.showMenu(G.UI.menu); break;
       case 'ops': for (const r of N.remotes.values()) r.op = (m.ids || []).includes(r.id); if (G.UI.menu === 'main') G.UI.showMenu('main'); break;
@@ -168,7 +172,7 @@
       N.stT = 1 / 15;
       const held = P.held();
       N.send({ t: 'st', p: [+P.pos.x.toFixed(2), +P.pos.y.toFixed(2), +P.pos.z.toFixed(2)], yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(2),
-        h: held ? held.id : null, lh: P.equip && P.equip[0] ? P.equip[0].id : null, bl: P.blocking ? 1 : 0, sw: P.swingT > 0.5 ? 1 : 0, sm: P.swim ? 1 : 0, b: P.boat ? P.boat.id : null, cr: G.creative() ? 1 : 0, hm: P.boat && P.helm && P.boat.T.sit ? 1 : 0, hp: Math.round(P.health), ping: N.ping });
+        h: held ? held.id : null, lh: P.equip && P.equip[0] ? P.equip[0].id : null, bl: P.blocking ? 1 : 0, sw: P.swingT > 0.5 ? 1 : 0, sm: P.swim ? 1 : 0, b: P.boat ? P.boat.id : null, cr: G.creative() || P.ghost ? 1 : 0, hm: P.boat && P.helm && P.boat.T.sit ? 1 : 0, hp: Math.round(P.health), ping: N.ping });
     }
     if (N.pingT <= 0) { N.pingT = 2; N.send({ t: 'ping', c: now }); }
     if (N.pdT <= 0) { N.pdT = 8; N.send({ t: 'pdata', data: P.serialize() }); }

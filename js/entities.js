@@ -195,7 +195,7 @@
       st.hurt = Math.max(0, st.hurt - dt); st.atkT = Math.max(0, (st.atkT || 0) - dt);
     } else {
       const P = G.Player;
-      const atk = G.animalStep(st, dt, blocks, [{ id: 'local', x: P.pos.x, y: P.pos.y, z: P.pos.z, sw: P.swim || P.under, cr: G.creative() || P.health <= 0 }]);
+      const atk = G.animalStep(st, dt, blocks, [{ id: 'local', x: P.pos.x, y: P.pos.y, z: P.pos.z, sw: P.swim || P.under, cr: G.creative() || P.ghost || P.health <= 0 }]);
       if (atk) E.onAttack(a, atk);
       if (st.sp === 'gallina') { st.eggTimer -= dt; if (st.eggTimer <= 0 && dP < 30) { st.eggTimer = 120 + Math.random() * 180; G.Build.dropPickup('uovo', st.x, W().groundAt(st.x, st.z) + 0.05, st.z); } }
     }

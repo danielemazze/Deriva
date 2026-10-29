@@ -405,15 +405,17 @@
     const moving = P.vel.lengthSq() > 1;
     const sprint = !!P.sprinting && moving && !P.swim;
     const Cl = G.Climate;
+    const h0 = P.hunger, t0 = P.thirst;
     P.hunger = Math.max(0, P.hunger - dt * 0.021 * (sprint ? 1.7 : P.swim ? 1.35 : 1) * (Cl ? Cl.hungerMul() : 1));
     P.thirst = Math.max(0, P.thirst - dt * 0.029 * (sprint ? 1.6 : 1) * (G.sky.day > 0.5 ? 1.1 : 0.85) * (Cl ? Cl.thirstMul() : 1));
+    if (P.noNeeds) { P.hunger = h0; P.thirst = t0; }
     if (P.under) { P.oxygen = Math.max(0, P.oxygen - dt * 100 / 32 * (G.Combat && G.Combat.has('pinne') ? 0.4 : 1)); if (P.oxygen <= 0) P.hurt(dt * 7, true); }
     else P.oxygen = Math.min(100, P.oxygen + dt * 40);
     if (P.hunger <= 0 || P.thirst <= 0) P.hurt(dt * 0.6, true);
     else if (P.hunger > 50 && P.thirst > 50 && P.health < 100) P.health = Math.min(100, P.health + dt * 0.5);
   }
   P.hurt = function (n, quiet, kind) {
-    if (G.creative()) return;
+    if (G.creative() || P.god) return;
     // parata con lo scudo: assorbe il 75% dei colpi (non le cadute né la fame)
     if (P.blocking && !quiet && kind !== 'fall') { const ab = Math.min(0.95, 0.75 + (G.Skills.lv('parata') - 1) * 0.004); n *= 1 - ab; if ((P._parT || 0) < performance.now()) { P._parT = performance.now() + 300; G.Skills.add('parata', 3); } if (G.Audio) G.Audio.hit('wood'); G.FX.burst(P.pos.x - Math.sin(P.yaw) * 0.6, P.pos.y + 1.2, P.pos.z - Math.cos(P.yaw) * 0.6, [0.85, 0.75, 0.5], 6, 1.5); if (!P._blockTip) { P._blockTip = 1; G.UI.toast('Parato con lo scudo!', 'good'); } }
     P.health -= n; if (!quiet) P.dmgFlash = 1; else P.dmgFlash = Math.max(P.dmgFlash, 0.25);
@@ -814,8 +816,8 @@
   }
 
   P.serialize = () => ({ pos: [P.pos.x, P.pos.y, P.pos.z], yaw: P.yaw, pitch: P.pitch, health: P.health, hunger: P.hunger, thirst: P.thirst, inv: P.inv, sel: P.sel, spawn: P.spawn,
-    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina });
-  P.resetProgress = function () { P.quests = []; P.questsDone = {}; P.discovered = {}; P.revealed = {}; P.explored = new Set(); P.kills = {}; P.rareFound = {}; P.stats = {}; P.known = {}; };
+    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina, pw: { god: !!P.god, pc: !!P.pcreative, fly: !!P.allowFly, nn: !!P.noNeeds, gh: !!P.ghost } });
+  P.resetProgress = function () { P.god = P.pcreative = P.allowFly = P.noNeeds = P.ghost = false; P.quests = []; P.questsDone = {}; P.discovered = {}; P.revealed = {}; P.explored = new Set(); P.kills = {}; P.rareFound = {}; P.stats = {}; P.known = {}; };
   P.load = function (d) {
     if (!d) return;
     P.pos.set(d.pos[0], d.pos[1], d.pos[2]); P.yaw = d.yaw; P.pitch = d.pitch;
@@ -825,6 +827,7 @@
     P.equip = Array.isArray(d.equip) ? d.equip.slice(0, 4).concat([null, null, null, null]).slice(0, 4) : [null, null, null, null];
     if (typeof d.temp === 'number') P.temp = d.temp;
     G.Skills.load(d.skills); if (typeof d.stamina === 'number') P.stamina = d.stamina;
+    { const w = d.pw || {}; P.god = !!w.god; P.pcreative = !!w.pc; P.allowFly = !!w.fly; P.noNeeds = !!w.nn; P.ghost = !!w.gh; }
     // il libro non sta più nell'inventario: si apre con B
     P.inv = P.inv.map((st) => (st && st.id === 'libro' ? null : st)); P.equip = P.equip.map((st) => (st && st.id === 'libro' ? null : st));
     P.vmLId = undefined; P.vmId = undefined;

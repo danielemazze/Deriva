@@ -342,6 +342,7 @@
     npc: { render: () => G.Quests.render(), click: (e) => G.Quests.click(e), close: () => G.Quests.close() },
     map: { render: () => G.MapUI.render(), mount: () => G.MapUI.mount(), click: (e) => { if (e.target.closest('[data-act=center]')) { const p = P().pos; G.MapUI.view.x = p.x; G.MapUI.view.z = p.z; G.MapUI.draw(); return true; } return !!e.target.closest('#mapc'); }, close: () => { window.onmousemove = null; window.onmouseup = null; }, wide: true },
     diario: { render: () => G.MapUI.renderJournal(), click: (e) => G.MapUI.clickJournal(e) },
+    giocatori: { render: () => G.Admin.render(), click: (e) => G.Admin.click(e), mount: () => G.Admin.mount() },
     abilita: { render: () => G.Skills.render(), click: (e) => { if (e.target.closest('[data-act=tabinv]')) { UI.openInventory(3); return true; } return false; } },
     mappa: { render: () => G.Treasure.render(), mount: () => G.Treasure.draw() },
   };
@@ -1040,7 +1041,7 @@
       if (!G.started) return;
       if ((e.ctrlKey || e.metaKey) && !UI.open && /^Key[A-Z]$/.test(k)) e.preventDefault(); // si corre con Ctrl: niente scorciatoie del browser
       if (UI.open) {
-        if (k === 'Escape' || k === 'KeyI' || (k === 'KeyL' && UI.open === 'abilita') || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
+        if (k === 'Escape' || k === 'KeyI' || (k === 'KeyL' && UI.open === 'abilita') || (k === 'KeyP' && UI.open === 'giocatori') || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
         else if (/^Digit[1-8]$/.test(k) && !UI.hoverSlot && UI.open === 'inv' && G.creative()) UI.applyKit(+k.slice(5) - 1);
         else if (/^Digit[1-9]$/.test(k) && UI.hoverSlot && UI.open !== 'book') {
           // tasto numerico sopra uno slot: scambia con la barra rapida
@@ -1050,7 +1051,7 @@
         return;
       }
       if (k === 'Tab') e.preventDefault();
-      if (k === 'Space' && !e.repeat && G.creative() && !P_.boat) {
+      if (k === 'Space' && !e.repeat && (G.creative() || P_.allowFly) && !P_.boat) {
         const now = performance.now();
         if (now - (UI._spaceT || 0) < 320) { P_.fly = !P_.fly; P_.vel.set(0, 0, 0); UI.toast(P_.fly ? 'Volo attivo · Spazio sali · Maiusc scendi · Ctrl veloce · doppio Spazio per atterrare' : 'Volo disattivato'); UI._spaceT = 0; }
         else UI._spaceT = now;
@@ -1063,6 +1064,7 @@
       else if (k === 'KeyJ') G.MapUI.openJournal();
       else if (k === 'KeyE') { if (P_.placing) UI.cancelPlace(); else if (P_.crouch && G.Stealth && G.Stealth.steal(P_)) {} else UI.openInventory(3); }
       else if (k === 'KeyL') UI.openCustom('abilita');
+      else if (k === 'KeyP' && G.Admin) G.Admin.open();
       else if (k === 'KeyF') P_.swapHands();
       else if (k === 'KeyG') { if (P_.boat && P_.boat.inv) UI.openChest(P_.boat.inv, 'Stiva', { boat: P_.boat }); else { const tg = P_.target; if (tg && tg.kind === 'boat' && !G.Boats.isComplete(tg.boat)) UI.openBoatBuild(tg.boat); } }
       else if (k === 'F4') { e.preventDefault(); UI.toggleMode(); }

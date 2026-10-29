@@ -55,11 +55,12 @@
   };
   Cmd.teleport = function (x, z, label) {
     const p = P(); if (p.boat) p.leaveBoat(true);
-    p.fly = G.creative() ? p.fly : false;
+    p.fly = G.creative() || p.allowFly ? p.fly : false;
     G.World.update(x, z, 400);
     const g = Math.max(G.World.groundAt(x, z), G.Build.groundAt(x, z, 500, 0.1));
     p.pos.set(x, Math.max(g, G.SEA - 1.5) + 0.2, z); p.vel.set(0, 0, 0);
     G.settleOnGround();
+    if (Cmd._pend) setTimeout(Cmd.cycleDone, 0);
     return label ? `Sei a: ${label}` : `Teletrasporto a ${Math.round(x)}, ${Math.round(z)}`;
   };
   Cmd.BIOMES = { pianura: 'PIANURA', foresta: 'FORESTA', pluviale: 'PLUVIALE', 'foresta pluviale': 'PLUVIALE', giungla: 'GIUNGLA', deserto: 'DESERTO', montagna: 'MONTAGNA', montagne: 'MONTAGNA', neve: 'NEVE', ghiaccio: 'NEVE', vulcano: 'VULCANO' };
@@ -85,9 +86,12 @@
   };
   Cmd.reveal = function (v) { P().revealed = P().revealed || {}; P().revealed[v.id] = 1; };
   Cmd.goVillage = function (style) {
-    const l = Cmd.villages(style); if (!l.length) return 'Nessun villaggio trovato' + (style ? ` di stile "${style}"` : '');
-    const v = l[0]; Cmd.reveal(v);
-    const a = Math.atan2(v.z - P().pos.z, v.x - P().pos.x);
+    const st = norm(style);
+    const pick = Cmd.cycle('village', 5000, (v) => !st || norm(v.style).includes(st) || norm(v.name).includes(st));
+    if (!pick) return 'Nessun villaggio trovato' + (style ? ` di stile "${style}"` : '');
+    const v = pick.v; Cmd.reveal(v);
+    if (pick.n > 1) setTimeout(() => G.UI.toast(`${pick.i + 1}° villaggio più vicino (su ${pick.n}) · ripeti per il prossimo`), 50);
+    const a = Math.atan2(v.z - pick.from.z, v.x - pick.from.x);
     return Cmd.teleport(v.x - Math.cos(a) * 26, v.z - Math.sin(a) * 26, `vicino a ${v.name} (${v.style})`);
   };
   Cmd.listVillages = function () {
@@ -112,12 +116,27 @@
     const r = Cmd.findPlayer(name); if (!r) return name ? `Nessun giocatore "${name}"` : 'Uso: /op Nome';
     N.setOp(r.id, on); return on ? `${r.name} ora è operatore` : `${r.name} non è più operatore`;
   };
+  // stesso luogo richiesto di nuovo da dove ti aveva portato: si passa al successivo (dal punto di partenza)
+  Cmd._cyc = null;
+  Cmd.cycle = function (t, R, filter) {
+    const p = P().pos, c = Cmd._cyc;
+    const again = c && c.t === t && Math.hypot(p.x - c.at.x, p.z - c.at.z) < 120 && performance.now() - c.time < 600000;
+    const from = again ? c.from : { x: p.x, z: p.z };
+    let l = G.POI.near(from.x, from.z, R, t); if (filter) l = l.filter(filter);
+    l.sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z));
+    if (!l.length) return null;
+    const i = again ? (c.i + 1) % l.length : 0;
+    Cmd._pend = { t, from, i };
+    return { v: l[i], from, i, n: l.length };
+  };
+  // dopo il teletrasporto si ricorda dove si è arrivati
+  Cmd.cycleDone = function () { if (Cmd._pend) { const p = P().pos; Cmd._cyc = Object.assign(Cmd._pend, { at: { x: p.x, z: p.z }, time: performance.now() }); Cmd._pend = null; } };
   Cmd.goPlace = function (type) {
     const map = { faro: 'faro', fari: 'faro', relitto: 'relitto', covo: 'covo', pirati: 'covo', rovina: 'rovina', rovine: 'rovina', miniera: 'miniera', grotta: 'grotta', grotte: 'grotta', caverna: 'grotta', accampamento: 'accampamento', castello: 'castello', castelli: 'castello' };
     const t = map[norm(type)]; if (!t) return null;
-    const p = P().pos, l = G.POI.near(p.x, p.z, t === 'castello' ? 9000 : 5000, t).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
-    if (!l.length) return `Nessun ${type} trovato entro 5 km`;
-    const v = l[0]; Cmd.reveal(v);
+    const pick = Cmd.cycle(t, t === 'castello' ? 9000 : 5000); if (!pick) return `Nessun ${type} trovato entro 5 km`;
+    const v = pick.v, p = pick.from; Cmd.reveal(v);
+    if (pick.n > 1) setTimeout(() => G.UI.toast(`${pick.i + 1}° ${type} più vicino (su ${pick.n}) · ripeti per il prossimo`), 50);
     if (t === 'relitto') return Cmd.teleport(v.x + 6, v.z, v.name);
     if (t === 'castello') {
       // nel cortile esterno, fra la porta grande e quella interna
@@ -171,6 +190,106 @@
     P().give(id, k, true); return `+${k} ${G.ITEMS[id].n}`;
   };
 
+  /* ---------------- GIOCATORI (operatori) ---------------- */
+  const YES = (s) => !/^(no|off|0|falso)$/.test(norm(s || 'si'));
+  Cmd.PLAYER = {
+    salute: ['set', 'health', '0–100'], fame: ['set', 'hunger', '0–100'], sete: ['set', 'thirst', '0–100'], stamina: ['set', 'stamina', 'numero'], ossigeno: ['set', 'oxygen', '0–100'], temperatura: ['set', 'temp', '0 gelo · 50 normale · 100 caldo'],
+    invincibile: ['flag', 'god', 'si · no'], creativa: ['flag', 'pcreative', 'si · no'], volo: ['flag', 'fly', 'si · no'], bisogni: ['flag', 'noNeeds', 'si = fame e sete bloccate'], invisibile: ['flag', 'ghost', 'si · no (ai nemici)'],
+    abilita: ['skill', null, 'spada · corsa · … livello'], tp: ['tp', null, 'da me · x z'], vaida: ['goto', null, 'vai da lui'], letto: ['bed', null, 'al suo letto'], cura: ['heal', null, 'tutto al massimo'],
+    svuota: ['clear', null, 'svuota l’inventario'], dai: ['give', null, 'oggetto [quanti]'], espelli: ['kick', null, 'solo chi ospita'], op: ['op', null, 'diventa operatore'], deop: ['deop', null, 'non più operatore'],
+  };
+  Cmd.player = function (parts) {
+    const AD = G.Admin; if (!AD) return 'Non disponibile';
+    if (!AD.allowed()) return 'Solo chi ospita o un operatore può cambiare i giocatori';
+    const who = AD.byName(parts[0]); if (!who) return parts[0] ? `Nessun giocatore "${parts[0]}"` : 'Uso: /giocatore Nome cosa valore (oppure il menu col tasto P)';
+    const what = norm(parts[1]), spec = Cmd.PLAYER[what], v = parts.slice(2);
+    if (!spec) return `Cosa vuoi cambiare a ${who.name}? ${Object.keys(Cmd.PLAYER).join(', ')}`;
+    const [a, k] = spec, id = who.id;
+    if (a === 'set') { const n = +v[0]; if (!isFinite(n)) return `Uso: /giocatore ${who.name} ${what} numero`; AD.send(id, 'set', { k, v: n }); return `${who.name}: ${what} ${n}`; }
+    if (a === 'flag') { const on = YES(v[0]); AD.send(id, 'flag', { k, v: on }); return `${who.name}: ${what} ${on ? 'sì' : 'no'}`; }
+    if (a === 'skill') { const s = G.Skills.LIST.find((x) => x.k === norm(v[0]) || norm(x.n).startsWith(norm(v[0]))); const L = +v[1]; if (!s || !isFinite(L)) return `Uso: /giocatore ${who.name} abilita spada 10 (abilità: ${G.Skills.LIST.map((x) => x.k).join(', ')})`; AD.send(id, 'skill', { k: s.k, v: L }); return `${who.name}: ${s.n} livello ${Math.max(1, Math.min(G.Skills.MAX, L | 0))}`; }
+    if (a === 'tp') { const x = +v[0], z = +v[1]; if (isFinite(x) && isFinite(z) && v.length >= 2) { AD.send(id, 'tp', { x, z }); return `${who.name} portato a ${x}, ${z}`; } const f = P().pos, y = P().yaw; AD.send(id, 'tp', { x: f.x - Math.sin(y) * 2, y: f.y, z: f.z - Math.cos(y) * 2 }); return `${who.name} sta arrivando da te`; }
+    if (a === 'goto') { if (who.me) return 'Sei già qui'; return Cmd.tpTo(who.name); }
+    if (a === 'give') { const n = v.find((x) => /^\d+$/.test(x)); const name = v.filter((x) => !/^\d+$/.test(x)).join(' '); const w = norm(name).replace(/ /g, '_'); const it = G.ITEMS[w] ? w : Object.keys(G.ITEMS).find((q) => norm(G.ITEMS[q].n).startsWith(norm(name))); if (!it || !name) return `Oggetto "${name}" non trovato`; AD.send(id, 'give', { id: it, n: n ? +n : 1 }); return `${who.name}: +${n || 1} ${G.ITEMS[it].n}`; }
+    if (a === 'kick') { if (who.me || !G.Net || !G.Net.isHost) return 'Solo chi ospita può espellere gli altri'; G.Net.send({ t: 'padm', id, a: 'kick', v: {} }); return `${who.name} espulso`; }
+    if (a === 'op' || a === 'deop') return Cmd.setOp(who.name, a === 'op');
+    AD.send(id, a, {}); return `${who.name}: ${what}`;
+  };
+
+  /* ---------------- SUGGERIMENTI MENTRE SCRIVI ---------------- */
+  const L = (arr) => arr.map((x) => (Array.isArray(x) ? x : [x, '']));
+  const players = (me) => (G.Admin ? G.Admin.list().filter((p) => me || !p.me).map((p) => [p.me ? (me ? 'me' : p.name) : p.name, p.me ? 'tu' : 'in partita']) : []);
+  const items = () => Object.keys(G.ITEMS).map((k) => [k, G.ITEMS[k].n]);
+  const nums = (a, b, d) => { const o = []; for (let i = a; i <= b; i++) o.push([String(i), d || '']); return o; };
+  const PLACES = [['faro', 'faro'], ['relitto', 'nave affondata'], ['covo', 'covo dei pirati'], ['rovina', 'rovine'], ['miniera', 'miniera'], ['grotta', 'grotta'], ['accampamento', 'accampamento'], ['castello', 'castello'], ['villaggio', 'villaggio']];
+  const BIOMES = () => Object.keys(Cmd.BIOMES).filter((k) => !k.includes(' ')).map((k) => [k, 'bioma']);
+  Cmd.GRAMMAR = {
+    aiuto: { d: 'elenco dei comandi' },
+    ora: { d: 'orario', sig: ['ora'], a: [() => L([['alba', '06:00'], ['mattina', '08:30'], ['mezzogiorno', '12:00'], ['pomeriggio', '15:30'], ['tramonto', '18:36'], ['sera', '20:30'], ['notte', '23:00'], ['mezzanotte', '00:00'], ['6', ''], ['12', ''], ['18', '']])] },
+    meteo: { d: 'cambia il tempo', sig: ['tipo'], a: [() => L([['sereno', 'sole'], ['nuvoloso', 'nuvole'], ['pioggia', 'pioggia (neve al freddo)'], ['temporale', 'tuoni e fulmini'], ['caldo', 'caldo torrido'], ['siccita', 'siccità'], ['auto', 'torna a cambiare da solo']])] },
+    vento: { d: 'forza e direzione del vento', sig: ['0–10', 'direzione'], a: [() => nums(0, 10, 'forza'), () => L([['N', 'nord'], ['NE', ''], ['E', 'est'], ['SE', ''], ['S', 'sud'], ['SO', ''], ['O', 'ovest'], ['NO', '']])] },
+    luna: { d: 'fase lunare', sig: ['fase'], a: [() => [['piena', 'luna piena'], ['nuova', 'luna nuova']].concat(G.Climate.PHASES.map((n, i) => [String(i), n]))] },
+    bioma: { d: 'vai al bioma più vicino', sig: ['bioma'], a: [BIOMES] },
+    villaggio: { d: 'vai al villaggio più vicino (ripeti per il prossimo)', sig: ['stile'] },
+    villaggi: { d: 'segna i villaggi sulla mappa' },
+    vai: { d: 'vai al luogo più vicino (ripeti per il prossimo)', sig: ['luogo'], a: [() => PLACES.concat(BIOMES())] },
+    spawn: { d: 'fa comparire animali, nemici, abitanti', sig: ['cosa', 'quanti'], a: [() => [...new Set(Object.values(Cmd.SPAWN))].map((k) => [k, G.SPECIES[k] ? G.SPECIES[k].n : '']).concat([['abitante', 'persona'], ['mercante', 'persona'], ['kraken', 'mostro marino'], ['pirati', 'nave pirata'], ['mare', 'mare calmo']]), () => nums(1, 12, 'quanti')] },
+    tp: { d: 'teletrasporto alle coordinate', sig: ['x', 'z'] },
+    tpda: { d: 'vai da un giocatore', sig: ['nome'], a: [() => players(false)] },
+    coord: { d: 'le tue coordinate' },
+    op: { d: 'dai i diritti di operatore', sig: ['nome'], a: [() => players(false)] },
+    deop: { d: 'togli i diritti di operatore', sig: ['nome'], a: [() => players(false)] },
+    modalita: { d: 'creativa · sopravvivenza', sig: ['modalità'], a: [() => L([['creativa', 'tutti gli oggetti, volo'], ['sopravvivenza', 'raccogli e sopravvivi']])] },
+    nemici: { d: 'attiva o disattiva i nemici', sig: ['si · no'], a: [() => L([['si', 'nemici attivi'], ['no', 'nemici disattivati']])] },
+    dai: { d: 'oggetti nell’inventario', sig: ['oggetto', 'quanti'], a: [items, () => L([['1', ''], ['16', ''], ['64', '']])] },
+    cura: { d: 'salute, fame e sete al massimo' },
+    gorgo: { d: 'un gorgo qui vicino' },
+    giocatore: { d: 'cambia un giocatore (menu: tasto P)', sig: ['nome', 'cosa', 'valore'], a: [() => players(true), () => Object.entries(Cmd.PLAYER).map(([k, s]) => [k, s[2]]), (tk) => {
+      const s = Cmd.PLAYER[norm(tk[2])]; if (!s) return [];
+      if (s[0] === 'flag') return L([['si', ''], ['no', '']]);
+      if (s[0] === 'skill') return G.Skills.LIST.map((x) => [x.k, x.n]);
+      if (s[0] === 'give') return items();
+      if (s[0] === 'tp') return L([['da', 'me: da te']]);
+      if (s[0] === 'set') return s[1] === 'temp' ? L([['50', 'normale'], ['20', 'freddo'], ['80', 'caldo']]) : L([['100', 'pieno'], ['50', 'metà'], ['0', 'vuoto']]);
+      return [];
+    }, (tk) => { const s = Cmd.PLAYER[norm(tk[2])]; return s && s[0] === 'skill' ? L([['10', 'livello'], ['25', ''], ['50', 'massimo']]) : s && s[0] === 'tp' && norm(tk[3]) === 'da' ? L([['me', '']]) : []; }] },
+  };
+  Cmd.suggest = function (text) {
+    if (!text || text[0] !== '/') return null;
+    const tk = text.slice(1).split(' '), cur = tk[tk.length - 1], q = norm(cur);
+    const head = (n) => `/${n}`;
+    if (tk.length === 1) {
+      const it = Object.keys(Cmd.GRAMMAR).filter((c) => c.startsWith(q)).map((c) => ['/' + c, Cmd.GRAMMAR[c].d]);
+      const g = Cmd.GRAMMAR[it[0] ? it[0][0].slice(1) : ''];
+      return { sig: it.length ? `<b>${esc(it[0][0])}</b>${g && g.sig ? ' ' + g.sig.map((s) => `&lt;${esc(s)}&gt;`).join(' ') : ''}` : 'Nessun comando · scrivi /aiuto', items: it.slice(0, 8), q: '/' + q };
+    }
+    const c = norm(tk[0]), g = Cmd.GRAMMAR[c === 'player' ? 'giocatore' : c === 'tpa' ? 'tpda' : c === 'evoca' ? 'spawn' : c === 'oggetto' ? 'dai' : c === 'modo' ? 'modalita' : c]; if (!g) return null;
+    const ai = tk.length - 2;
+    const sig = `${esc(head(c))} ${(g.sig || []).map((s, i) => (i === ai ? `<b>&lt;${esc(s)}&gt;</b>` : i < ai ? esc(tk[i + 1]) : `&lt;${esc(s)}&gt;`)).join(' ')}`;
+    const fn = g.a && g.a[ai]; let it = fn ? fn(tk) : [];
+    it = it.filter(([v, d]) => norm(v).startsWith(q) || (q.length > 1 && norm(d).includes(q)));
+    return { sig, items: it.slice(0, 8), q: cur };
+  };
+  let sugSel = 0, sugLast = null;
+  function showSug() {
+    const inp = $('coninput'), box = $('consug'), gh = $('conghost'); if (!inp || !box) return;
+    const s = Cmd.suggest(inp.value); sugLast = s;
+    if (!s || (!s.items.length && !s.sig)) { box.hidden = true; gh.innerHTML = ''; return; }
+    if (sugSel >= s.items.length) sugSel = 0;
+    box.hidden = false;
+    const qq = norm(s.q || '');
+    box.innerHTML = `<div class="sig">${s.sig}</div>` + s.items.map(([v, d], i) => { const m = norm(v).startsWith(qq) ? (s.q || '').length : 0; return `<div class="it${i === sugSel ? ' on' : ''}" data-sug="${i}"><div><em>${esc(v.slice(0, m))}</em>${esc(v.slice(m))}</div><span>${esc(d)}</span></div>`; }).join('');
+    const top = s.items[sugSel];
+    const rest = top && norm(top[0]).startsWith(qq) ? top[0].slice((s.q || '').length) : '';
+    gh.innerHTML = `<span class="t">${esc(inp.value)}</span><span class="g">${esc(rest)}</span>`;
+  }
+  function acceptSug() {
+    const inp = $('coninput'), s = sugLast; if (!s || !s.items.length) return false;
+    const v = s.items[sugSel][0], tk = inp.value.split(' '); tk[tk.length - 1] = tk.length === 1 ? v : v;
+    inp.value = tk.join(' ') + ' '; sugSel = 0; showSug(); return true;
+  }
+  Cmd.showSug = showSug;
+
   /* ---------------- CONSOLE ---------------- */
   const HELP = [
     ['/ora 18 · /ora alba · /ora notte', 'orario'],
@@ -188,6 +307,7 @@
     ['/modalita creativa · sopravvivenza', 'cambia modalità (anche F4)'],
     ['/nemici si · no', 'attiva o disattiva i nemici'],
     ['/dai assi 64 · /cura · /gorgo', 'oggetti · salute piena · gorgo qui vicino'],
+    ['/giocatore Marco fame 50 · invincibile si · abilita spada 10 · tp', 'cambia un giocatore (menu: tasto P)'],
   ];
   Cmd.run = function (line, remoteFrom) {
     line = String(line || '').trim(); if (!line) return;
@@ -221,6 +341,7 @@
       case 'nemici': { const on = /^(si|on|1|sì)/.test(norm(rest)); G.setEnemies(on); G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0; r = on ? 'Nemici attivi' : 'Nemici disattivati'; break; }
       case 'dai': case 'oggetto': { const n = parts.find((x) => /^\d+$/.test(x)); r = Cmd.give(parts.filter((x) => !/^\d+$/.test(x)).join(' '), n ? +n : 0); break; }
       case 'cura': { const p = P(); p.health = p.hunger = p.thirst = p.oxygen = 100; p.temp = 50; r = 'Salute, fame e sete al massimo'; break; }
+      case 'giocatore': case 'player': r = Cmd.player(parts); break;
       case 'gorgo': { const p = P(); const a = p.yaw; G.Climate.forceVortex = { id: 'cmd', x: p.pos.x - Math.sin(a) * 40, z: p.pos.z - Math.cos(a) * 40, R: 34, cw: 1, forced: true, until: G.clock + 240 }; r = 'Un gorgo si apre davanti a te per 4 minuti'; break; }
       default: r = `Comando sconosciuto: /${c} · scrivi /aiuto`;
     }
@@ -232,23 +353,28 @@
     const inp = $('coninput'); inp.value = prefix || ''; Cmd.hi = -1;
     document.exitPointerLock && document.exitPointerLock();
     G.Player.keys = {};
-    setTimeout(() => inp.focus(), 0);
+    setTimeout(() => { inp.focus(); showSug(); }, 0);
     Cmd.log(Cmd.lines.length ? Cmd.lines.pop() : 'Scrivi /aiuto per l’elenco dei comandi' + (G.Net && G.Net.on ? ' · senza / è chat' : ''));
   };
   Cmd.closeConsole = function () { $('console').hidden = true; $('coninput').blur(); G.requestLock(); };
   Cmd.init = function () {
     const box = document.createElement('div'); box.id = 'console'; box.hidden = true;
-    box.innerHTML = '<div id="conlog"></div><input id="coninput" autocomplete="off" spellcheck="false" placeholder="/aiuto · /ora 18 · /meteo temporale · /bioma deserto">';
+    box.innerHTML = '<div id="conlog"></div><div id="consug" hidden></div><div class="conin"><input id="coninput" autocomplete="off" spellcheck="false" placeholder="/aiuto · /ora 18 · /meteo temporale · /bioma deserto"><div id="conghost" aria-hidden="true"></div><span class="contab"><kbd>Tab</kbd> completa · <kbd>↑</kbd><kbd>↓</kbd> scegli</span></div>';
     $('game').appendChild(box);
     const inp = $('coninput');
     inp.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Enter') { const v = inp.value; inp.value = ''; Cmd.run(v); Cmd.closeConsole(); }
+      const sug = !$('consug').hidden && sugLast && sugLast.items.length;
+      if (e.key === 'Enter') { const v = inp.value; inp.value = ''; showSug(); Cmd.run(v); Cmd.closeConsole(); }
       else if (e.key === 'Escape') Cmd.closeConsole();
-      else if (e.key === 'ArrowUp') { if (!Cmd.history.length) return; Cmd.hi = Cmd.hi < 0 ? Cmd.history.length - 1 : Math.max(0, Cmd.hi - 1); inp.value = Cmd.history[Cmd.hi]; e.preventDefault(); }
-      else if (e.key === 'ArrowDown') { if (Cmd.hi < 0) return; Cmd.hi = Math.min(Cmd.history.length - 1, Cmd.hi + 1); inp.value = Cmd.history[Cmd.hi]; e.preventDefault(); }
-      else if (e.key === 'Tab') { e.preventDefault(); const v = inp.value; const all = ['/aiuto', '/ora ', '/meteo ', '/vento ', '/luna ', '/bioma ', '/villaggio', '/villaggi', '/vai ', '/spawn ', '/tp ', '/modalita ', '/nemici ', '/dai ', '/cura', '/gorgo']; const m = all.find((x) => x.startsWith(v)); if (m) inp.value = m; }
+      else if (e.key === 'Tab') { e.preventDefault(); acceptSug(); }
+      else if (e.key === 'ArrowUp' && sug && inp.value) { e.preventDefault(); sugSel = (sugSel - 1 + sugLast.items.length) % sugLast.items.length; showSug(); }
+      else if (e.key === 'ArrowDown' && sug && inp.value) { e.preventDefault(); sugSel = (sugSel + 1) % sugLast.items.length; showSug(); }
+      else if (e.key === 'ArrowUp') { if (!Cmd.history.length) return; Cmd.hi = Cmd.hi < 0 ? Cmd.history.length - 1 : Math.max(0, Cmd.hi - 1); inp.value = Cmd.history[Cmd.hi]; e.preventDefault(); showSug(); }
+      else if (e.key === 'ArrowDown') { if (Cmd.hi < 0) return; Cmd.hi = Math.min(Cmd.history.length - 1, Cmd.hi + 1); inp.value = Cmd.history[Cmd.hi]; e.preventDefault(); showSug(); }
     });
+    inp.addEventListener('input', () => { sugSel = 0; showSug(); });
+    $('consug').addEventListener('mousedown', (e) => { const it = e.target.closest('[data-sug]'); if (!it) return; e.preventDefault(); sugSel = +it.dataset.sug; acceptSug(); inp.focus(); });
     G.UI.custom.strumenti = { render: renderPanel, click: clickPanel, wide: true };
   };
 
