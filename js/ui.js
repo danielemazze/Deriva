@@ -110,7 +110,7 @@
     }
     if (tg.kind === 'piece') {
       const pc = tg.piece;
-      if (G.Lockpick && G.Lockpick.locked(pc)) return `<div class="tname">🔒 Baule chiuso a chiave</div><div class="thint">${p.crouch ? `${k(G.isTouch ? 'Usa' : 'E')} <b class="steal">Scassina</b> · ${G.Stealth && G.Stealth.seen ? '<span class="steal">ti stanno guardando</span>' : 'nessuno ti vede'}` : `accovacciati (${k('Maiusc')}) per scassinarlo`} · ${G.Player.count('grimaldello')} grimaldelli</div>`; const h = PIECE_HINT[pc.t];
+      if (G.Lockpick && G.Lockpick.locked(pc)) return `<div class="tname">${G.ico('lucchetto')} Baule chiuso a chiave</div><div class="thint">${p.crouch ? `${k(G.isTouch ? 'Usa' : 'E')} <b class="steal">Scassina</b> · ${G.Stealth && G.Stealth.seen ? '<span class="steal">ti stanno guardando</span>' : 'nessuno ti vede'}` : `accovacciati (${k('Maiusc')}) per scassinarlo`} · ${G.Player.count('grimaldello')} grimaldelli</div>`; const h = PIECE_HINT[pc.t];
       const nm = G.ITEMS[pc.t] ? G.ITEMS[pc.t].n : pc.t === 'forziere' ? 'Forziere' : pc.t;
       return `<div class="tname">${nm}</div><div class="thint">${h ? `${k(G.useKey())} ${h}` : ''}${pc.gen ? '' : `${h ? ' · ' : ''}${k('Clic sinistro')} smonta`}</div>`;
     }
@@ -147,7 +147,7 @@
     // temperatura: cosa ti scalda e cosa ti raffredda, e se ti stai scaldando o raffreddando
     { const ti = $('tempinfo'), C = G.Climate; if (ti && C && C.factors) { const b0 = p.temp === undefined ? 50 : p.temp, tr = C.trend || 0;
         const show = !G.creative() && (tr !== 0 || b0 < 42 || b0 > 58);
-        const html = show ? `<b class="${tr > 0 ? 'up' : tr < 0 ? 'dn' : ''}">${tr > 0 ? '▲ ti stai scaldando' : tr < 0 ? '▼ ti stai raffreddando' : G.Climate.bodyLabel(b0)}</b>${C.factors.slice(0, 4).map(([ic, n, sg]) => `<span class="${sg > 0 ? 'w' : 'c'}">${ic} ${n}</span>`).join('')}<small>aria ${Math.round(C.felt !== undefined ? C.felt : 0)}°C</small>` : '';
+        const html = show ? `<b class="${tr > 0 ? 'up' : tr < 0 ? 'dn' : ''}">${tr > 0 ? '▲ ti stai scaldando' : tr < 0 ? '▼ ti stai raffreddando' : G.Climate.bodyLabel(b0)}</b>${C.factors.slice(0, 4).map(([ic, n, sg]) => `<span class="${sg > 0 ? 'w' : 'c'}">${G.ico(ic)} ${n}</span>`).join('')}<small>aria ${Math.round(C.felt !== undefined ? C.felt : 0)}°C</small>` : '';
         if (html !== UI._ti) { UI._ti = html; ti.innerHTML = html; ti.hidden = !show; } } }
     // temperatura corporea: la barra compare quando hai freddo o caldo (blu = freddo, rosso = caldo)
     { const m = UI.meterEls.temp, b = p.temp === undefined ? 50 : p.temp, show = !G.creative() && (b < 42 || b > 58 || (G.Climate && G.Climate.trend));
@@ -161,9 +161,9 @@
       UI._cmT = performance.now();
       const marks = [];
       const bear = (x, z) => ((Math.atan2(x - p.pos.x, -(z - p.pos.z)) * 180) / Math.PI + 360) % 360;
-      const gt = G.Combat.goldenTarget(); if (gt) marks.push(['★', 'gold', bear(gt.x, gt.z)]);
-      const qt = G.MapUI.questTargets(); if (qt.length) { qt.sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z)); marks.push(['◆', 'quest', bear(qt[0].x, qt[0].z)]); }
-      const tm = p.inv.find((st) => st && st.id === 'mappa_tesoro' && st.d && !G.state.removed.has('dig:' + st.d.id)); if (tm) marks.push(['✕', 'tx', bear(tm.d.x, tm.d.z)]);
+      const gt = G.Combat.goldenTarget(); if (gt) marks.push([G.ico('stella', 'fill'), 'gold', bear(gt.x, gt.z)]);
+      const qt = G.MapUI.questTargets(); if (qt.length) { qt.sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z)); marks.push([G.ico('rombo', 'fill'), 'quest', bear(qt[0].x, qt[0].z)]); }
+      const tm = p.inv.find((st) => st && st.id === 'mappa_tesoro' && st.d && !G.state.removed.has('dig:' + st.d.id)); if (tm) marks.push([G.ico('croce'), 'tx', bear(tm.d.x, tm.d.z)]);
       if (G.Net && G.Net.on) for (const r of G.Net.remotes.values()) { const d = Math.hypot(r.pos.x - p.pos.x, r.pos.z - p.pos.z); marks.push(['●', 'pl', bear(r.pos.x, r.pos.z), G.Net.COLOR_CSS[r.slot % 4], `${r.name} ${d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km'}`]); }
       const el = $('cmarks');
       if (el) el.innerHTML = marks.map(([c, cls, b, colr, lab]) => { let dd = ((b - hd + 540) % 360) - 180; const out = Math.abs(dd) > 72; dd = Math.max(-72, Math.min(72, dd)); if (cls === 'pl') return `<i class="cm pl ${out ? 'edge' : ''}" style="left:${150 + dd * 2}px;color:${colr}">●<b>${esc(lab)}</b></i>`; return `<i class="cm ${cls} ${out ? 'edge' : ''}" style="left:${150 + dd * 2}px">${c}</i>`; }).join('');
@@ -171,7 +171,7 @@
     const hours = (G.time % 1) * 24, hh = Math.floor(hours), mm = Math.floor((hours - hh) * 60);
     const nowB = performance.now(); if (!UI._bioT || nowB - UI._bioT > 500) { UI._bioT = nowB; const gh = G.heightAt(p.pos.x, p.pos.z); UI._bio = gh > 0.6 ? G.BIOME_N[G.biomeAt(p.pos.x, p.pos.z)] : gh > -3 ? 'Costa' : 'Mare aperto'; }
     const Cl = G.Climate;
-    if (Cl && (!UI._wT || nowB - UI._wT > 1000)) { UI._wT = nowB; const K = Cl.KINDS[Cl.state.kind], snow = Cl.cur.snow > Cl.cur.rain && Cl.cur.snow > 0.3; UI._wx = ` · ${snow ? '❄ Neve' : K.icon + ' ' + K.n} · ${Math.round(Cl.felt !== undefined ? Cl.felt : Cl.airTemp(p.pos.x, p.pos.z, p.pos.y))}°C${G.sky.night > 0.3 ? ' · ' + Cl.PHASE_ICON[Cl.moonIndex()] + ' ' + Cl.moonName() : ''}`; }
+    if (Cl && (!UI._wT || nowB - UI._wT > 1000)) { UI._wT = nowB; const K = Cl.KINDS[Cl.state.kind], snow = Cl.cur.snow > Cl.cur.rain && Cl.cur.snow > 0.3; UI._wx = ` · ${snow ? G.ico('neve') + ' Neve' : G.ico(K.icon) + ' ' + K.n} · ${Math.round(Cl.felt !== undefined ? Cl.felt : Cl.airTemp(p.pos.x, p.pos.z, p.pos.y))}°C${G.sky.night > 0.3 ? ' · ' + G.ico(Cl.PHASE_ICON[Cl.moonIndex()]) + ' ' + Cl.moonName() : ''}`; }
     const ck = `Giorno ${Math.floor(G.time) + 1} · ${String(hh).padStart(2, '0')}:${String(mm - (mm % 5)).padStart(2, '0')} · ${UI._bio}${UI._wx || ''}`;
     // giorno, ora, coordinate, vento e il resto stanno nella schermata tecnica (F3)
     const f3 = !!G.settings.f3;
@@ -382,8 +382,8 @@
     let main = '', hot = '';
     for (let i = 9; i < 36; i++) main += slot('inv', i, inv[i]);
     for (let i = 0; i < 9; i++) hot += slot('inv', i, inv[i], i === P().sel ? 'sel' : '');
-    const eq = P().equip || [], hints = ['✋', '🧢', '🧥', '👢'], names = ['Sinistra', 'Testa', 'Corpo', 'Piedi'];
-    const eqHTML = eq.map((st, i) => `<div class="eqs"><div class="slot ${st ? '' : 'empty-hint'}" data-src="equip" data-i="${i}" data-hint="${hints[i]}">${UI.slotHTML(st)}</div><label>${names[i]}</label></div>`).join('');
+    const eq = P().equip || [], hints = ['mano', 'berretto', 'giacca', 'stivale'].map((n) => G.ico(n)), names = ['Sinistra', 'Testa', 'Corpo', 'Piedi'];
+    const eqHTML = eq.map((st, i) => `<div class="eqs"><div class="slot ${st ? '' : 'empty-hint'}" data-src="equip" data-i="${i}" >${st ? UI.slotHTML(st) : `<span class="eqhint">${hints[i]}</span>`}</div><label>${names[i]}</label></div>`).join('');
     const T = G.Player.tempInfo ? G.Player.tempInfo() : null;
     return `<div class="invcol"><h3>Inventario</h3><div class="grid" style="grid-template-columns:repeat(9,var(--slot))">${main}</div><div class="grid" style="grid-template-columns:repeat(9,var(--slot));margin-top:6px">${hot}</div>
       <div class="equip">${eqHTML}</div>
@@ -532,7 +532,7 @@
     ['Attrezzi', 'piccone_ferro', ['piccone_ferro', 'ascia_ferro', 'pala_ferro', 'coltello', 'canna', 'cannocchiale', 'scudo', 'ciotola', 'lanterna', 'bussola_oro', 'pinne', 'mappa_tesoro', 'piccone', 'ascia', 'pala', 'cappello_lana', 'maglione_lana', 'mantello_pelle', 'stivali_pelle', 'cappello_paglia']],
     ['Armi', 'spada_ferro', ['spada_ferro', 'sciabola', 'lancia', 'arco', 'freccia', 'pistola', 'pistola_capitano', 'munizioni', 'coltello_ossidiana', 'scudo', 'cannone', 'trappola']],
     ['Luce', 'torcia', ['torcia', 'lanterna', 'falo', 'camino', 'fornace', 'carbone', 'tronco', 'letto', 'baule', 'banco']],
-    ['Cibo', 'pesce_cotto', ['pesce_cotto', 'pollo_cotto', 'manzo_cotto', 'maiale_cotto', 'montone_cotto', 'coniglio_cotto', 'uovo_cotto', 'funghi_cotti', 'bacche', 'cocco', 'polpa_cactus', 'ciotola_acqua', 'canna', 'falo', 'ciotola', 'pesce_crudo', 'uovo']],
+    ['Cibo', 'pesce_cotto', ['pesce_cotto', 'pollo_cotto', 'manzo_cotto', 'maiale_cotto', 'montone_cotto', 'coniglio_cotto', 'uovo_cotto', 'funghi_cotti', 'bacche', 'cocco', 'mela', 'pera', 'arancia', 'limone', 'mango', 'kiwi', 'avocado', 'melone', 'pane', 'polpa_cactus', 'ciotola_acqua', 'canna', 'falo', 'ciotola', 'pesce_crudo', 'uovo']],
     ['Natura', 'tronco', ['tronco', 'assi', 'bastone', 'fibra', 'foglie', 'pietra', 'terra', 'carbone', 'ferro_grezzo', 'oro_grezzo', 'lingotto_ferro', 'lingotto_oro', 'ossidiana', 'lana', 'pelle', 'piume', 'conchiglia', 'perla', 'dente_squalo', 'corda', 'stoffa', 'chiodi', 'doblone']],
   ];
   UI.kit = -1;
@@ -660,39 +660,73 @@
     }
     if (key === 'veliero') { x.strokeRect(x0 + 6, wl - hh - 12, 26, 12); }
   }
-  UI.renderBook = function () {
-    const tab = UI.bookTab;
-    let L = `<div class="page l"><button class="close-x" data-act="close" aria-label="Chiudi">×</button><h1>Libro del costruttore</h1><div class="sub">appunti di un naufrago, isola di partenza</div>
-      <div class="tabs">${['barche', 'ricette', 'guida'].map((t) => `<button class="tab ${t === tab ? 'on' : ''}" data-tab="${t}">${{ barche: 'Barche', ricette: 'Ricettario', guida: 'Guida' }[t]}</button>`).join('')}</div>`;
-    let R = '<div class="page r">';
-    if (tab === 'barche') {
-      L += `<p><b>Barca libera</b>: niente progetto. Con il fasciame in mano mira il mare e usa il tasto destro: nasce una barca che galleggia subito. Poi aggiungi pezzi dove vuoi (fasciame, ponte, zavorra, timone, albero, vela, remi, baule): ogni pezzo pesa, e la barca si inclina verso dove pesa di più. In alto a destra vedi peso, portata e stabilità.</p><p>Scegli un progetto, poi tracciane la sagoma sul mare. Poi guarda la barca e usa il tasto destro: si apre l’elenco delle parti con i materiali che servono, e le monti con un clic.</p><div class="boatlist">` +
-        Object.entries(G.BOAT_TPL).map(([k, T]) => `<button class="bcard ${k === UI.bookBoat ? 'on' : ''} ${G.Boats.unlocked(k) ? '' : 'locked'}" data-boat="${k}"><canvas width="240" height="140" data-sketch="${k}"></canvas><div><strong>${G.Boats.unlocked(k) ? '' : '🔒 '}${T.n}</strong><span>${T.d}</span></div></button>`).join('') + '</div>';
-      const T = G.BOAT_TPL[UI.bookBoat], need = G.Boats.needs(UI.bookBoat), parts = G.Boats.parts(UI.bookBoat);
+  // il libro: doppie pagine da sfogliare (indice, barca libera, una doppia pagina per barca, ricettario)
+  const BOOK_ORDER = ['zattera', 'canoa', 'barca_remi', 'barca_vela', 'catamarano', 'veliero', 'galeone', 'vascello'];
+  UI.bookPage = 0;
+  function bookSpreads() {
+    const boats = BOOK_ORDER.filter((k) => G.BOAT_TPL[k]).concat(Object.keys(G.BOAT_TPL).filter((k) => !BOOK_ORDER.includes(k)));
+    const small = G.RECIPES.filter((r) => r.size === 3), big = G.RECIPES.filter((r) => r.size === 5);
+    const recPages = [];
+    for (let i = 0; i < small.length; i += 8) recPages.push({ h: i ? 'Ricettario · a mano (segue)' : 'Ricettario · a mano', s: 'griglia 3×3, nell’inventario', list: small.slice(i, i + 8) });
+    for (let i = 0; i < big.length; i += 8) recPages.push({ h: 'Ricettario · al banco', s: 'griglia 5×5 del banco da lavoro', list: big.slice(i, i + 8) });
+    const S = [];
+    // indice
+    const firstBoat = 1, firstRec = 1 + boats.length;
+    const idx = (n, t, sp) => `<button class="bidx" data-go="${sp}"><span>${t}</span><i></i><b>${n}</b></button>`;
+    S.push({ l: `<h1>Libro del costruttore</h1><div class="sub">appunti di un naufrago, isola di partenza</div>
+        <div class="bindex"><h2>Indice</h2>${idx(2, 'Barca libera, senza progetto', 0)}${boats.map((k, i) => idx(3 + i * 2, (G.Boats.unlocked(k) ? '' : G.ico('lucchetto') + ' ') + G.BOAT_TPL[k].n, firstBoat + i)).join('')}${idx(3 + boats.length * 2, 'Ricettario', firstRec)}</div>
+        <p class="bhint">Gira le pagine con le frecce in basso, con ← → o con A e D.</p>`,
+      r: `<h2>Barca libera</h2><div class="sub">niente progetto: la inventi tu</div>
+        <p>Con il <em>fasciame</em> in mano mira il mare e usa il tasto destro: nasce una barca che galleggia subito. Poi aggiungi pezzi dove vuoi: fasciame, ponte, zavorra, timone, albero, vela, remi, baule.</p>
+        <p>Ogni pezzo pesa, e la barca si inclina verso dove pesa di più. In alto a destra vedi peso, portata e stabilità.</p>
+        <h2 style="margin-top:18px">Con un progetto</h2><p>Scegli una barca nelle pagine che seguono e traccia la sagoma sul mare. Poi guarda la barca e usa il tasto destro: si apre l’elenco delle parti con i materiali che servono, e le monti con un clic.</p>
+        <p>Le barche col lucchetto ${G.ico('lucchetto')} richiedono un progetto: si trova nei forzieri, nei relitti, dai mercanti o come ricompensa delle missioni.</p>` });
+    for (const k of boats) {
+      const T = G.BOAT_TPL[k], need = G.Boats.needs(k), parts = G.Boats.parts(k), un = G.Boats.unlocked(k);
       const all = Object.entries(need).every(([id, n]) => P().count(id) >= n);
-      R += `<h2>${T.n}</h2><div class="sub">${T.d}</div>
-        <div class="stat"><span>Velocità <b>${(T.speed * 1.944).toFixed(0)} nodi</b></span><span>Lunghezza <b>${T.L.toFixed(1)} m</b></span><span>${T.sail ? 'A vela' : T.canoe ? 'A pagaia' : 'A remi'}</span></div>
-        <h2 style="font-size:19px;margin-top:14px">Materiali</h2><div class="mats">` +
-        Object.entries(need).map(([id, n]) => { const h = P().count(id); return `<div class="mat ${h >= n ? 'ok' : 'no'}"><img src="${G.icon(id)}" alt=""><span>${G.ITEMS[id].n}</span><em>${h} / ${n}</em></div>`; }).join('') +
-        `</div><h2 style="font-size:19px">Parti della sagoma</h2><ul class="partlist">${parts.map((p) => `<li>${esc(p.name)} — ${p.n} ${G.ITEMS[p.item].n.toLowerCase()}</li>`).join('')}</ul>
-        ${G.Boats.unlocked(UI.bookBoat) ? '<button class="bigbtn" data-act="placeboat">Traccia la sagoma in mare</button>' : `<p class="lockmsg">Ti manca il progetto. Cercalo nei forzieri, nei relitti, dai mercanti o come ricompensa delle missioni più difficili.</p>`}
-        <p class="sub" style="margin-top:10px">${all ? 'Hai già tutto il necessario.' : 'Puoi tracciare la sagoma subito e montare le parti man mano che raccogli i materiali.'}</p>`;
-    } else if (tab === 'ricette') {
-      L += `<p>Disponi i materiali nella griglia come nei disegni. Le ricette grandi richiedono il <em>banco da lavoro</em>, che apre una griglia 5×5.</p><p>Nell’inventario (<em>E</em> o <em>I</em>) puoi anche fare clic su una ricetta per riempire la griglia in automatico.</p>`;
-      const small = G.RECIPES.filter((r) => r.size === 3), big = G.RECIPES.filter((r) => r.size === 5);
-      L += recCards(small.slice(0, 10));
-      R += `<h2>Case e parti navali</h2><div class="sub">le ultime quattro solo al banco da lavoro 5×5</div>` + recCards(small.slice(10).concat(big));
-    } else {
-      L += `<h2>Sopravvivere</h2><p>Tieni d’occhio <em>fame</em> e <em>sete</em>. Le noci di cocco dissetano; con una ciotola raccogli acqua di mare e la bolli sul falò per renderla potabile.</p>
-        <p>Abbatti alberi per i tronchi, trasformali in assi, raccogli fibra dall’erba alta e dai cespugli e intrecciala in corda. Le rocce danno pietra per ascia e piccone.</p>
-        <p>Galline, pecore, mucche, maiali e conigli ti sfamano: cuoci la carne sul falò. Le pecore si possono tosare con <em>E</em>.</p>
-        <p>Di notte accendi torce e falò, oppure dormi in un letto: salverai anche il punto di rinascita.</p>
-        <h2 style="margin-top:14px">La casa</h2><p>Pavimenti, muri, porte, finestre e tetti si agganciano a una griglia di 3 metri. Posa prima il pavimento, poi i muri sui bordi e infine il tetto.</p>`;
-      R += `<h2>Comandi</h2><div class="ctrl">${CONTROLS.map(([k, v]) => `<span><kbd>${k}</kbd></span><span>${v}</span>`).join('')}</div>`;
+      S.push({ boat: k,
+        l: `<h2 class="bname">${un ? '' : G.ico('lucchetto') + ' '}${T.n}</h2><div class="sub">${T.d}</div><canvas class="bsketch ${un ? '' : 'locked'}" width="480" height="280" data-sketch="${k}"></canvas>
+          <div class="stat"><span>Velocità <b>${(T.speed * 1.944).toFixed(0)} nodi</b></span><span>Lunghezza <b>${T.L.toFixed(1)} m</b></span><span>${T.sail ? 'A vela' : T.canoe ? 'A pagaia' : 'A remi'}</span>${T.hold ? `<span>Stiva <b>${T.holdN || 27} posti</b></span>` : ''}</div>`,
+        r: `<h2 style="font-size:20px">Materiali</h2><div class="mats">` +
+          Object.entries(need).map(([id, n]) => { const h = P().count(id); return `<div class="mat ${h >= n ? 'ok' : 'no'}"><img src="${G.icon(id)}" alt=""><span>${G.ITEMS[id].n}</span><em>${h} / ${n}</em></div>`; }).join('') +
+          `</div><h2 style="font-size:20px">Parti della sagoma</h2><ul class="partlist">${parts.map((p) => `<li>${esc(p.name)} — ${p.n} ${G.ITEMS[p.item].n.toLowerCase()}</li>`).join('')}</ul>
+          ${un ? `<button class="bigbtn" data-act="placeboat" data-boat="${k}">Traccia la sagoma in mare</button>` : `<p class="lockmsg">Ti manca il progetto. Cercalo nei forzieri, nei relitti, dai mercanti o come ricompensa delle missioni più difficili.</p>`}
+          <p class="sub" style="margin-top:10px">${!un ? '' : all ? 'Hai già tutto il necessario.' : 'Puoi tracciare la sagoma subito e montare le parti man mano che raccogli i materiali.'}</p>` });
     }
-    R += '</div>';
-    $('bookWrap').innerHTML = `<div class="book">${L}</div>${R}</div>`;
-    document.querySelectorAll('canvas[data-sketch]').forEach((c) => boatSketch(c, c.dataset.sketch));
+    for (let i = 0; i < recPages.length; i += 2) {
+      const pg = (q) => q ? `<h2>${q.h}</h2><div class="sub">${q.s}</div>${recCards(q.list)}` : `<p class="bend">Fine degli appunti.</p>`;
+      S.push({ l: (i ? '' : `<p>Disponi i materiali nella griglia come nei disegni. Nell’inventario (<em>E</em>) puoi anche fare clic su una ricetta per riempire la griglia da sola.</p>`) + pg(recPages[i]), r: pg(recPages[i + 1]) });
+    }
+    return S;
+  }
+  UI.bookTurn = function (d) {
+    const S = UI._spreads || bookSpreads(), n = G.clamp(UI.bookPage + d, 0, S.length - 1);
+    if (n === UI.bookPage) return;
+    UI.renderBook(n);
+  };
+  UI.renderBook = function (to) {
+    const S = (UI._spreads = bookSpreads()), from = UI.bookPage;
+    if (to === undefined) to = G.clamp(from, 0, S.length - 1);
+    UI.bookPage = to;
+    const num = (i, side) => `<div class="pnum">${i * 2 + (side === 'l' ? 1 : 2)}</div>`;
+    const page = (i, side, extra) => `<div class="page ${side} ${extra || ''}">${S[i][side]}${num(i, side)}</div>`;
+    const nav = `<button class="bturn prev" data-turn="-1" ${to ? '' : 'disabled'} aria-label="Pagina precedente">‹</button><button class="bturn next" data-turn="1" ${to < S.length - 1 ? '' : 'disabled'} aria-label="Pagina successiva">›</button>`;
+    const close = `<button class="close-x" data-act="close" aria-label="Chiudi">×</button>`;
+    const W = $('bookWrap');
+    const anim = to !== from && W.querySelector('.book') && !(G.settings && G.settings.reduceMotion);
+    if (!anim) W.innerHTML = `<div class="book">${close}${page(to, 'l')}${page(to, 'r')}${nav}</div>`;
+    else {
+      // la pagina gira: davanti c'è la vecchia, dietro la nuova
+      const fwd = to > from;
+      const under = fwd ? page(from, 'l') + page(to, 'r') : page(to, 'l') + page(from, 'r');
+      const front = fwd ? page(from, 'r', 'face front') : page(from, 'l', 'face front');
+      const back = fwd ? page(to, 'l', 'face back') : page(to, 'r', 'face back');
+      W.innerHTML = `<div class="book">${close}${under}<div class="flip ${fwd ? 'fwd' : 'bwd'}">${front}${back}</div>${nav}</div>`;
+      if (G.Audio && G.Audio.page) G.Audio.page(); else if (G.Audio) G.Audio.click();
+      clearTimeout(UI._flipT);
+      UI._flipT = setTimeout(() => { if (UI.open === 'book' && UI.bookPage === to) { W.innerHTML = `<div class="book">${close}${page(to, 'l')}${page(to, 'r')}${nav}</div>`; W.querySelectorAll('canvas[data-sketch]').forEach((c) => boatSketch(c, c.dataset.sketch)); } }, 620);
+    }
+    W.querySelectorAll('canvas[data-sketch]').forEach((c) => boatSketch(c, c.dataset.sketch));
   };
   function recCards(list) {
     return '<div class="recgrid">' + list.map((r) => {
@@ -717,7 +751,7 @@
   const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Ctrl', 'correre (consuma stamina)'], ['Maiusc', 'accovacciarsi · rubare (E) se nessuno ti vede'], ['L', 'abilità'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
     ['E · I', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
-    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa ⇄ sopravvivenza'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
+    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa / sopravvivenza'], ['F5', 'visuale: prima persona, terza persona, di fronte'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
   UI.CONTROLS = CONTROLS;
 
   /* ---------------- MENU ---------------- */
@@ -780,7 +814,7 @@
     const N = G.NEWS, seen = G.settings.newsSeen === N.v;
     el.className = seen ? 'mini' : '';
     el.innerHTML = seen ? `<button data-news="open">Novità della ${esc(N.v)} · ${esc(N.t)}</button>`
-      : `<small class="k">Novità della versione ${esc(N.v)}</small><h3>${esc(N.t)}</h3><div class="d">${esc(N.d)}</div><ul>${N.items.map(([i, t]) => `<li><i>${i}</i>${esc(t)}</li>`).join('')}</ul><div class="f"><span>${window.deriva ? 'Tutte le versioni nel diario (PDF) accanto a Deriva.exe' : 'Buon viaggio!'}</span><button data-news="close">Chiudi ✕</button></div>`;
+      : `<small class="k">Novità della versione ${esc(N.v)}</small><h3>${esc(N.t)}</h3><div class="d">${esc(N.d)}</div><ul>${N.items.map(([i, t]) => `<li><i>${G.ico(i)}</i>${esc(t)}</li>`).join('')}</ul><div class="f"><span>${window.deriva ? 'Tutte le versioni nel diario (PDF) accanto a Deriva.exe' : 'Buon viaggio!'}</span><button data-news="close">Chiudi</button></div>`;
   };
   UI.showMenu = function (screen) {
     UI.menu = screen || 'main';
@@ -940,7 +974,7 @@
   UI.damageNumber = function (x, y, z, dmg, killed) {
     _dn.set(x, y, z).project(G.camera); if (_dn.z > 1) return;
     const el = document.createElement('div'); el.className = 'dmgnum' + (killed ? ' kill' : '');
-    el.textContent = killed ? '✖ ' + dmg : '−' + dmg;
+    if (killed) el.innerHTML = G.ico('teschio') + ' ' + dmg; else el.textContent = '−' + dmg;
     el.style.left = ((_dn.x * 0.5 + 0.5) * innerWidth + (Math.random() - 0.5) * 30) + 'px'; el.style.top = ((-_dn.y * 0.5 + 0.5) * innerHeight) + 'px';
     $('hud').appendChild(el); setTimeout(() => el.remove(), 900);
   };
@@ -1020,7 +1054,7 @@
     const N = G.Net;
     if (!N || !N.on) { box.hidden = true; return; }
     box.hidden = false;
-    const spk = '<b class="spk" aria-label="parla">♪</b>';
+    const spk = '<b class="spk" aria-label="parla">' + G.ico('nota') + '</b>';
     box.innerHTML = `<li><i style="background:${N.COLOR_CSS[N.slot % 4]}"></i>${esc(G.settings.name || 'Tu')}${G.Voice && G.Voice.talking ? spk : ''}</li>` + [...N.remotes.values()].map((r) => `<li><i style="background:${N.COLOR_CSS[r.slot % 4]}"></i>${esc(r.name)}${r.speaking ? spk : ''}${G.settings.showPing !== false && r.ping ? `<span>${r.ping} ms</span>` : ''}</li>`).join('');
   };
   function onMenuClick(e) {
@@ -1121,6 +1155,8 @@
       if ((e.ctrlKey || e.metaKey) && !UI.open && /^Key[A-Z]$/.test(k)) e.preventDefault(); // si corre con Ctrl: niente scorciatoie del browser
       if (UI.open) {
         if (k === 'Escape' || k === 'KeyI' || (k === 'KeyL' && UI.open === 'abilita') || (k === 'KeyP' && UI.open === 'giocatori') || (k === 'KeyE' && UI.open !== 'book') || (k === 'KeyB' && UI.open === 'book') || (k === 'KeyM' && UI.open === 'map') || (k === 'KeyJ' && UI.open === 'diario')) { e.preventDefault(); UI.close(); }
+        else if (UI.open === 'book' && (k === 'ArrowRight' || k === 'KeyD' || k === 'PageDown')) { e.preventDefault(); UI.bookTurn(1); }
+        else if (UI.open === 'book' && (k === 'ArrowLeft' || k === 'KeyA' || k === 'PageUp')) { e.preventDefault(); UI.bookTurn(-1); }
         else if (/^Digit[1-8]$/.test(k) && !UI.hoverSlot && UI.open === 'inv' && G.creative()) UI.applyKit(+k.slice(5) - 1);
         else if (/^Digit[1-9]$/.test(k) && UI.hoverSlot && UI.open !== 'book') {
           // tasto numerico sopra uno slot: scambia con la barra rapida
@@ -1147,6 +1183,7 @@
       else if (k === 'KeyF') P_.swapHands();
       else if (k === 'KeyG') { if (P_.boat && P_.boat.inv) UI.openChest(P_.boat.inv, 'Stiva', { boat: P_.boat }); else { const tg = P_.target; if (tg && tg.kind === 'boat' && !G.Boats.isComplete(tg.boat)) UI.openBoatBuild(tg.boat); } }
       else if (k === 'F4') { e.preventDefault(); UI.toggleMode(); }
+      else if (k === 'F5') { e.preventDefault(); P_.view = ((P_.view || 0) + 1) % 3; UI.toast(['Prima persona', 'Terza persona', 'Terza persona, di fronte'][P_.view]); }
       else if (k === 'KeyT' || k === 'Slash' || k === 'NumpadDivide') { e.preventDefault(); P_.keys = {}; G.Cmd.openConsole(k === 'KeyT' ? '' : '/'); }
       else if (k === 'KeyK') UI.openCustom('strumenti');
       else if (k === 'KeyZ' && G.Voice) G.Voice.setPTT(true);
@@ -1220,18 +1257,18 @@
       const d = G.ITEMS[st.id];
       const f = [d.food ? `+${d.food} fame` : '', d.water ? `+${d.water} sete` : '', G.COOK[st.id] ? 'si cuoce sul falò' : ''].filter(Boolean).join(' · ');
       const wi = G.weaponInfo(st.id);
-      tt.innerHTML = `<div class="tn">${esc(d.n)}</div>${d.d ? `<div class="td">${esc(d.d)}</div>` : ''}${wi ? `<div class="tw">⚔ ${wi.text}</div>` : ''}${f ? `<div class="tf">${f}</div>` : ''}`;
+      tt.innerHTML = `<div class="tn">${esc(d.n)}</div>${d.d ? `<div class="td">${esc(d.d)}</div>` : ''}${wi ? `<div class="tw">${G.ico('spada')} ${wi.text}</div>` : ''}${f ? `<div class="tf">${f}</div>` : ''}`;
       tt.hidden = false;
     });
     $('bookWrap').addEventListener('click', (e) => {
-      const t = e.target.closest('[data-tab],[data-boat],[data-act]');
+      const t = e.target.closest('[data-turn],[data-go],[data-act]');
       if (!t && e.target === $('bookWrap')) { UI.close(); return; }
       if (!t) return;
+      if (t.dataset.turn) { UI.bookTurn(+t.dataset.turn); return; }
       if (G.Audio) G.Audio.click();
-      if (t.dataset.tab) { UI.bookTab = t.dataset.tab; UI.renderBook(); }
-      else if (t.dataset.boat) { UI.bookBoat = t.dataset.boat; UI.renderBook(); }
+      if (t.dataset.go) UI.renderBook(+t.dataset.go);
       else if (t.dataset.act === 'close') UI.close();
-      else if (t.dataset.act === 'placeboat' && G.Boats.unlocked(UI.bookBoat)) UI.startBoatPlace(UI.bookBoat);
+      else if (t.dataset.act === 'placeboat' && G.Boats.unlocked(t.dataset.boat)) { UI.bookBoat = t.dataset.boat; UI.startBoatPlace(t.dataset.boat); }
     });
     $('menu').addEventListener('click', onMenuClick);
     $('menuSide').addEventListener('input', onMenuInput);

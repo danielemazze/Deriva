@@ -123,7 +123,7 @@
   };
   MU.floatNote = function (id) {
     const h = document.getElementById('hud'); if (!h) return;
-    const n = document.createElement('div'); n.className = 'mnote'; n.textContent = ['♪', '♫', '♩'][(Math.random() * 3) | 0];
+    const n = document.createElement('div'); n.className = 'mnote'; n.innerHTML = G.ico('nota');
     n.style.left = (id === 'chitarra' ? 56 + Math.random() * 8 : 44 + Math.random() * 6) + '%'; n.style.top = (id === 'chitarra' ? 58 : 50) + '%';
     h.appendChild(n); setTimeout(() => n.remove(), 1600);
   };

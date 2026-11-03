@@ -16,7 +16,7 @@
     return { hw, kd, gw };
   }
   function hullSide(L, W, D, sheer, side, rows) {
-    const H = hullShape(L, W, D, sheer), NS = 28, NV = 9;
+    const H = hullShape(L, W, D, sheer), NS = 56, NV = 18;
     const pos = [], uv = [], idx = [];
     for (let i = 0; i <= NS; i++) {
       const t = i / NS, z = (t - 0.5) * L;
@@ -52,7 +52,7 @@
     return M.merge([g, ...rail]);
   }
   function deckGeo(L, W, D, sheer, yOff, hole) {
-    const H = hullShape(L, W, D, sheer), NS = 24, pos = [], uv = [], idx = [];
+    const H = hullShape(L, W, D, sheer), NS = 48, pos = [], uv = [], idx = [];
     const y = D * 0.38 - (yOff || 0.25);
     if (hole) {
       // ponte con il boccaporto: le fasce che toccano l'apertura si dividono in due
@@ -86,7 +86,7 @@
   // mezza larghezza interna dello scafo a una certa altezza (per il ponte di sotto)
   function hullXAt(H, t, y) { const kd = H.kd(t), gw = H.gw(t); const f = G.clamp((y + kd) / (gw + kd), 0, 1); const s = Math.pow(f, 0.8); return H.hw(t) * Math.pow(Math.sin((s * Math.PI) / 2), 0.55); }
   // un segmento di corda (cilindro sottile) da a a b
-  function seg(a, b, r) { const d = new V3().subVectors(b, a), len = d.length(); const g = new THREE.CylinderGeometry(r, r, len, 5); g.translate(0, len / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), d.normalize())); g.translate(a.x, a.y, a.z); return g; }
+  function seg(a, b, r) { const d = new V3().subVectors(b, a), len = d.length(); const g = new THREE.CylinderGeometry(r, r, len, 8); g.translate(0, len / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), d.normalize())); g.translate(a.x, a.y, a.z); return g; }
   // altezza della coffa (piattaforma) su un albero
   function rigTop(T, t, h) { return T.D && (T === TPL.galeone || T === TPL.vascello) ? T.D * 0.38 - 0.18 + (h - 3) * 0.5 + 2 : T.D * 0.38 - 0.18 + (h - 2.4) * 0.55 + 1.75; }
   // sartie con le griselle (la scala di corda) su un lato
@@ -107,8 +107,11 @@
     for (let z = z0 + 1; z < z1; z += 1.8) { const t = z / L + 0.5, w = hullXAt(H, t, T.deck - 0.3); out.push(M.colorize(box(w * 2, 0.2, 0.2, 0, T.deck - 0.28, z), 0.3, 0.22, 0.15)); }
     // scala verso il boccaporto
     const [hx, hz] = T.hatch, hgt = T.deck - y;
-    for (const sx of [-0.28, 0.28]) { const r = box(0.07, Math.hypot(hgt, 0.9), 0.07, 0, 0, 0); r.rotateX(-Math.atan2(0.9, hgt)); r.translate(hx + sx, y + hgt / 2, hz - 0.35); out.push(M.colorize(r, 0.45, 0.33, 0.2)); }
-    for (let i = 0; i < 6; i++) { const k = (i + 0.5) / 6; out.push(M.colorize(box(0.56, 0.05, 0.18, hx, y + k * hgt, hz + 0.1 - k * 0.9), 0.6, 0.45, 0.3)); }
+    { const run = 1.7, a = Math.atan2(hgt, run), len = Math.hypot(hgt, run);
+      for (const sx of [-0.34, 0.34]) { const r = box(0.08, 0.22, len + 0.2, 0, 0, 0); r.rotateX(-a); r.translate(hx + sx, y + hgt / 2 - 0.05, hz); out.push(M.colorize(r, 0.45, 0.33, 0.2)); }
+      for (let i = 0; i < 9; i++) { const k = (i + 0.5) / 9; out.push(M.colorize(box(0.62, 0.05, 0.24, hx, y + k * hgt - 0.03, hz - run / 2 + k * run), 0.6, 0.45, 0.3)); }
+      // corrimano
+      for (const sx of [-0.4, 0.4]) { const r = cyl(0.025, 0.025, len, 0, 0, 0, Math.PI / 2 - a, 0); r.translate(hx + sx, y + hgt / 2 + 0.85, hz); out.push(M.colorize(r, 0.4, 0.3, 0.2)); } }
     // cannoni ai portelli (lato sinistro e destro) e portelli chiusi
     for (let i = 0; i < 6; i++) for (const sd of [-1, 1]) {
       const z = z0 + 1.2 + i * (z1 - z0 - 2.4) / 5, t = z / L + 0.5, w = hullXAt(H, t, y + 0.9);
@@ -121,6 +124,97 @@
     out.push(M.colorize(box(1.6, 0.08, 0.9, 0, y + 0.8, z0 + 2.4), 0.55, 0.4, 0.26)); for (const [lx, lz] of [[-0.7, -0.35], [0.7, -0.35], [-0.7, 0.35], [0.7, 0.35]]) out.push(M.colorize(box(0.08, 0.8, 0.08, lx, y + 0.4, z0 + 2.4 + lz), 0.3, 0.22, 0.15));
     return M.merge(out);
   }
+
+  /* ---------- cassero e castello: muri che seguono lo scafo, ponte rialzato, paratia con la porta ---------- */
+  // muro spesso lungo un percorso [[x,z],...] da yb(i) a yt(i)
+  function wallPath(path, yb, yt, th) {
+    const pos = [], uv = [], idx = []; let acc = 0;
+    const n = path.length, nrm = path.map((p, i) => { const a = path[Math.max(0, i - 1)], b = path[Math.min(n - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; });
+    const quad = (a, b, c, d) => { const o = pos.length / 3; idx.push(o, o + 1, o + 2, o + 2, o + 1, o + 3); };
+    for (let side = 0; side < 2; side++) {
+      acc = 0;
+      for (let i = 0; i < n; i++) {
+        if (i) acc += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+        const off = side ? -th : 0, x = path[i][0] + nrm[i][0] * off, z = path[i][1] + nrm[i][1] * off;
+        pos.push(x, yb(i), z, x, yt(i), z); uv.push(acc / 2.2, yb(i) / 2.2, acc / 2.2, yt(i) / 2.2);
+      }
+      const o = side * n * 2;
+      for (let i = 0; i < n - 1; i++) { const a = o + i * 2; if (side) idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    }
+    // bordo superiore
+    const o2 = pos.length / 3;
+    for (let i = 0; i < n; i++) { const x = path[i][0], z = path[i][1]; pos.push(x, yt(i), z, x + nrm[i][0] * -th, yt(i), z + nrm[i][1] * -th); uv.push(i * 0.3, 0, i * 0.3, 0.1); }
+    for (let i = 0; i < n - 1; i++) { const a = o2 + i * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    return M.colorize(g, 1, 1, 1);
+  }
+  // lastra orizzontale tra z0 e z1 con mezza larghezza w(z)
+  function slab(z0, z1, w, y, th, N) {
+    const pos = [], uv = [], idx = [];
+    for (const [yy, up] of [[y, 1], [y - th, 0]]) {
+      const o = pos.length / 3;
+      for (let i = 0; i <= N; i++) { const z = z0 + (z1 - z0) * i / N, ww = w(z); pos.push(-ww, yy, z, ww, yy, z); uv.push(-ww / 2, z / 2, ww / 2, z / 2); }
+      for (let i = 0; i < N; i++) { const a = o + i * 2; if (up) idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    return M.colorize(g, 1, 1, 1);
+  }
+  // ringhiera con colonnine tra x0 e x1 a quota y, lungo z
+  function railing(x0, x1, y, z, out, gaps) {
+    const inGap = (x) => (gaps || []).some(([a, b]) => Math.abs(x) > a - 0.02 && Math.abs(x) < b + 0.02);
+    for (let x = x0; x <= x1 + 1e-3; x += 0.24) if (!inGap(x)) out.push(M.colorize(cyl(0.035, 0.045, 0.8, x, y + 0.4, z), 0.62, 0.5, 0.38));
+    const segs = [[x0, x1]]; for (const [a, b] of gaps || []) for (const sd of [-1, 1]) { const s0 = sd < 0 ? -b : a, s1 = sd < 0 ? -a : b; for (let i = segs.length - 1; i >= 0; i--) { const [p, q] = segs[i]; if (s1 <= p || s0 >= q) continue; segs.splice(i, 1, ...[[p, s0], [s1, q]].filter(([u, v]) => v - u > 0.05)); } }
+    for (const [a, b] of segs) { out.push(M.colorize(box(b - a, 0.08, 0.12, (a + b) / 2, y + 0.84, z), 0.5, 0.38, 0.26)); out.push(M.colorize(box(b - a, 0.06, 0.08, (a + b) / 2, y + 0.06, z), 0.5, 0.38, 0.26)); }
+  }
+  function stairs(x, zTop, run, y0, y1, out, dir) {
+    const n = Math.max(6, Math.round((y1 - y0) / 0.24)), w = 0.68;
+    for (let i = 0; i < n; i++) { const k = (i + 0.5) / n, z = zTop + dir * run * (1 - k); out.push(M.colorize(box(w, 0.06, run / n + 0.06, x, y0 + k * (y1 - y0) - 0.03, z), 0.66, 0.52, 0.38)); out.push(M.colorize(box(w, (y1 - y0) / n, 0.04, x, y0 + (i + 0.5) / n * (y1 - y0) - (y1 - y0) / n / 2, z + dir * (run / n) / 2), 0.5, 0.38, 0.27)); }
+    const len = Math.hypot(run, y1 - y0), a = Math.atan2(y1 - y0, run);
+    for (const sx of [-w / 2 - 0.04, w / 2 + 0.04]) { const r = box(0.08, 0.26, len, 0, 0, 0); r.rotateX(dir * a); r.translate(x + sx, (y0 + y1) / 2 - 0.08, zTop + dir * run / 2); out.push(M.colorize(r, 0.42, 0.31, 0.21)); }
+  }
+  function castleGeo(T, which) {
+    const H = T.H, L = T.L, C = T.castles[which], deck = T.deck, out = [], aft = which === 'q';
+    const zb = C.z1, zEnd = aft ? -L / 2 + 0.02 : L / 2 - 0.35, y = C.y;
+    const hwAt = (z) => H.hw(z / L + 0.5) * 0.985;
+    // muri laterali (sopra la murata, fino al parapetto)
+    const N = 22, path = (sd) => { const p = []; for (let i = 0; i <= N; i++) { const z = zb + (zEnd - zb) * i / N; p.push([sd * hwAt(z), z]); } return aft === (sd > 0) ? p.reverse() : p; };
+    for (const sd of [-1, 1]) { const p = path(sd); out.push(wallPath(p, (i) => H.gw(p[i][1] / L + 0.5) - 0.12, () => y + 0.95, 0.12)); }
+    // specchio di poppa con le finestre della galleria
+    if (aft) {
+      const w = hwAt(zEnd);
+      out.push(wallPath([[w, zEnd], [-w, zEnd]], () => H.gw(0) - 0.3, () => y + 1.25, 0.14));
+      for (let i = 0; i < 4; i++) { const x = -w * 0.62 + i * (w * 1.24 / 3);
+        out.push(M.colorize(box(0.56, 0.78, 0.06, x, deck + 1.25, zEnd - 0.04), 0.86, 0.72, 0.5)); out.push(M.colorize(box(0.44, 0.66, 0.07, x, deck + 1.25, zEnd - 0.045), 0.08, 0.1, 0.12)); out.push(M.colorize(box(0.04, 0.66, 0.08, x, deck + 1.25, zEnd - 0.05), 0.86, 0.72, 0.5)); }
+      out.push(M.colorize(box(w * 2 + 0.2, 0.12, 0.5, 0, deck + 0.75, zEnd - 0.22), 0.5, 0.38, 0.26)); // balconata
+      for (let x = -w; x <= w + 1e-3; x += 0.3) out.push(M.colorize(cyl(0.03, 0.03, 0.55, x, deck + 1.05, zEnd - 0.42), 0.62, 0.5, 0.38));
+      out.push(M.colorize(box(w * 2 + 0.2, 0.07, 0.08, 0, deck + 1.33, zEnd - 0.42), 0.5, 0.38, 0.26));
+      for (const x of [-w + 0.2, 0, w - 0.2]) { out.push(M.colorize(box(0.24, 0.34, 0.24, x, y + 1.6, zEnd + 0.1), 0.95, 0.8, 0.45)); out.push(M.colorize(cyl(0.03, 0.03, 0.4, x, y + 1.25, zEnd + 0.1), 0.2, 0.2, 0.2)); }
+    } else {
+      // punta del castello: parapetto a V verso il bompresso
+      const w = hwAt(zEnd); out.push(wallPath([[w, zEnd], [0, zEnd + 0.3], [-w, zEnd]], () => y - 0.1, () => y + 0.95, 0.12));
+    }
+    // ponte rialzato
+    out.push(slab(Math.min(zb, zEnd), Math.max(zb, zEnd), (z) => hwAt(z) - 0.05, y, 0.16, 20));
+    // travi sotto il ponte (si vedono dalla cabina)
+    for (let k = 1; k < 5; k++) { const z = zb + (zEnd - zb) * k / 5; out.push(M.colorize(box(hwAt(z) * 2 - 0.2, 0.18, 0.16, 0, y - 0.25, z), 0.36, 0.27, 0.18)); }
+    // paratia con la porta e due finestrelle
+    const wb = hwAt(zb) - 0.06, D = T.castles.door, dz = aft ? 0.06 : -0.06;
+    out.push(wallPath([[-wb, zb], [-D, zb]], () => deck - 0.05, () => y, 0.12), wallPath([[D, zb], [wb, zb]], () => deck - 0.05, () => y, 0.12), wallPath([[-D, zb], [D, zb]], () => deck + 2.0, () => y, 0.12));
+    for (const sd of [-1, 1]) { out.push(M.colorize(box(0.12, 2.05, 0.2, sd * (D + 0.06), deck + 1.0, zb + dz), 0.42, 0.3, 0.2)); out.push(M.colorize(box(0.5, 0.42, 0.05, sd * (wb * 0.62), deck + 1.45, zb + dz * 2.2), 0.08, 0.1, 0.12)); out.push(M.colorize(box(0.6, 0.06, 0.1, sd * (wb * 0.62), deck + 1.2, zb + dz * 2.2), 0.6, 0.48, 0.34)); }
+    out.push(M.colorize(box(D * 2 + 0.24, 0.14, 0.2, 0, deck + 2.07, zb + dz), 0.42, 0.3, 0.2));
+    // porta aperta verso l'interno
+    { const d = box(D * 2 - 0.04, 1.96, 0.06, 0, 0, 0); d.translate(D - 0.02, 0, 0); d.rotateY(aft ? 1.75 : -1.75); d.translate(-D, deck + 0.99, zb - dz * 1.2); out.push(M.colorize(d, 0.55, 0.38, 0.24)); }
+    // ringhiera davanti, con i varchi delle scale
+    railing(-wb, wb, y, zb + dz * 0.4, out, [C.sx]);
+    // scale che salgono dal ponte di coperta
+    for (const sd of [-1, 1]) stairs(sd * (C.sx[0] + C.sx[1]) / 2, zb + (aft ? 0.02 : -0.02), C.run, deck, y, out, aft ? 1 : -1);
+    // arredo della cabina: tavolo, panca, lanterna
+    { const zc = (zb + zEnd) / 2 + (aft ? 0.4 : -0.3);
+      out.push(M.colorize(box(1.3, 0.07, 0.8, 0, deck + 0.78, zc), 0.5, 0.34, 0.2)); for (const [lx, lz] of [[-0.55, -0.3], [0.55, -0.3], [-0.55, 0.3], [0.55, 0.3]]) out.push(M.colorize(box(0.07, 0.76, 0.07, lx, deck + 0.38, zc + lz), 0.34, 0.24, 0.15));
+      out.push(M.colorize(box(1.2, 0.07, 0.34, 0, deck + 0.45, zc + (aft ? 0.75 : -0.75)), 0.46, 0.32, 0.2));
+      out.push(M.colorize(box(0.18, 0.24, 0.18, 0, y - 0.55, zc), 0.95, 0.8, 0.45)); }
+    return M.merge(out);
+  }
   function lowerCannonsGeo(T) {
     const H = T.H, L = T.L, y = T.lowerY, [z0, z1] = T.lowerZ, out = [];
     for (let i = 0; i < 6; i++) for (const sd of [-1, 1]) { const z = z0 + 1.2 + i * (z1 - z0 - 2.4) / 5, w = hullXAt(H, z / L + 0.5, y + 0.9); out.push(M.colorize(cyl(0.13, 0.17, 1.4, sd * (w - 0.75), y + 0.62, z, 0, -sd * Math.PI / 2), 0.07, 0.07, 0.075)); }
@@ -129,8 +223,8 @@
   function lanternsGeo(T) { const out = []; for (const z of [T.lowerZ[0] + 2.2, T.hatch[1] - 2.2, T.lowerZ[1] - 2.2]) { out.push(M.colorize(box(0.2, 0.28, 0.2, 1.1, T.deck - 0.6, z), 1, 1, 1)); out.push(M.colorize(cyl(0.015, 0.015, 0.3, 1.1, T.deck - 0.32, z), 0.2, 0.2, 0.2)); } return M.merge(out); }
   function keelGeo(L, W, D, sheer) {
     const H = hullShape(L, W, D, sheer), parts = [];
-    for (let i = 0; i < 16; i++) {
-      const t0 = i / 16, t1 = (i + 1) / 16;
+    for (let i = 0; i < 32; i++) {
+      const t0 = i / 32, t1 = (i + 1) / 32;
       const a = new V3(0, -H.kd(t0) - 0.06, (t0 - 0.5) * L), b = new V3(0, -H.kd(t1) - 0.06, (t1 - 0.5) * L);
       const g = new THREE.BoxGeometry(0.16, 0.18, a.distanceTo(b) + 0.02);
       const m = new THREE.Matrix4().lookAt(b, a, new V3(0, 1, 0)); m.setPosition(a.clone().lerp(b, 0.5)); g.applyMatrix4(m); parts.push(g);
@@ -140,7 +234,7 @@
     const tw = H.hw(0) * 2, tr = new THREE.BoxGeometry(tw * 0.98, H.gw(0) + H.kd(0), 0.1); tr.translate(0, (H.gw(0) - H.kd(0)) / 2, -L / 2); parts.push(tr);
     return M.merge(parts);
   }
-  function cyl(r0, r1, h, x, y, z, rx, rz, c) { const g = new THREE.CylinderGeometry(r0, r1, h, 8); if (rx) g.rotateX(rx); if (rz) g.rotateZ(rz); g.translate(x, y, z); return c ? M.colorize(g, c[0], c[1], c[2]) : g; }
+  function cyl(r0, r1, h, x, y, z, rx, rz, c) { const g = new THREE.CylinderGeometry(r0, r1, h, 20); if (rx) g.rotateX(rx); if (rz) g.rotateZ(rz); g.translate(x, y, z); return c ? M.colorize(g, c[0], c[1], c[2]) : g; }
   function box(w, h, d, x, y, z) { const g = new THREE.BoxGeometry(w, h, d); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / 2, uv.getY(i) * Math.max(h, d) / 2); g.translate(x, y, z); return M.colorize(g, 1, 1, 1); }
   function oar(x, y, z, side, len) {
     const shaft = cyl(0.035, 0.035, len, 0, 0, 0, 0, Math.PI / 2, [1.1, 1.1, 1.1]);
@@ -154,7 +248,7 @@
     g.computeVertexNormals(); g.rotateY(Math.PI / 2); g.translate(x, y, z);
     return M.colorize(g, 1, 1, 1);
   }
-  function rope(a, b) { const len = a.distanceTo(b); const g = new THREE.CylinderGeometry(0.018, 0.018, len, 4); g.rotateX(Math.PI / 2); const m = new THREE.Matrix4().lookAt(b, a, new V3(0, 1, 0)); m.setPosition(a.clone().lerp(b, 0.5)); g.applyMatrix4(m); return M.colorize(g, 1, 1, 1); }
+  function rope(a, b) { const len = a.distanceTo(b); const g = new THREE.CylinderGeometry(0.018, 0.018, len, 6); g.rotateX(Math.PI / 2); const m = new THREE.Matrix4().lookAt(b, a, new V3(0, 1, 0)); m.setPosition(a.clone().lerp(b, 0.5)); g.applyMatrix4(m); return M.colorize(g, 1, 1, 1); }
 
   /* ---------- progetti ---------- */
   const TPL = (G.BOAT_TPL = {
@@ -181,10 +275,12 @@
     c.deck = -0.12; c.helm = [0, -0.2]; c.helmTxt = 'Sedile'; c.sit = 0.08; c.oars = true;
     k.deck = 0.55; k.helm = [0, -k.L / 2 + 1.1]; k.helmTxt = 'Timone'; k.obst = [{ c: [0, 0.6], r: 0.3 }];
     g.deck = g.D * 0.38 - 0.18; g.helm = [0, -g.L * 0.3]; g.helmTxt = 'Timone';
-    g.obst = [{ c: [0, (0.7 - 0.5) * g.L], r: 0.4 }, { c: [0, (0.5 - 0.5) * g.L], r: 0.45 }, { c: [0, (0.3 - 0.5) * g.L], r: 0.4 }, { box: [-g.W * 0.4, -g.L / 2 + 0.3, g.W * 0.4, -g.L * 0.36] }, { box: [-g.W * 0.36, g.L * 0.34, g.W * 0.36, g.L / 2 - 0.6] }, { box: [-0.6, g.L * 0.08 - 0.4, 0.6, g.L * 0.08 + 0.4] }];
+    g.obst = [{ c: [0, (0.7 - 0.5) * g.L], r: 0.4 }, { c: [0, (0.5 - 0.5) * g.L], r: 0.45 }, { c: [0, (0.3 - 0.5) * g.L], r: 0.4 }, { box: [-0.6, g.L * 0.08 - 0.4, 0.6, g.L * 0.08 + 0.4] }];
     vs.deck = vs.D * 0.38 - 0.18; vs.helm = [0, -vs.L * 0.31]; vs.helmTxt = 'Timone';
-    vs.hatch = [0, vs.L * 0.02]; vs.lowerY = vs.deck - 2.3; vs.lowerZ = [-vs.L * 0.3, vs.L * 0.3];
-    vs.obst = [{ c: [0, (0.72 - 0.5) * vs.L], r: 0.45 }, { c: [0, 0], r: 0.5 }, { c: [0, (0.28 - 0.5) * vs.L], r: 0.42 }, { box: [-vs.W * 0.4, -vs.L / 2 + 0.3, vs.W * 0.4, -vs.L * 0.36] }, { box: [-vs.W * 0.36, vs.L * 0.34, vs.W * 0.36, vs.L / 2 - 0.6] }, { box: [-0.6, vs.L * 0.12 - 0.4, 0.6, vs.L * 0.12 + 0.4] }, { box: [-0.8, vs.hatch[1] - 0.95, 0.8, vs.hatch[1] + 0.95] }];
+    vs.hatch = [0, -vs.L * 0.1]; vs.lowerY = vs.deck - 2.3; vs.lowerZ = [-vs.L * 0.3, vs.L * 0.3];
+    vs.obst = [{ c: [0, (0.72 - 0.5) * vs.L], r: 0.45 }, { c: [0, 0], r: 0.5 }, { c: [0, (0.28 - 0.5) * vs.L], r: 0.42 }, { box: [-0.6, vs.L * 0.12 - 0.4, 0.6, vs.L * 0.12 + 0.4] }];
+    // cassero di poppa e castello di prua: ponti rialzati con le scale, e sotto una cabina con la porta
+    for (const T of [g, vs]) T.castles = { q: { z1: -T.L * 0.34, y: T.deck + 2.3, sx: [0.8, 1.5], run: 2.4, part: 'Cassero di poppa' }, f: { z1: T.L * 0.34, y: T.deck + 2.15, sx: [0.55, 1.2], run: 2.2, part: 'Castello di prua' }, door: 0.48 };
     w.obst = [{ c: [0, (0.62 - 0.5) * w.L], r: 0.32 }, { c: [0, (0.36 - 0.5) * w.L], r: 0.34 }, { box: [-w.W * 0.39, -w.L * 0.33 - 1.65, w.W * 0.39, -w.L * 0.33 + 1.65] }, { box: [-0.55, w.L * 0.05 - 0.38, 0.55, w.L * 0.05 + 0.38] }];
     for (const T of Object.values(TPL)) if (T.D) T.H = hullShape(T.L, T.W, T.D, T.sheer);
     // sartie scalabili: dove partono sulla murata e dove arrivano (la coffa)
@@ -243,7 +339,7 @@
       P.local.y = r.top + 0.08; P.lvy = 0;
       return true;
     }
-    if (P.lower && T.lower) {
+    if (P.lower && T.lower && !T.castles) {
       P.local.x += lx * sp * dt; P.local.z += lz * sp * dt;
       const [z0, z1] = T.lowerZ; P.local.z = G.clamp(P.local.z, z0 + 0.35, z1 - 0.35);
       const w = Math.max(0.5, hullXAt(H, P.local.z / T.L + 0.5, T.lowerY + 0.8) - 1.3); P.local.x = G.clamp(P.local.x, -w, w);
@@ -262,11 +358,93 @@
     }
     return false;
   };
+  /* ---------- camminare su galeone e vascello: cassero e castello (sopra e dentro la cabina), scale, boccaporto ---------- */
+  const built = (b, name) => { const i = b.parts.findIndex((p) => p.name === name); return i >= 0 && !!b.filled[i]; };
+  // parti rialzate costruite su questa barca
+  function castlesOf(b) {
+    const C = b.T.castles; if (!C) return null;
+    return { q: built(b, C.q.part) ? C.q : null, f: built(b, C.f.part) ? C.f : null, door: C.door, low: b.T.lower && built(b, 'Ponte di sotto') };
+  }
+  // dentro la zona del castello? (poppa: z < z1, prua: z > z1)
+  const inC = (c, w, z) => c && (w === 'q' ? z < c.z1 : z > c.z1);
+  // altezza del pavimento in (x, z) per chi sta a quota y (null = muro)
+  BT.floorAt = function (b, x, z, y) {
+    const T = b.T, K = castlesOf(b); if (!K) return T.deck;
+    for (const w of ['q', 'f']) {
+      const c = K[w]; if (!c) continue;
+      if (inC(c, w, z)) return y > c.y - 0.9 ? c.y : T.deck; // sopra il ponte rialzato o dentro la cabina
+      // scale: salgono verso la paratia
+      const ax = Math.abs(x), d = w === 'q' ? z - c.z1 : c.z1 - z;
+      if (ax > c.sx[0] && ax < c.sx[1] && d >= 0 && d < c.run) { const h = T.deck + (c.y - T.deck) * (1 - d / c.run); if (y > h - 0.7 || h - T.deck < 0.7) return h; }
+    }
+    if (K.low) {
+      const [hx, hz] = T.hatch, hl = 0.85;
+      if (Math.abs(x - hx) < 0.7 && Math.abs(z - hz) < hl) {
+        const k = (z - (hz - hl)) / (2 * hl), h = T.lowerY + (T.deck - T.lowerY) * G.clamp(k, 0, 1);
+        if (Math.abs(x - hx) < 0.3 && y > h - 0.7) return h; // sui gradini
+        return T.lowerY; // nel buco del boccaporto si cade di sotto
+      }
+      if (y < T.deck - 1.0) return T.lowerY;
+    }
+    return T.deck;
+  };
+  // muri: paratie (si passa solo dalla porta), ringhiere davanti ai ponti rialzati, scafo del ponte di sotto
+  function blocked(b, K, x0, z0, x, z, y) {
+    const T = b.T;
+    for (const w of ['q', 'f']) {
+      const c = K[w]; if (!c) continue;
+      const was = inC(c, w, z0), now = inC(c, w, z);
+      if (was !== now) {
+        if (y < c.y - 0.9) { if (Math.abs(x) > K.door - 0.12) return true; } // paratia: solo dalla porta
+        else if (Math.abs(y - c.y) < 0.5 && !(Math.abs(x) > c.sx[0] + 0.05 && Math.abs(x) < c.sx[1] - 0.05)) return true; // ringhiera, varchi solo alle scale
+      }
+      // fianchi delle scale: non si sale di lato
+      const ax = Math.abs(x), d = w === 'q' ? z - c.z1 : c.z1 - z;
+      if (d >= 0 && d < c.run && y < T.deck + 0.3) { const h = T.deck + (c.y - T.deck) * (1 - d / c.run), ax0 = Math.abs(x0); if (h - T.deck > 0.5 && (ax0 <= c.sx[0]) !== (ax <= c.sx[0]) || h - T.deck > 0.5 && (ax0 >= c.sx[1]) !== (ax >= c.sx[1])) return true; }
+    }
+    if (K.low && y < T.deck - 1.0) {
+      const [z0l, z1l] = T.lowerZ; if (z < z0l + 0.35 || z > z1l - 0.35) return true;
+      const wl = Math.max(0.5, hullXAt(T.H, z / T.L + 0.5, T.lowerY + 0.8) - 1.3); if (Math.abs(x) > wl) return true;
+      // sotto il ponte si esce solo dal buco del boccaporto (lungo la scala)
+    }
+    return false;
+  }
+  BT.walk = function (b, P, dt, k, lx, lz, l, sp) {
+    const T = b.T, K = castlesOf(b); if (!K) return false;
+    const y = P.local.y, x0 = P.local.x, z0 = P.local.z;
+    const tryMove = (ax, az) => {
+      const nx = x0 + ax * sp * dt, nz = z0 + az * sp * dt;
+      if (blocked(b, K, x0, z0, nx, nz, y)) return false;
+      const f = BT.floorAt(b, nx, nz, y); if (f > y + 0.62) return false;
+      P.local.x = nx; P.local.z = nz; return true;
+    };
+    if (l > 0) { if (!tryMove(lx, lz)) if (!tryMove(lx, 0)) tryMove(0, lz); }
+    const fy = BT.floorAt(b, P.local.x, P.local.z, P.local.y);
+    if (k.Space && P.local.y <= fy + 0.001) P.lvy = 5.2;
+    P.lvy -= 20 * dt; P.local.y += P.lvy * dt;
+    if (P.local.y < fy) { P.local.y = fy; P.lvy = 0; }
+    // soffitto della cabina e del ponte di sotto
+    for (const w of ['q', 'f']) { const c = K[w]; if (c && inC(c, w, P.local.z) && fy < c.y - 0.9 && P.local.y > c.y - 1.85) { P.local.y = c.y - 1.85; P.lvy = Math.min(0, P.lvy); } }
+    P.lower = !!(K.low && P.local.y < T.deck - 1.0);
+    // dentro una cabina: la lanterna appesa si accende
+    let cab = null; for (const w of ['q', 'f']) { const c = K[w]; if (c && inC(c, w, P.local.z) && P.local.y < c.y - 0.9) cab = w; }
+    if (cab && !b._cabL) { b._cabL = new THREE.PointLight(0xffb060, 1.5, 8, 1.6); b.inner.add(b._cabL); }
+    if (b._cabL) { b._cabL.visible = !!cab; if (cab) { const c = K[cab], zEnd = cab === 'q' ? -T.L / 2 : T.L / 2 - 0.35; b._cabL.position.set(0, c.y - 0.6, (c.z1 + zEnd) / 2 + (cab === 'q' ? 0.4 : -0.3)); } }
+    if (P.lower) { const [hx, hz] = T.hatch; const under = Math.abs(P.local.x - hx) < 0.7 && Math.abs(P.local.z - hz) < 0.85; if (!under && P.local.y > T.lowerY + 0.3 && fy === T.lowerY && P.local.y > T.deck - 1.85) { P.local.y = T.deck - 1.85; P.lvy = Math.min(0, P.lvy); } }
+    // sul ponte (e sui ponti rialzati) valgono murate e ostacoli; sotto, lo scafo
+    let side = 0;
+    if (!P.lower) { const v = P.local.clone(); side = BT.clampDeck(T, v); if (Math.abs(P.local.y - T.deck) < 0.4) { P.local.x = v.x; P.local.z = v.z; } else { const hw = BT.deckHalfW(T, P.local.z); P.local.x = G.clamp(P.local.x, -hw, hw); P.local.z = v.z; } }
+    if (side && k.Space && Math.sign(lx) === side && Math.abs(P.local.y - fy) < 0.3) { P.jumpOverboard(side); return true; }
+    if (l > 0 && P.local.y <= fy + 0.01) { P.bob += dt * 8; if (Math.floor(P.bob / Math.PI) !== Math.floor((P.bob - dt * 8) / Math.PI) && G.Audio) G.Audio.step('wood'); }
+    return true;
+  };
+  // salendo a bordo dentro la zona di un castello si finisce sul ponte rialzato
+  BT.boardY = function (b, v) { const K = castlesOf(b); if (!K) return b.T.deck; for (const w of ['q', 'f']) if (inC(K[w], w, v.z)) return K[w].y; return b.T.deck; };
   const hasRig = (b) => { const i = b.parts.findIndex((p) => p.name === 'Sartie'); return i >= 0 && b.filled[i]; };
   BT.rigReset = function (P) { P.rig = null; P.top = null; P.lower = false; };
   // boccaporto: scendi o sali
   BT.hatchUse = function (P) {
-    const b = P.boat; if (!b || !b.T.lower || P.helm || !BT.isComplete(b)) return false;
+    const b = P.boat; if (!b || !b.T.lower || b.T.castles || P.helm || !BT.isComplete(b)) return false;
     const T = b.T, [hx, hz] = T.hatch;
     if (P.lower) { if (Math.hypot(P.local.x - hx, P.local.z - (hz - 0.4)) < 1.8) { P.lower = false; P.local.set(hx + 1.25, T.deck, hz); if (G.Audio) G.Audio.step('wood'); return true; } return false; }
     if (!P.rig && !P.top && Math.hypot(P.local.x - hx, P.local.z - hz) < 1.9) { P.lower = true; P.local.set(hx, T.lowerY, hz - 1.6); P.yaw = b.yaw; if (G.Audio) G.Audio.step('wood'); return true; }
@@ -277,7 +455,8 @@
     const b = P.boat; if (!b || P.helm) return null; const T = b.T;
     if (P.rig) return ['Sartie', '<kbd>W</kbd> sali · <kbd>S</kbd> scendi'];
     if (P.top) return ['Coffa', '<kbd>Maiusc</kbd> riscendi dalle sartie'];
-    if (T.lower && BT.isComplete(b)) { const [hx, hz] = T.hatch;
+    if (T.lower && T.castles && BT.isComplete(b)) { const [hx, hz] = T.hatch; if (Math.hypot(P.local.x - hx, P.local.z - hz) < 2.2) return P.lower ? ['Scala del boccaporto', 'sali i gradini per tornare in coperta'] : ['Boccaporto', 'scendi la scala per andare sottocoperta']; }
+    else if (T.lower && BT.isComplete(b)) { const [hx, hz] = T.hatch;
       if (P.lower && Math.hypot(P.local.x - hx, P.local.z - (hz - 0.4)) < 1.8) return ['Scala del boccaporto', `<kbd>${G.useKey()}</kbd> sali sul ponte`];
       if (!P.lower && Math.hypot(P.local.x - hx, P.local.z - hz) < 1.9) return ['Boccaporto', `<kbd>${G.useKey()}</kbd> scendi sottocoperta`]; }
     if (T.rigs && !P.lower && hasRig(b)) for (const r of T.rigs) if (Math.abs(P.local.z - r.bz) < 1.1 && Math.abs(P.local.x) > BT.deckHalfW(T, P.local.z) - 0.8) return ['Sartie', 'cammina contro la murata con <kbd>W</kbd> per arrampicarti'];
@@ -301,12 +480,12 @@
     if (key === 'zattera') {
       for (let i = 0; i < 5; i++) { const x = -1.1 + i * 0.55; const g = cyl(0.26, 0.26, T.L, x, 0.05, 0, Math.PI / 2, 0, [1, 1, 1]); add(`Tronco ${i + 1}`, 'tronco', 2, g, 'logs'); }
       for (const z of [-1.4, 1.4]) add(z < 0 ? 'Traversa di poppa' : 'Traversa di prua', 'assi', 3, box(2.9, 0.1, 0.32, 0, 0.36, z), 'planks');
-      for (const z of [-1.4, 1.4]) { const rr = []; for (let i = 0; i < 5; i++) { const t = new THREE.TorusGeometry(0.29, 0.03, 4, 10); t.rotateY(Math.PI / 2); t.translate(-1.1 + i * 0.55, 0.06, z); rr.push(M.colorize(t, 1, 1, 1)); } add(z < 0 ? 'Legature di poppa' : 'Legature di prua', 'corda', 2, M.merge(rr), 'rope'); }
+      for (const z of [-1.4, 1.4]) { const rr = []; for (let i = 0; i < 5; i++) { const t = new THREE.TorusGeometry(0.29, 0.03, 8, 22); t.rotateY(Math.PI / 2); t.translate(-1.1 + i * 0.55, 0.06, z); rr.push(M.colorize(t, 1, 1, 1)); } add(z < 0 ? 'Legature di poppa' : 'Legature di prua', 'corda', 2, M.merge(rr), 'rope'); }
       add('Remo', 'remo', 1, oar(1.35, 0.55, -0.6, 1, 2.4), 'planks');
     } else if (key === 'canoa' || key === 'catamarano') {
       // scafi affusolati a prua e a poppa (canoa scavata nel tronco)
       const hull = (side, off, L, W, D) => {
-        const NS = 24, NV = 7, pos = [], idx = [];
+        const NS = 48, NV = 14, pos = [], idx = [];
         for (let i = 0; i <= NS; i++) { const t = i / NS, z = (t - 0.5) * L, hw = Math.pow(Math.sin(Math.PI * t), 0.75) * W / 2, kd = D * 0.6 * Math.pow(Math.sin(Math.PI * t), 0.5), gw = D * 0.4 + Math.pow(t - 0.5, 2) * 1.2;
           for (let j = 0; j <= NV; j++) { const s2 = j / NV; pos.push(off + side * hw * Math.pow(Math.sin((s2 * Math.PI) / 2), 0.6), G.lerp(-kd, gw, Math.pow(s2, 1.2)), z); } }
         for (let i = 0; i < NS; i++) for (let j = 0; j < NV; j++) { const a = i * (NV + 1) + j, b = a + 1, c = a + NV + 1, d = c + 1; if (side > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c); }
@@ -372,14 +551,14 @@
           }
         }
         if (GAL) {
-          add('Cassero di poppa', 'assi', VAS ? 30 : 20, M.merge([box(W * 0.8, 2.6, L * 0.14, 0, deckY + 1.3, -L * 0.43), box(W * 0.86, 0.16, L * 0.16, 0, deckY + 2.68, -L * 0.43), box(W * 0.7, 0.9, 0.08, 0, deckY + 3.2, -L * 0.36), box(0.8, 1.8, 0.06, 0, deckY + 0.9, -L * 0.36 + 0.02)]), 'planks');
-          add('Castello di prua', 'assi', VAS ? 18 : 12, M.merge([box(W * 0.72, 1.8, L * 0.16, 0, deckY + 0.9, L * 0.42), box(W * 0.76, 0.14, L * 0.17, 0, deckY + 1.85, L * 0.42)]), 'planks');
+          add('Cassero di poppa', 'assi', VAS ? 30 : 20, castleGeo(T, 'q'), 'planks');
+          add('Castello di prua', 'assi', VAS ? 18 : 12, castleGeo(T, 'f'), 'planks');
           const cannons = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const t = 0.28 + i * 0.1, z = (t - 0.5) * L, x = sd * (H.hw(t) - 0.35); const c = cyl(0.13, 0.17, 1.4, x, deckY + 0.55, z, 0, -sd * Math.PI / 2); c.translate(0, 0, 0); cannons.push(M.colorize(c, 0.07, 0.07, 0.075)); cannons.push(M.colorize(new THREE.BoxGeometry(0.5, 0.35, 0.6).translate(x - sd * 0.4, deckY + 0.2, z), 0.32, 0.2, 0.11)); }
           add('Cannoni', 'cannone', 6, M.merge(cannons), 'cannon');
           const fl = new THREE.PlaneGeometry(2.2, 1.4); fl.translate(1.1, deckY + (VAS ? 19 : 15.5) + 0.6, (0.5 - 0.5) * L); add('Bandiera', 'stoffa', 2, M.colorize(fl, 0.12, 0.12, 0.12), 'cloth');
         }
         if (key === 'veliero') add('Cassero', 'assi', 12, M.merge([box(W * 0.75, 1.9, 3.2, 0, deckY + 0.95, -L * 0.33), box(W * 0.85, 0.14, 3.5, 0, deckY + 1.95, -L * 0.33), box(0.7, 1.4, 0.06, 0, deckY + 0.7, -L * 0.33 + 1.62)]), 'planks');
-        add('Timone', 'timone', 1, M.merge([box(0.1, D * 1.1, 0.7, 0, -D * 0.1, -L / 2 - 0.35), cyl(0.04, 0.04, 1.4, 0, D * 0.55, -L / 2 + 0.3, Math.PI / 2 - 0.25, 0, [1, 1, 1])]), 'planks');
+        add('Timone', 'timone', 1, M.merge([box(0.1, D * 1.1, 0.7, 0, -D * 0.1, -L / 2 - 0.35), ...(GAL ? [] : [cyl(0.04, 0.04, 1.4, 0, D * 0.55, -L / 2 + 0.3, Math.PI / 2 - 0.25, 0, [1, 1, 1])])]), 'planks');
         const rp = [];
         for (const [t, h] of masts) {
           const z = (t - 0.5) * L, top = new V3(0, deckY + h - 0.2, z);
@@ -476,7 +655,7 @@
   BT.toggleAnchor = function (b) {
     if (!b) return;
     b.anchored = !b.anchored;
-    G.UI.toast(b.anchored ? '⚓ Ancora gettata: la barca resta qui' : 'Ancora salpata: senza nessuno al timone la barca va dove la porta il vento', b.anchored ? 'good' : '');
+    G.UI.toast(b.anchored ? 'Ancora gettata: la barca resta qui' : 'Ancora salpata: senza nessuno al timone la barca va dove la porta il vento', b.anchored ? 'good' : '');
     if (G.Audio) { G.Audio.splash(); if (G.Audio.chest) setTimeout(() => G.Audio.chest(), 150); }
     if (G.Net && G.Net.on) G.Net.send({ t: 'banchor', id: b.id, on: b.anchored ? 1 : 0 });
     G.saveSoon && G.saveSoon();

@@ -45,8 +45,10 @@
     const vols = (G.settings && G.settings.vols) || {};
     for (const [k] of A.BUSES) {
       const g = ctx.createGain(); g.gain.value = vols[k] === undefined ? 1 : vols[k];
-      if (k === 'amb' || k === 'wx') g.connect(A.outside); else g.connect(A.master);
-      if (k === 'sfx' || k === 'ani' || k === 'room') { const s = ctx.createGain(); s.gain.value = k === 'room' ? 0.7 : 0.45; g.connect(s); s.connect(A.revIn); }
+      // cancello: nel menu principale si sentono solo la musica e i tasti
+      const gate = ctx.createGain(); gate.gain.value = k === 'mus' || k === 'ui' || G.started ? 1 : 0; g.connect(gate); A.gates[k] = gate;
+      if (k === 'amb' || k === 'wx') gate.connect(A.outside); else gate.connect(A.master);
+      if (k === 'sfx' || k === 'ani' || k === 'room') { const s = ctx.createGain(); s.gain.value = k === 'room' ? 0.7 : 0.45; gate.connect(s); s.connect(A.revIn); }
       A.bus[k] = g;
     }
     A.bus.voice = ctx.createGain(); A.bus.voice.connect(A.master); // voci della chat (il volume si regola in Impostazioni > Voce)
@@ -81,6 +83,11 @@
     return b;
   }
   A.setVolume = (v) => { A.vol = v; if (A.master) A.master.gain.value = v; };
+  A.gates = {};
+  A.menuGate = function (inMenu) {
+    if (!A.ctx || A._gateMenu === inMenu) return; A._gateMenu = inMenu; const t = A.ctx.currentTime;
+    for (const [k, g] of Object.entries(A.gates)) if (k !== 'mus' && k !== 'ui') { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(inMenu ? 0 : 1, t, inMenu ? 0.05 : 0.4); }
+  };
   A.setBus = (k, v) => { if (A.bus[k]) A.bus[k].gain.setTargetAtTime(v, A.ctx.currentTime, 0.05); };
 
   /* ---------------- mattoncini ---------------- */
@@ -160,6 +167,7 @@
   }
   A.update = function (dt, t, P) {
     if (!A.ctx) return;
+    A.menuGate(false);
     if (smRaw) decodeAll();
     if (P) updateListener(P);
     musicUpdate(dt, P);
@@ -321,6 +329,8 @@
   A.craft = () => { modal('wood', 0.3, 0, undefined, 1.2); modal('wood', 0.25, 0.14, undefined, 1.4); tone('triangle', 523, 523, 0.12, 0.08, 0.22, U()); tone('triangle', 784, 784, 0.18, 0.07, 0.3, U()); };
   A.levelUp = () => { [523, 659, 784, 1047].forEach((f, i) => tone('triangle', f, f, 0.32, 0.06, i * 0.09, U())); };
   A.click = () => tone('sine', 900, 700, 0.04, 0.05, 0, U());
+  // pagina del libro che gira: fruscio di carta
+  A.page = () => { noise(0.22, 'bandpass', 2600, 0.7, 0.09, 0, U()); noise(0.12, 'highpass', 5200, 0.5, 0.05, 0.2, U()); };
   A.coins = () => { for (let i = 0; i < 5; i++) tone('triangle', 1800 + Math.random() * 900, 1500, 0.08, 0.05, i * 0.06, U()); };
   A.bow = () => { if (A.ctx && playS('arco_scocca', A.bus.sfx, { vol: 0.9 })) return; A.bow0(); };
   A.bow0 = () => { const f = rnd(180, 230); tone('triangle', f, f * 0.98, 0.35, 0.14); tone('sine', f * 2.01, f * 2, 0.25, 0.05); noise(0.04, 'bandpass', 900, 2, 0.2); noise(0.35, 'bandpass', 2400, 0.8, 0.05, 0.03, undefined, A.white); };
@@ -410,9 +420,18 @@
   };
   /* ---------------- registrazioni ---------------- */
   const SM = (A.samples = {}); let smRaw = null;
+  // il tema del menu: scaricato e decodificato per primo, così parte senza attese
+  A.preloadMenu = async function (base) {
+    try { A._menuBuf = await (await fetch(base + 'musica/menu_1.mp3')).arrayBuffer(); if (A.ctx) A.decodeMenu(); } catch (e) { }
+  };
+  A.decodeMenu = async function () {
+    if (!A._menuBuf || !A.ctx || hasS('menu')) return; const b = A._menuBuf; A._menuBuf = null;
+    try { SM.menu = [await A.ctx.decodeAudioData(b)]; if (!G.started) A.music('menu'); } catch (e) { }
+  };
   A.loadSamples = async function (base) {
     try {
       const list = await (await fetch(base + 'suoni.json')).json(); smRaw = [];
+      if (hasS('menu') && list.musica) list.musica = list.musica.filter((n) => !/^menu_/.test(n));
       for (const [dir, names] of Object.entries(list)) for (const n of names) smRaw.push({ n, url: base + dir + '/' + n + '.mp3', dir });
       await Promise.all(smRaw.map(async (r) => { try { r.buf = await (await fetch(r.url)).arrayBuffer(); } catch (e) { } }));
       if (A.ctx) decodeAll();
@@ -446,17 +465,21 @@
     if (mus) { const old = mus; old.g.gain.cancelScheduledValues(t); old.g.gain.setTargetAtTime(0, t, 1.2); setTimeout(() => { try { old.s.stop(); } catch (e) { } }, 6000); mus = null; }
     if (!name || !hasS(name)) return;
     const s = A.ctx.createBufferSource(); s.buffer = SM[name][0]; s.loop = true;
-    const g = A.ctx.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(0.55 * Math.pow(10, A.MUSIC_DB / 20), t, 1.5);
+    const full = 0.55 * Math.pow(10, A.MUSIC_DB / 20), g = A.ctx.createGain();
+    if (name === 'menu') g.gain.value = full; else { g.gain.value = 0.0001; g.gain.setTargetAtTime(full, t, 1.5); }
     s.connect(g); g.connect(A.bus.mus); s.start(); mus = { name, s, g };
   };
   let musT = 0;
   // pagina principale: il tema di Deriva (l'audio parte al primo clic o tasto)
   A.title = function () {
+    if (!A.ctx && window.deriva && !A._autoTry) { A._autoTry = true; A.start(G.settings.volume); }
+    if (A.ctx && A._menuBuf) A.decodeMenu();
     if (!A.ctx) {
       if (!A._tHook) { A._tHook = true; const go = () => { if (!A.ctx && !G.started) A.start(G.settings.volume); }; for (const ev of ['mousedown', 'keydown', 'touchend']) document.addEventListener(ev, go, { once: true }); }
       return;
     }
     if (smRaw) decodeAll();
+    A.menuGate(!G.started);
     A.music(G.UI && G.UI.menu ? 'menu' : null);
   };
   function musicUpdate(dt, P) {

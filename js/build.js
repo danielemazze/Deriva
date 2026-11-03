@@ -73,22 +73,40 @@
     GEO.banco = M.merge([boxUV(1.6, 0.12, 0.85, 0, 0.92, 0), ...[[-0.7, -0.33], [0.7, -0.33], [-0.7, 0.33], [0.7, 0.33]].map(([x, z]) => darker(boxUV(0.1, 0.9, 0.1, x, 0.45, z), 0.75)), darker(boxUV(1.45, 0.06, 0.7, 0, 0.3, 0), 0.8),
       M.colorize(new THREE.BoxGeometry(0.3, 0.05, 0.12).translate(-0.3, 1.0, 0.1), 0.55, 0.55, 0.55), M.colorize(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 5).rotateZ(1.2).translate(0.3, 1.0, -0.1), 0.45, 0.3, 0.15)]);
     // forziere del tesoro: legno scuro con bande di ferro e coperchio bombato
-    const lid = new THREE.CylinderGeometry(0.29, 0.29, 0.92, 14, 1, false, 0, Math.PI); lid.rotateZ(Math.PI / 2); lid.rotateY(Math.PI / 2); lid.rotateX(0); lid.scale(1, 0.7, 1);
+    const lid = new THREE.CylinderGeometry(0.29, 0.29, 0.92, 32, 1, false, 0, Math.PI); lid.rotateZ(Math.PI / 2); lid.rotateY(Math.PI / 2); lid.rotateX(0); lid.scale(1, 0.7, 1);
     lid.rotateY(Math.PI / 2); lid.translate(0, 0.5, 0);
     GEO.forziere = M.merge([darker(boxUV(0.9, 0.5, 0.56, 0, 0.25, 0), 0.62), darker(lid, 0.62),
       ...[-0.32, 0, 0.32].map((x) => M.colorize(new THREE.BoxGeometry(0.06, 0.56, 0.6).translate(x, 0.28, 0), 0.22, 0.22, 0.24)),
-      ...[-0.32, 0, 0.32].map((x) => { const b = new THREE.CylinderGeometry(0.305, 0.305, 0.06, 14, 1, false, 0, Math.PI); b.rotateZ(Math.PI / 2); b.scale(1, 0.7, 1); b.translate(x, 0.5, 0); return M.colorize(b, 0.22, 0.22, 0.24); }),
+      ...[-0.32, 0, 0.32].map((x) => { const b = new THREE.CylinderGeometry(0.305, 0.305, 0.06, 32, 1, false, 0, Math.PI); b.rotateZ(Math.PI / 2); b.scale(1, 0.7, 1); b.translate(x, 0.5, 0); return M.colorize(b, 0.22, 0.22, 0.24); }),
       M.colorize(new THREE.BoxGeometry(0.12, 0.14, 0.05).translate(0, 0.46, 0.3), 0.85, 0.7, 0.3)]);
-    GEO.baule = M.merge([boxUV(0.9, 0.5, 0.55, 0, 0.25, 0), darker(boxUV(0.92, 0.18, 0.57, 0, 0.58, 0), 0.85), M.colorize(new THREE.BoxGeometry(0.94, 0.06, 0.59).translate(0, 0.48, 0), 0.35, 0.3, 0.25), M.colorize(new THREE.BoxGeometry(0.1, 0.12, 0.04).translate(0, 0.45, 0.29), 0.85, 0.7, 0.35)]);
+    const bLid = new THREE.CylinderGeometry(0.285, 0.285, 0.92, 32, 1, false, 0, Math.PI); bLid.rotateZ(Math.PI / 2); bLid.rotateY(Math.PI / 2); bLid.rotateY(Math.PI / 2); bLid.scale(1, 0.42, 1); bLid.translate(0, 0.5, 0);
+    { const u = bLid.attributes.uv, p = bLid.attributes.position; for (let i = 0; i < u.count; i++) u.setXY(i, p.getX(i) * 0.42 + 0.5, (p.getY(i) + p.getZ(i)) * 0.42); }
+    GEO.baule = M.merge([boxUV(0.9, 0.5, 0.55, 0, 0.25, 0), darker(bLid, 0.85), ...[-0.3, 0.3].map((x) => { const r = new THREE.CylinderGeometry(0.295, 0.295, 0.05, 32, 1, false, 0, Math.PI); r.rotateZ(Math.PI / 2); r.scale(1, 0.42, 1); r.translate(x, 0.5, 0); return M.colorize(r, 0.35, 0.3, 0.25); }), M.colorize(new THREE.BoxGeometry(0.94, 0.06, 0.59).translate(0, 0.48, 0), 0.35, 0.3, 0.25), M.colorize(new THREE.BoxGeometry(0.1, 0.12, 0.04).translate(0, 0.45, 0.29), 0.85, 0.7, 0.35)]);
     // barile: doghe bombate con i cerchi di ferro
     {
-      const bar = new THREE.CylinderGeometry(0.3, 0.3, 0.86, 20, 8, false); const bp = bar.attributes.position, bc = new Float32Array(bp.count * 3);
+      const bar = new THREE.CylinderGeometry(0.3, 0.3, 0.86, 32, 10, false); const bp = bar.attributes.position, bc = new Float32Array(bp.count * 3);
       for (let i = 0; i < bp.count; i++) { const y = bp.getY(i), a = Math.atan2(bp.getZ(i), bp.getX(i)), r0 = Math.hypot(bp.getX(i), bp.getZ(i)); const k = r0 > 0.01 ? (1 + 0.16 * (1 - (y / 0.43) ** 2)) : 1; bp.setX(i, bp.getX(i) * k); bp.setZ(i, bp.getZ(i) * k); bp.setY(i, y + 0.43); const st = Math.floor((a + Math.PI) / (Math.PI * 2) * 20); const v = 0.78 + ((st * 37) % 9) / 40 - (Math.abs(((a + Math.PI) / (Math.PI * 2) * 20) % 1 - 0.5) > 0.45 ? 0.25 : 0); bc[i * 3] = v; bc[i * 3 + 1] = v * 0.93; bc[i * 3 + 2] = v * 0.85; }
       bar.setAttribute('color', new THREE.BufferAttribute(bc, 3));
-      const hoops = [0.1, 0.3, 0.56, 0.76].map((y) => { const r = 0.3 * (1 + 0.16 * (1 - ((y - 0.43) / 0.43) ** 2)) + 0.012; return M.colorize(new THREE.CylinderGeometry(r, r, 0.045, 20, 1, true).translate(0, y, 0), 0.2, 0.2, 0.22); });
-      const lidG = M.colorize(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 20).translate(0, 0.86, 0), 0.62, 0.55, 0.45);
+      const hoops = [0.1, 0.3, 0.56, 0.76].map((y) => { const r = 0.3 * (1 + 0.16 * (1 - ((y - 0.43) / 0.43) ** 2)) + 0.012; return M.colorize(new THREE.CylinderGeometry(r, r, 0.045, 32, 1, true).translate(0, y, 0), 0.2, 0.2, 0.22); });
+      const lidG = M.colorize(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 32).translate(0, 0.86, 0), 0.62, 0.55, 0.45);
       GEO.barile = M.merge([bar, ...hoops, lidG]);
     }
+    // cannone da terra: affusto di legno a quattro ruote; la canna (a parte) gira sul suo perno
+    { const cheek = (sd) => { const g = []; for (const [h, z0, z1] of [[0.52, -0.62, 0.55], [0.66, -0.62, 0.2], [0.78, -0.62, -0.18]]) g.push(boxUV(0.09, 0.22, z1 - z0, sd * 0.27, h - 0.11, (z0 + z1) / 2)); return g; };
+      const parts = [...cheek(-1), ...cheek(1), darker(boxUV(0.62, 0.1, 1.15, 0, 0.36, -0.05), 0.8), darker(boxUV(0.7, 0.12, 0.14, 0, 0.3, 0.42), 0.7), darker(boxUV(0.7, 0.12, 0.14, 0, 0.3, -0.5), 0.7)];
+      for (const [z, r] of [[0.42, 0.24], [-0.5, 0.21]]) for (const sd of [-1, 1]) {
+        const w = new THREE.CylinderGeometry(r, r, 0.09, 22).rotateZ(Math.PI / 2).translate(sd * 0.39, r, z); parts.push(darker(w, 0.72));
+        parts.push(M.colorize(new THREE.TorusGeometry(r - 0.012, 0.016, 6, 22).rotateY(Math.PI / 2).translate(sd * 0.395, r, z), 0.2, 0.2, 0.22));
+        parts.push(M.colorize(new THREE.CylinderGeometry(0.035, 0.035, 0.14, 8).rotateZ(Math.PI / 2).translate(sd * 0.42, r, z), 0.22, 0.22, 0.24));
+      }
+      for (const sd of [-1, 1]) parts.push(M.colorize(new THREE.BoxGeometry(0.11, 0.035, 0.16).translate(sd * 0.27, 0.8, 0.1), 0.2, 0.2, 0.22)); // staffe dei perni
+      GEO.cannone = M.merge(parts);
+      // canna: profilo girato attorno all'asse (culatta, rinforzi, bocca svasata)
+      const prof = [[0, -0.62], [0.07, -0.64], [0.13, -0.6], [0.17, -0.52], [0.19, -0.42], [0.2, -0.36], [0.185, -0.34], [0.18, -0.1], [0.19, -0.08], [0.19, 0.0], [0.17, 0.02], [0.155, 0.6], [0.165, 0.62], [0.165, 0.66], [0.15, 0.68], [0.15, 0.95], [0.175, 1.0], [0.18, 1.05], [0.1, 1.06], [0.09, 0.6]];
+      const lathe = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 28).rotateX(Math.PI / 2);
+      const knob = new THREE.SphereGeometry(0.06, 12, 10).translate(0, 0, -0.7);
+      const trun = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 12).rotateZ(Math.PI / 2);
+      GEO.cannoneCanna = M.merge([lathe, knob, trun]); }
     GEO.letto = M.merge([darker(boxUV(1.1, 0.3, 2.1, 0, 0.25, 0), 0.8), darker(boxUV(1.1, 0.7, 0.1, 0, 0.45, -1.05), 0.7), M.colorize(new THREE.BoxGeometry(1.0, 0.16, 1.6).translate(0, 0.46, 0.2), 0.72, 0.2, 0.18), M.colorize(new THREE.BoxGeometry(1.0, 0.14, 0.45).translate(0, 0.45, -0.75), 0.95, 0.93, 0.88), M.colorize(new THREE.BoxGeometry(0.7, 0.12, 0.3).translate(0, 0.56, -0.78), 0.98, 0.97, 0.94)]);
     // falò: pietre + legna
     const fp = [];
@@ -166,8 +184,8 @@
   };
 
   /* ---------- creazione pezzi ---------- */
-  const FREE = new Set(['banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola', 'pilastro', 'camino', 'fornace']);
-  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace'].includes(id);
+  const FREE = new Set(['banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola', 'pilastro', 'camino', 'fornace', 'cannone']);
+  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace', 'cannone'].includes(id);
 
   function makeMesh(p) {
     const MAT = G.MAT;
@@ -195,6 +213,11 @@
       const mouth = new THREE.Mesh(GEO.fornaceMouth, SM.glow.clone()); g.add(mouth); p.mouth = mouth;
       const c = Math.cos(p.rot), s = Math.sin(p.rot);
       p.light = true; p.lightPos = new V3(p.x + s * 0.9, p.y + 0.6, p.z + c * 0.9); p.power = 0.5;
+    } else if (p.t === 'cannone') {
+      add(GEO.cannone, MAT.planks);
+      const piv = new THREE.Group(); piv.position.set(0, 0.8, 0.1); g.add(piv); p.piv = piv;
+      const br = new THREE.Mesh(GEO.cannoneCanna, MAT.cannon || MAT.solid); br.castShadow = true; piv.add(br); p.barrel = br;
+      piv.rotation.set(-(p.pi || 0.08), p.yo || 0, 0, 'YXZ');
     } else if (STONE.has(p.t)) {
       add(GEO[p.t], G.Structures.mats().stone);
     } else if (p.t === 'tetto_pietra') {
@@ -264,6 +287,7 @@
       case 'banco': bx.push(rotBox(p, -0.8, 0, -0.42, 0.8, 1.0, 0.42, { walk: true })); break;
       case 'barile': bx.push(rotBox(p, -0.33, 0, -0.33, 0.33, 0.88, 0.33, { walk: true })); break;
       case 'baule': case 'forziere': bx.push(rotBox(p, -0.45, 0, -0.28, 0.45, 0.65, 0.28, { walk: true })); break;
+      case 'cannone': bx.push(rotBox(p, -0.46, 0, -0.75, 0.46, 0.95, 0.7, { walk: true })); break;
       case 'letto': bx.push(rotBox(p, -0.55, 0, -1.05, 0.55, 0.55, 1.05, { walk: true })); break;
       case 'falo': bx.push(rotBox(p, -0.5, 0, -0.5, 0.5, 0.3, 0.5, { soft: true })); break;
       case 'torcia': break;

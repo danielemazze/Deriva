@@ -6,14 +6,14 @@
 (function () {
   const SK = (G.Skills = { xp: {}, MAX: 50 });
   SK.LIST = [
-    { k: 'spada', n: 'Spada', ic: '⚔', eff: 'Fendenti più forti e più rapidi', how: 'Colpisci con spada e sciabola' },
-    { k: 'parata', n: 'Parata', ic: '🛡', eff: 'Meno danno quando pari con lo scudo', how: 'Para i colpi con lo scudo' },
-    { k: 'fuoco', n: 'Arma da fuoco', ic: '✹', eff: 'Ricarica più veloce, colpi più precisi', how: 'Spara con pistole e cannoni' },
-    { k: 'arco', n: 'Arceria', ic: '➶', eff: 'Tendi prima, frecce più veloci e più forti', how: 'Colpisci con l’arco' },
-    { k: 'furto', n: 'Furtività', ic: '◐', eff: 'Ti vedono da più vicino, furti più ricchi', how: 'Muoviti accovacciato e ruba' },
-    { k: 'corsa', n: 'Corsa', ic: '➤', eff: 'Più stamina e recupero più rapido', how: 'Corri (Ctrl)' },
-    { k: 'contadino', n: 'Contadino', ic: '❀', eff: 'Raccolti più abbondanti da piante e cespugli', how: 'Raccogli bacche, fibra e piante' },
-    { k: 'allevatore', n: 'Allevatore', ic: '♞', eff: 'Più lana, a volte il cibo non si consuma', how: 'Nutri, tosa e fai nascere cuccioli' },
+    { k: 'spada', n: 'Spada', ic: 'spada', eff: 'Fendenti più forti e più rapidi', how: 'Colpisci con spada e sciabola' },
+    { k: 'parata', n: 'Parata', ic: 'scudo', eff: 'Meno danno quando pari con lo scudo', how: 'Para i colpi con lo scudo' },
+    { k: 'fuoco', n: 'Arma da fuoco', ic: 'esplosione', eff: 'Ricarica più veloce, colpi più precisi', how: 'Spara con pistole e cannoni' },
+    { k: 'arco', n: 'Arceria', ic: 'freccia', eff: 'Tendi prima, frecce più veloci e più forti', how: 'Colpisci con l’arco' },
+    { k: 'furto', n: 'Furtività', ic: 'occhio', eff: 'Ti vedono da più vicino, furti più ricchi', how: 'Muoviti accovacciato e ruba' },
+    { k: 'corsa', n: 'Corsa', ic: 'corsa', eff: 'Più stamina e recupero più rapido', how: 'Corri (Ctrl)' },
+    { k: 'contadino', n: 'Contadino', ic: 'fiore', eff: 'Raccolti più abbondanti da piante e cespugli', how: 'Raccogli bacche, fibra e piante' },
+    { k: 'allevatore', n: 'Allevatore', ic: 'cavallo', eff: 'Più lana, a volte il cibo non si consuma', how: 'Nutri, tosa e fai nascere cuccioli' },
   ];
   SK.BY = {}; for (const s of SK.LIST) SK.BY[s.k] = s;
   // punti per passare dal livello L al successivo
@@ -40,7 +40,7 @@
     const after = SK.lv(k);
     SK.show(k, after > before);
     if (after > before) {
-      G.UI.toast(`${SK.BY[k].n}: livello ${after}!`, 'good');
+      SK.banner(k, after);
       if (G.Audio && G.Audio.levelUp) G.Audio.levelUp();
       if (G.saveSoon) G.saveSoon();
       if (G.UI.open === 'abilita') G.UI.renderPanel();
@@ -60,13 +60,20 @@
     pop.querySelector('u').style.width = Math.round(SK.frac(k) * 100) + '%';
     pop.classList.add('on'); pop.classList.toggle('up', !!up); popT = up ? 3.5 : 2.2;
   };
-  SK.update = function (dt) { if (popT > 0) { popT -= dt; if (popT <= 0 && pop) pop.classList.remove('on'); } };
+  // livello nuovo: grande, al centro dello schermo
+  let ban = null, banT = 0;
+  SK.banner = function (k, L) {
+    if (!ban) { ban = document.createElement('div'); ban.className = 'skillup'; const h = document.getElementById('hud'); if (!h) return; h.appendChild(ban); }
+    ban.innerHTML = `<div class="sic">${G.ico(SK.BY[k].ic)}</div><small>Abilità migliorata</small><b>${SK.BY[k].n}</b><span>livello <em>${L}</em></span>`;
+    ban.classList.remove('on'); void ban.offsetWidth; ban.classList.add('on'); banT = 3.2;
+  };
+  SK.update = function (dt) { if (banT > 0) { banT -= dt; if (banT <= 0 && ban) ban.classList.remove('on'); } if (popT > 0) { popT -= dt; if (popT <= 0 && pop) pop.classList.remove('on'); } };
 
   /* scheda Abilità (accanto all'inventario) */
   SK.render = function () {
     const rows = SK.LIST.map((s) => {
       const L = SK.lv(s.k), f = SK.frac(s.k);
-      return `<div class="skrow"><div class="skic">${s.ic}</div><div class="skmid"><b>${s.n}</b><small>${s.eff}</small><i><u style="width:${Math.round(f * 100)}%"></u></i><em>${s.how} · ${L >= SK.MAX ? 'livello massimo' : Math.round(f * 100) + '% al prossimo livello'}</em></div><div class="sklv"><small>LIV.</small>${L}</div></div>`;
+      return `<div class="skrow"><div class="skic">${G.ico(s.ic)}</div><div class="skmid"><b>${s.n}</b><small>${s.eff}</small><i><u style="width:${Math.round(f * 100)}%"></u></i><em>${s.how} · ${L >= SK.MAX ? 'livello massimo' : Math.round(f * 100) + '% al prossimo livello'}</em></div><div class="sklv"><small>LIV.</small>${L}</div></div>`;
     }).join('');
     return `<div class="sktabs"><button class="sktab" data-act="tabinv">Inventario</button><button class="sktab on">Abilità</button><span>Le abilità crescono facendo: più usi una cosa, più diventi bravo</span></div><div class="skgrid">${rows}</div>`;
   };

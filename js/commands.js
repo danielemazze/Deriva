@@ -51,7 +51,7 @@
     if (v === 'piena') i = 4; if (v === 'nuova') i = 0;
     if (i < 0 || i > 7) return 'Fasi: nuova, falce crescente, primo quarto, gibbosa crescente, piena, gibbosa calante, ultimo quarto, falce calante (o 0–7)';
     G.Climate.setMoon(i); G.saveSoon(); if (G.Net && G.Net.on) G.Net.timeT = 0;
-    return `${G.Climate.PHASE_ICON[i]} ${G.Climate.PHASES[i]}`;
+    return `Luna: ${G.Climate.PHASES[i]}`;
   };
   Cmd.teleport = function (x, z, label) {
     const p = P(); if (p.boat) p.leaveBoat(true);
@@ -347,6 +347,7 @@
     }
     if (r) say(r);
   };
+  Cmd.isOpen = () => { const b = document.getElementById('console'); return !!(b && !b.hidden); };
   Cmd.openConsole = function (prefix) {
     if (!G.started || G.UI.open || G.UI.menu) return;
     const box = $('console'); box.hidden = false;
@@ -385,20 +386,20 @@
     const vl = Cmd.villages().slice(0, 6), p = P().pos;
     const sp = ['gallina', 'pecora', 'mucca', 'maiale', 'coniglio', 'lupo', 'orso', 'giaguaro', 'serpente', 'coccodrillo', 'squalo', 'pirata', 'capitano'];
     const tab = Cmd.tab || 'mondo';
-    const TABS = [['mondo', '☀ Mondo'], ['viaggio', '🧭 Viaggi'], ['creature', '🐾 Creature'], ['giocatore', '🎒 Giocatore'], ['partita', '👥 Partita']];
+    const TABS = [['mondo', G.ico('sole') + ' Mondo'], ['viaggio', G.ico('bussola') + ' Viaggi'], ['creature', G.ico('zampa') + ' Creature'], ['giocatore', G.ico('zaino') + ' Giocatore'], ['partita', G.ico('persone') + ' Partita']];
     const S = {};
     S.mondo = `
       <section><h4>Orario <span class="tval">${String(Math.floor(hh)).padStart(2, '0')}:${String(Math.floor((hh % 1) * 60)).padStart(2, '0')}</span></h4>
         <div class="tbtns">${Object.entries({ alba: 'Alba', mattina: 'Mattina', mezzogiorno: 'Mezzogiorno', tramonto: 'Tramonto', sera: 'Sera', notte: 'Notte' }).map(([k, n]) => btn('ora:' + k, n)).join('')}</div>
         <input type="range" min="0" max="23.75" step="0.25" value="${hh.toFixed(2)}" data-toolr="ora" ${allowed ? '' : 'disabled'}><small class="cmdh">/ora 18 · /ora tramonto</small></section>
-      <section><h4>Meteo <span class="tval">${Cl.KINDS[Cl.state.kind].icon} ${Cl.KINDS[Cl.state.kind].n}${Cl.state.lock ? ' · fisso' : ' · variabile'}</span></h4>
-        <div class="tbtns">${Object.entries(Cl.KINDS).map(([k, v]) => btn('meteo:' + k, v.icon + ' ' + v.n, Cl.state.kind === k)).join('')}${btn('meteo:auto', '↻ Variabile', !Cl.state.lock)}</div><small class="cmdh">/meteo temporale</small></section>
+      <section><h4>Meteo <span class="tval">${G.ico(Cl.KINDS[Cl.state.kind].icon)} ${Cl.KINDS[Cl.state.kind].n}${Cl.state.lock ? ' · fisso' : ' · variabile'}</span></h4>
+        <div class="tbtns">${Object.entries(Cl.KINDS).map(([k, v]) => btn('meteo:' + k, G.ico(v.icon) + ' ' + v.n, Cl.state.kind === k)).join('')}${btn('meteo:auto', G.ico('giro') + ' Variabile', !Cl.state.lock)}</div><small class="cmdh">/meteo temporale</small></section>
       <section><h4>Vento <span class="tval">${G.WIND.level} · da ${Cl.dirName(G.Boats.wind.dir)}${Cl.cur.wind ? ` · col meteo ${Math.round(Cl.windLevel())}` : ''}</span></h4>
         <input type="range" min="0" max="10" step="1" value="${G.WIND.level}" data-toolr="vento" ${allowed ? '' : 'disabled'}>
         <div class="tbtns rose">${Cl.DIR_N.map((d) => btn('dir:' + d, d, Cl.dirName(G.Boats.wind.dir) === d)).join('')}</div>
-        <div class="tbtns">${btn('gorgo', '🌀 Gorgo qui davanti')}</div><small class="cmdh">/vento 6 NE · /gorgo</small></section>
-      <section><h4>Luna <span class="tval">${Cl.PHASE_ICON[Cl.moonIndex()]} ${Cl.moonName()}</span></h4>
-        <div class="tbtns moon">${Cl.PHASES.map((n, i) => btn('luna:' + i, Cl.PHASE_ICON[i], Cl.moonIndex() === i, `title="${n}"`)).join('')}</div><small class="cmdh">/luna piena</small></section>`;
+        <div class="tbtns">${btn('gorgo', G.ico('gorgo') + ' Gorgo qui davanti')}</div><small class="cmdh">/vento 6 NE · /gorgo</small></section>
+      <section><h4>Luna <span class="tval">${G.ico(Cl.PHASE_ICON[Cl.moonIndex()])} ${Cl.moonName()}</span></h4>
+        <div class="tbtns moon">${Cl.PHASES.map((n, i) => btn('luna:' + i, G.ico(Cl.PHASE_ICON[i]), Cl.moonIndex() === i, `title="${n}"`)).join('')}</div><small class="cmdh">/luna piena</small></section>`;
     const others = G.Net && G.Net.on ? [...G.Net.remotes.values()] : [];
     S.viaggio = `
       <section><h4>Vai al bioma</h4>
@@ -417,13 +418,13 @@
       <section class="wide2"><h4>Animali e nemici <span class="tval">Maiusc+clic: 3 alla volta</span></h4>
         <div class="tbtns">${sp.filter((s) => G.SPECIES[s]).map((s) => btn('spawn:' + s, G.SPECIES[s].n, false, G.isHostile(s) ? 'data-hostile="1"' : '')).join('')}</div><small class="cmdh">/spawn lupo 3</small></section>
       <section><h4>Persone</h4><div class="tbtns">${btn('spawn:abitante', 'Abitante')}${btn('spawn:mercante', 'Mercante')}</div><small class="cmdh">/spawn abitante</small></section>
-      <section><h4>Mare aperto</h4><div class="tbtns">${btn('spawn:kraken', '🐙 Kraken', false, 'data-hostile="1"')}${btn('spawn:pirati', '🏴‍☠️ Nave pirata', false, 'data-hostile="1"')}${btn('spawn:mare', 'Mare calmo')}</div><small class="cmdh">/spawn kraken · /spawn pirati · /spawn mare</small></section>
+      <section><h4>Mare aperto</h4><div class="tbtns">${btn('spawn:kraken', G.ico('kraken') + ' Kraken', false, 'data-hostile="1"')}${btn('spawn:pirati', G.ico('bandiera') + ' Nave pirata', false, 'data-hostile="1"')}${btn('spawn:mare', 'Mare calmo')}</div><small class="cmdh">/spawn kraken · /spawn pirati · /spawn mare</small></section>
       <section><h4>Nemici</h4><div class="tbtns">${btn('nemici:si', 'Nemici sì', !G.enemiesOff)}${btn('nemici:no', 'Nemici no', !!G.enemiesOff)}</div><small class="cmdh">/nemici si · no</small></section>`;
     const items = ['assi', 'tronco', 'pietra', 'corda', 'chiodi', 'ferro', 'munizioni', 'freccia', 'torcia', 'terra', 'doblone', 'cibo'].filter((i) => G.ITEMS[i]);
     S.giocatore = `
       <section><h4>Modalità <span class="tval">F4 per cambiare</span></h4>
         <div class="tbtns">${guest() ? `<small class="cmdh">La decide chi ospita · ora: ${G.creative() ? 'creativa' : 'sopravvivenza'}</small></div>` : `${btn('mode:sopravvivenza', 'Sopravvivenza', !G.creative())}${btn('mode:creativa', 'Creativa', G.creative())}</div><small class="cmdh">/modalita creativa</small>`}</section>
-      <section><h4>Salute</h4><div class="tbtns">${btn('cura', '❤ Salute, fame e sete al massimo')}</div><small class="cmdh">/cura</small></section>
+      <section><h4>Salute</h4><div class="tbtns">${btn('cura', G.ico('cuore') + ' Salute, fame e sete al massimo')}</div><small class="cmdh">/cura</small></section>
       <section class="wide2"><h4>Dai oggetti <span class="tval">Maiusc+clic: 64</span></h4>
         <div class="tbtns">${items.map((i) => btn('dai:' + i, esc(G.ITEMS[i].n))).join('')}</div>
         <div class="tbtns tpbox"><input id="daiid" placeholder="nome oggetto (es. lanterna)"><input type="number" id="dain" value="1" min="1" max="999">${btn('daix', 'Dai')}</div><small class="cmdh">/dai assi 64</small></section>`;

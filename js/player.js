@@ -89,6 +89,7 @@
   function toolMesh(id) {
     const MAT = G.MAT;
     if (G.Music && G.Music.is(id)) return G.Music.mesh(id);
+    if (G.M3D && G.M3D.has(id)) { const g = new THREE.Group(), m = G.M3D.mesh(id, id === 'bastone' ? 1 : 1.5); if (id === 'bastone') { m.rotation.set(0.2, 0.3, Math.PI / 2 - 0.2); m.position.set(0, 0.12, 0); } else m.position.set(0.01, 0.05, -0.02); g.add(m); g.position.set(0.02, 0.0, -0.06); return g; }
     const det = G.Tools && G.Tools.build(id);
     if (det) { det.rotation.x += -0.25; det.position.set(0.02, 0.0, -0.06); return det; }
     const g = new THREE.Group();
@@ -143,6 +144,12 @@
 
   /* ---------------- AGGIORNAMENTO ---------------- */
   const _f = new V3(), _r = new V3(), _dir = new V3(), _o = new V3();
+  // direzione del personaggio (per la mappa): la barca, il cavallo, o dove cammina; non dove guarda la camera
+  P.heading = function () {
+    if (P.boat) return P.boat.yaw - Math.PI;
+    if (P.mount) return P.mount.hdg + Math.PI;
+    return P.yaw;
+  };
   P.lookDir = (out) => out.set(-Math.sin(P.yaw) * Math.cos(P.pitch), Math.sin(P.pitch), -Math.cos(P.yaw) * Math.cos(P.pitch));
 
   P.update = function (dt, t) {
@@ -150,6 +157,7 @@
     P.refreshHeld();
     const waterY = G.waterLevelAt ? G.waterLevelAt(P.pos.x, P.pos.z, t, P.pos.y + 0.5) : G.waveHeight(P.pos.x, P.pos.z, t);
     if (P.boat) { P.crouch = false; P.sprinting = false; updateBoatRide(dt, t); }
+    else if (G.Sea && G.Sea.station && G.Sea.station.land) { P.crouch = false; P.sprinting = false; P.vel.set(0, 0, 0); P.onGround = true; G.Sea.stationUpdate(dt, P); }
     else {
       const ground = Math.max(G.Dig ? G.Dig.ground(P.pos.x, P.pos.z, P.pos.y) : G.World.groundAt(P.pos.x, P.pos.z), G.Build.groundAt(P.pos.x, P.pos.z, P.pos.y, 0.22));
       const px0 = P.pos.x, pz0 = P.pos.z;
@@ -244,9 +252,9 @@
         if (wading && _dir.lengthSq() > 0 && Math.random() < dt * 5) G.FX.splash(P.pos.x, waterY, P.pos.z, 2);
       }
       // pareti delle gallerie scavate: si scivola lungo la roccia
-      if (G.Dig && !P.fly && G.Dig.activeAt(P.pos.x, P.pos.z) && G.Dig.blocked(P.pos.x, P.pos.y, P.pos.z, HEIGHT)) {
-        if (!G.Dig.blocked(P.pos.x, P.pos.y, pz0, HEIGHT)) P.pos.z = pz0;
-        else if (!G.Dig.blocked(px0, P.pos.y, P.pos.z, HEIGHT)) P.pos.x = px0;
+      if (G.Dig && !P.fly && G.Dig.activeAt(P.pos.x, P.pos.z) && G.Dig.blocked(P.pos.x, P.pos.y, P.pos.z, HEIGHT, RAD * 0.85) && !G.Dig.blocked(px0, P.pos.y, pz0, HEIGHT, RAD * 0.85)) {
+        if (!G.Dig.blocked(P.pos.x, P.pos.y, pz0, HEIGHT, RAD * 0.85)) P.pos.z = pz0;
+        else if (!G.Dig.blocked(px0, P.pos.y, P.pos.z, HEIGHT, RAD * 0.85)) P.pos.x = px0;
         else { P.pos.x = px0; P.pos.z = pz0; }
       }
       // collisioni
@@ -279,7 +287,7 @@
       cam.position.set(b.x + Math.sin(yaw) * Math.cos(pit) * d, b.y + 2.5 - Math.sin(pit) * d, b.z + Math.cos(yaw) * Math.cos(pit) * d);
       cam.position.y = Math.max(cam.position.y, G.waveHeight(cam.position.x, cam.position.z, t) + 0.6);
       cam.lookAt(b.x, b.y + 2, b.z);
-      P.vm.visible = false;
+      P.vm.visible = false; P._tp = null;
       // visuale da lontano: si vede anche il tuo personaggio al timone
       if (!P.selfAv && G.Net && G.Net.buildAvatar) { P.selfAv = G.Net.buildAvatar(G.Net.on ? G.Net.slot || 0 : 0); G.scene.add(P.selfAv.g); }
       if (P.selfAv) { const av = P.selfAv, sit = !!b.T.sit; av.g.visible = true; av.g.position.set(P.pos.x, P.pos.y, P.pos.z); av.g.rotation.y = (b.yaw || 0) + Math.PI;
@@ -287,11 +295,28 @@
         else { av.legL.rotation.x = av.legR.rotation.x = sit ? -1.4 : 0; av.body.position.y = sit ? -0.75 : 0;
           const st = Math.sin(t * 1.3) * 0.08; av.armL.rotation.x = -1.1 + st; av.armR.rotation.x = -1.1 - st; } }
     } else {
+      const tp = P.view || 0; // 0 prima persona · 1 terza da dietro · 2 terza davanti (F5)
       if (P.selfAv) P.selfAv.g.visible = false;
-      const bobY = P.onGround && !(P.boat && P.helm) ? Math.sin(P.bob * 2) * 0.035 : 0;
+      const bobY = P.onGround && !(P.boat && P.helm) && !tp ? Math.sin(P.bob * 2) * 0.035 : 0;
       cam.position.set(P.eye.x, P.eye.y + bobY, P.eye.z);
       cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
-      P.vm.visible = true;
+      P.vm.visible = !tp;
+      if (tp) {
+        // il tuo personaggio, e la visuale che lo guarda da dietro o di fronte (senza entrare nel terreno)
+        if (!P.selfAv && G.Net && G.Net.buildAvatar) { P.selfAv = G.Net.buildAvatar(G.Net.on ? G.Net.slot || 0 : 0); G.scene.add(P.selfAv.g); }
+        const av = P.selfAv;
+        if (av) {
+          av.g.visible = true; av.g.position.set(P.pos.x, P.pos.y + (P.mount && G.Mount && G.Mount.seatY ? G.Mount.seatY(P) : 0), P.pos.z); av.g.rotation.y = P.yaw;
+          const sp = P.boat ? 0 : Math.hypot(P.vel.x, P.vel.z); P._avSwing = Math.max(0, (P._avSwing || 0) - dt * 3); if (P.swingT > 0.9) P._avSwing = 1;
+          if (av.person) { av.person.look = -P.pitch * 0.5; G.Humans.pose(av.person, dt, P.swim ? 0 : Math.min(sp, 7), P.swim ? 'swim' : P._avSwing > 0 ? 'attack' : 'idle', 1 - P._avSwing); }
+        }
+        const back = tp === 1 ? 1 : -1, d0 = 4.2;
+        _o.set(-Math.sin(P.yaw) * Math.cos(P.pitch), Math.sin(P.pitch), -Math.cos(P.yaw) * Math.cos(P.pitch)).multiplyScalar(-back);
+        let d = d0;
+        for (let s = 0.4; s <= d0; s += 0.3) { const x = P.eye.x + _o.x * s, y = P.eye.y + _o.y * s, z = P.eye.z + _o.z * s; const gy = G.Dig ? G.Dig.ground(x, z, y + 0.3) : G.World.groundAt(x, z); if (y < gy + 0.25 || (G.Build && G.Build.groundAt(x, z, y + 0.2, 0.1) > y - 0.1)) { d = Math.max(0.5, s - 0.35); break; } }
+        // la visuale si sposta solo per disegnare: mira e azioni restano dagli occhi
+        P._tp = { x: P.eye.x + _o.x * d, y: P.eye.y + _o.y * d, z: P.eye.z + _o.z * d, rx: tp === 2 ? -P.pitch : P.pitch, ry: tp === 2 ? P.yaw + Math.PI : P.yaw };
+      } else P._tp = null;
       if (G.Sea && G.Sea.station && G.Sea.stationEye(P, cam)) P.vm.visible = false;
     }
     // viewmodel: oscillazione e colpo
@@ -364,6 +389,7 @@
       const l = Math.hypot(lx, lz); if (l > 0) { lx /= l; lz /= l; }
       const sp = (k.ControlLeft || k.ControlRight) ? 4.4 : 2.9;
       if (G.Boats.rigMove(b, P, dt, k, lx, lz, l, sp)) { G.Boats.localToWorld(b, P.local, P.pos); P.vel.set(0, 0, 0); G.Boats.lowerLights(b, P.lower); return; }
+      if (G.Boats.walk(b, P, dt, k, lx, lz, l, sp)) { G.Boats.localToWorld(b, P.local, P.pos); P.vel.set(0, 0, 0); G.Boats.lowerLights(b, P.lower); return; }
       P.local.x += lx * sp * dt; P.local.z += lz * sp * dt;
       // salto sul ponte
       if (k.Space && P.local.y <= T.deck + 0.001) P.lvy = 5.2;
@@ -529,7 +555,13 @@
     if (tool === 'pala' && G.Treasure && G.Treasure.dig()) return;
     const tg = P.target;
     // piccone e pala sul terreno (senza bersagli davanti): si scava
-    if ((tool === 'piccone' || tool === 'pala') && (!tg || tg.kind === 'piece' && false) && G.Dig) { if (G.Dig.dig(P, tool, pow)) { P.actionCd = (tool === 'pala' ? 0.5 : 0.45) / Math.sqrt(pow); return; } }
+    // mira più precisa: si scava anche se davanti c'è uno sperone di roccia, o se il terreno colpito è più vicino del bersaglio
+    let digOK = !tg;
+    if (!digOK && (tool === 'piccone' || tool === 'pala') && G.Dig) {
+      P.lookDir(_dir); const gt = G.Dig.raycast(P.cam.position, _dir, 4.6);
+      if (gt >= 0 && ((tg.kind === 'res' && tg.res.type === 'cliff') || (tg.t !== undefined && gt < tg.t - 0.15))) digOK = true;
+    }
+    if ((tool === 'piccone' || tool === 'pala') && digOK && G.Dig) { if (G.Dig.dig(P, tool, pow)) { P.actionCd = (tool === 'pala' ? 0.5 : 0.45) / Math.sqrt(pow); return; } }
     const melee = (W.dmg || (tool === 'coltello' ? 2.5 : tool === 'ascia' ? 2 : tool === 'piccone' ? 1.5 : 1)) * (W.dmg ? G.Skills.mul('spada', 0.02) : 1);
     const swordXP = () => { if (W.dmg) G.Skills.add('spada', 2); };
     // tentacoli del Kraken o fiancata pirata a portata di spada
@@ -644,6 +676,7 @@
   P.secondary = function () {
     const it = P.held(), id = it ? it.id : null, tg = P.target;
     if (P.placing) { G.UI.placeConfirm(); return; }
+    if (G.Sea && G.Sea.station && G.Sea.station.land) { G.Sea.stationLeave(P); return; }
     if (G.Mount && G.Mount.trySecondary(P)) return;
     if (!P.target && G.Music && G.Music.secondary(P)) return;
     if (G.Stealth && P.crouch && G.Stealth.steal(P)) return;
@@ -698,7 +731,7 @@
     if (P.boat && id === 'assi' && !P.helm) return true;
     if (P.boat) return !!(P.helm || P.inHelmZone() || (P.boat.inv && tg && tg.kind === 'boat' && tg.boat === P.boat && P.boat.parts[tg.part] && P.boat.parts[tg.part].name === 'Stiva'));
     if (!tg) return false;
-    if (tg.kind === 'piece') return ['porta', 'baule', 'barile', 'forziere', 'banco', 'falo', 'letto', 'fornace'].includes(tg.piece.t);
+    if (tg.kind === 'piece') return ['porta', 'baule', 'barile', 'forziere', 'banco', 'falo', 'letto', 'fornace', 'cannone'].includes(tg.piece.t);
     if (tg.kind === 'npc') return true;
     if (tg.kind === 'boat') return true;
     if (tg.kind === 'animal') return !!(tg.ent.def.shear && tg.ent.st && tg.ent.st.wool !== false && !(G.BREED && G.BREED[tg.ent.sp] && id && G.BREED[tg.ent.sp].includes(id)));
@@ -729,6 +762,7 @@
       if (p.t === 'banco') { G.UI.openInventory(5); return; }
       if (p.t === 'falo' || p.t === 'fornace') { G.UI.openFire(p); return; }
       if (p.t === 'letto') { P.sleep(p); return; }
+      if (p.t === 'cannone' && G.Sea) { G.Sea.landToggle(P, p); return; }
     }
     if (tg && tg.kind === 'npc') { G.Quests.talk(tg.npc); return; }
     if (tg && tg.kind === 'animal' && tg.ent.def.shear) { if (G.Entities.shear(tg.ent)) return; }
@@ -748,11 +782,11 @@
     // sali nel punto del ponte più vicino a te
     P.boat = b; P.helm = false; P.cam3 = false; P.endFish(); P._boatYaw = b.yaw;
     G.Boats.worldToLocal(b, P.pos, P.local); P.local.y = b.T.deck; P.lvy = 0;
-    if (b.free) G.FreeBoat.snapOn(b, P.local); else G.Boats.clampDeck(b.T, P.local);
+    if (b.free) G.FreeBoat.snapOn(b, P.local); else { G.Boats.clampDeck(b.T, P.local); P.local.y = G.Boats.boardY(b, P.local); }
     if (!P._boardTip || performance.now() - P._boardTip > 60000) { P._boardTip = performance.now(); G.UI.toast(`${climbed ? 'Sei salito a bordo' : 'A bordo'} · il segno dorato indica ${b.T.helmTxt.toLowerCase()}: vai lì e ${G.useHow()} per guidare`, 'good'); }
   };
   P.leaveBoat = function (silent) {
-    if (P.boat) G.Boats.lowerLights(P.boat, false); G.Boats.rigReset(P);
+    if (P.boat) { G.Boats.lowerLights(P.boat, false); if (P.boat._cabL) P.boat._cabL.visible = false; } G.Boats.rigReset(P);
     const b = P.boat; if (!b) return;
     if (!silent && !b.anchored && !b.ai && !b.pirate && (!P._anchorTip || performance.now() - P._anchorTip > 90000)) { P._anchorTip = performance.now(); setTimeout(() => G.UI.toast('Senza ancora la barca va lentamente dove la porta il vento · torna a bordo e premi X per gettarla', ''), 400); }
     P.boat = null; P.helm = false; P._boatYaw = undefined; G.UI.setBoatHud(false);

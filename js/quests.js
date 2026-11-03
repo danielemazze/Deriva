@@ -113,16 +113,16 @@
   Q.onDiscover = function (poi) {
     for (const q of active().slice()) if (q.type === 'esplora' && q.to === poi.id && !q.ready) { q.ready = true; Q.complete(q); }
   };
-  Q.stars = (n) => '★'.repeat(n) + '<span class="soft">' + '★'.repeat(3 - n) + '</span>';
+  Q.stars = (n) => G.ico('stella', 'fill').repeat(n) + '<span class="soft">' + G.ico('stella').repeat(3 - n) + '</span>';
 
   /* ---------------- commercio ---------------- */
   const SHOP = {
-    base: [['freccia', 8, 3], ['grimaldello', 3, 9], ['munizioni', 4, 6], ['pala', 1, 12], ['mappa_tesoro', 1, 35], ['corda', 4, 3], ['torcia', 4, 2]],
+    base: [['pane', 3, 3], ['freccia', 8, 3], ['grimaldello', 3, 9], ['munizioni', 4, 6], ['pala', 1, 12], ['mappa_tesoro', 1, 35], ['corda', 4, 3], ['torcia', 4, 2]],
     coloniale: [['pistola', 1, 95], ['sciabola', 1, 45], ['cannocchiale', 1, 140], ['progetto_catamarano', 1, 120], ['progetto_galeone', 1, 420], ['progetto_vascello', 1, 750], ['cannone', 1, 30], ['stoffa', 4, 5]],
-    alberi: [['arco', 1, 20], ['freccia', 16, 5], ['cocco', 3, 2], ['progetto_canoa', 1, 30], ['pinne', 1, 160]],
+    alberi: [['arco', 1, 20], ['freccia', 16, 5], ['cocco', 3, 2], ['mango', 3, 3], ['avocado', 2, 3], ['progetto_canoa', 1, 30], ['pinne', 1, 160]],
     palafitte: [['lancia', 1, 12], ['canna', 1, 6], ['pesce_cotto', 3, 3], ['progetto_canoa', 1, 30]],
-    fattoria: [['manzo_cotto', 2, 4], ['lana', 4, 3], ['stoffa', 4, 4], ['uovo', 4, 2], ['letto', 1, 15]],
-    baite: [['arco', 1, 22], ['ascia', 1, 6], ['montone_cotto', 2, 4], ['progetto_catamarano', 1, 120]],
+    fattoria: [['pane', 3, 3], ['melone', 1, 4], ['pera', 4, 2], ['manzo_cotto', 2, 4], ['lana', 4, 3], ['stoffa', 4, 4], ['uovo', 4, 2], ['letto', 1, 15]],
+    baite: [['kiwi', 4, 2], ['limone', 4, 2], ['arco', 1, 22], ['ascia', 1, 6], ['montone_cotto', 2, 4], ['progetto_catamarano', 1, 120]],
     pietra: [['piccone', 1, 6], ['lancia', 1, 12], ['munizioni', 6, 8], ['bussola_oro', 1, 180]],
     oste: [['pesce_cotto', 2, 3], ['manzo_cotto', 2, 5], ['funghi_cotti', 2, 3], ['ciotola_acqua', 1, 2], ['pollo_cotto', 2, 4]],
   };

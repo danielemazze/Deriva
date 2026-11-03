@@ -43,7 +43,7 @@
     const dx = x - s[0], dy = y - s[1], dz = z - s[2], d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const ph = s[0] * 1.7 + s[1] * 2.3 + s[2] * 3.1, id = 1 / (d + 1e-4), nx = dx * id, ny = dy * id, nz = dz * id;
     const n = Math.sin(nx * 3.1 + ph) * Math.sin(ny * 2.7 + ph * 1.3) * Math.sin(nz * 3.4 + ph * 0.7) + 0.5 * Math.sin((nx + nz) * 6.3 + ph * 2.1) * Math.sin(ny * 5.7 - ph);
-    return s[3] * (1 + 0.3 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n)))) - d;
+    return s[3] * (1 + (s[4] ? 0.3 : 0.1) * (0.5 + 0.5 * Math.max(-1, Math.min(1, n)))) - d; // scavi del giocatore: bordo quasi liscio
   }
   function carveDist(x, y, z, l) {
     let m = -Infinity;
@@ -95,9 +95,12 @@
     return Infinity;
   };
   // pareti della galleria: punti del corpo dentro la roccia
-  D.blocked = function (x, feet, z, height) {
+  // il corpo è un cilindro: si controllano il centro e quattro punti sul bordo (non si entra più nella roccia fino a metà)
+  D.blocked = function (x, feet, z, height, r) {
     if (!near(x, z)) return false;
-    for (const dy of [0.45, 1.0, height - 0.15]) if (D.solidAt(x, feet + dy, z)) return true;
+    r = r || 0;
+    const pts = r ? [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r], [r * 0.7, r * 0.7], [-r * 0.7, r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, -r * 0.7]] : [[0, 0]];
+    for (const dy of [0.45, 1.0, height - 0.15]) for (const [ox, oz] of pts) if (D.solidAt(x + ox, feet + dy, z + oz)) return true;
     return false;
   };
   D.raycast = function (o, d, max) {
@@ -175,14 +178,11 @@
     // non si scava sotto un villaggio o una costruzione
     for (const b of G.Build.boxes) if (hx > b.x0 - 1 && hx < b.x1 + 1 && hz > b.z0 - 1 && hz < b.z1 + 1 && hy > b.y0 - 1.5 && hy < b.y1 + 0.5) { G.UI.toast('Qui sopra c’è una costruzione', 'warn'); return true; }
     // un colpo non fa una sfera perfetta: un grappolo di cavità più piccole, diverso ogni volta
-    D.add([c[0], c[1], c[2], r * 0.78]);
+    // un colpo: una cavità unica e pulita, allungata un poco verso dove guardi (niente pezzetti sospesi)
+    D.add([c[0], c[1], c[2], r * 0.86]);
+    D.add([c[0] + d.x * r * 0.45, c[1] + d.y * r * 0.45, c[2] + d.z * r * 0.45, r * 0.7]);
     if (G.Caves && G.Caves.onDig) G.Caves.onDig(c[0], c[1], c[2]);
     D.gemsDirtyNear(c[0], c[1], c[2]); D._gt = 11;
-    const nSat = 2 + ((Math.random() * 3) | 0);
-    for (let k = 0; k < nSat; k++) {
-      const a = Math.random() * 6.283, e = (Math.random() - 0.5) * 1.6, rr = r * (0.38 + Math.random() * 0.3), off = r * (0.35 + Math.random() * 0.35);
-      D.add([c[0] + Math.cos(a) * Math.cos(e) * off, c[1] + Math.sin(e) * off * 0.8, c[2] + Math.sin(a) * Math.cos(e) * off, rr]);
-    }
     // materiale: terra in superficie, pietra (e carbone) in profondità, ossidiana nei vulcani
     const surf = G.heightAt(hx, hz) - hy, rocky = G.normalAt(hx, hz)[1] < 0.82 || (G.climate(hx, hz).mt > 0.5 && surf > 0.6) || surf > 1.6;
     const vol = G.biomeAt(hx, hz) === G.BIOME.VULCANO;

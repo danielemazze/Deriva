@@ -12,7 +12,7 @@
 
   /* ---------------- LUNA ---------------- */
   C.PHASES = ['Luna nuova', 'Falce crescente', 'Primo quarto', 'Gibbosa crescente', 'Luna piena', 'Gibbosa calante', 'Ultimo quarto', 'Falce calante'];
-  C.PHASE_ICON = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+  C.PHASE_ICON = ['luna0', 'luna1', 'luna2', 'luna3', 'luna4', 'luna5', 'luna6', 'luna7'];
   G.moonOffset = 0;
   // 0 = nuova, 0.5 = piena; un ciclo ogni 8 giorni di gioco
   C.moonPhase = () => ((((G.time + G.moonOffset) / 8) % 1) + 1) % 1;
@@ -23,12 +23,12 @@
 
   /* ---------------- METEO ---------------- */
   C.KINDS = {
-    sereno: { n: 'Sereno', icon: '☀', cloud: 0.32, rain: 0, storm: 0, heat: 0, dry: 0, wind: 0, dur: [420, 780] },
-    nuvoloso: { n: 'Nuvoloso', icon: '☁', cloud: 0.78, rain: 0, storm: 0, heat: 0, dry: 0, wind: 1, dur: [200, 420] },
-    pioggia: { n: 'Pioggia', icon: '🌧', cloud: 0.95, rain: 0.75, storm: 0, heat: 0, dry: 0, wind: 2, dur: [200, 420] },
-    temporale: { n: 'Temporale', icon: '⛈', cloud: 1, rain: 1, storm: 1, heat: 0, dry: 0, wind: 4, dur: [160, 320] },
-    caldo: { n: 'Caldo torrido', icon: '🔥', cloud: 0.08, rain: 0, storm: 0, heat: 1, dry: 0.3, wind: -2, dur: [300, 600] },
-    siccita: { n: 'Siccità', icon: '🏜', cloud: 0.04, rain: 0, storm: 0, heat: 0.7, dry: 1, wind: -3, dur: [480, 900] },
+    sereno: { n: 'Sereno', icon: 'sole', cloud: 0.32, rain: 0, storm: 0, heat: 0, dry: 0, wind: 0, dur: [420, 780] },
+    nuvoloso: { n: 'Nuvoloso', icon: 'nuvola', cloud: 0.78, rain: 0, storm: 0, heat: 0, dry: 0, wind: 1, dur: [200, 420] },
+    pioggia: { n: 'Pioggia', icon: 'pioggia', cloud: 0.95, rain: 0.75, storm: 0, heat: 0, dry: 0, wind: 2, dur: [200, 420] },
+    temporale: { n: 'Temporale', icon: 'temporale', cloud: 1, rain: 1, storm: 1, heat: 0, dry: 0, wind: 4, dur: [160, 320] },
+    caldo: { n: 'Caldo torrido', icon: 'caldo', cloud: 0.08, rain: 0, storm: 0, heat: 1, dry: 0.3, wind: -2, dur: [300, 600] },
+    siccita: { n: 'Siccità', icon: 'siccita', cloud: 0.04, rain: 0, storm: 0, heat: 0.7, dry: 1, wind: -3, dur: [480, 900] },
   };
   const NEXT = {
     sereno: [['nuvoloso', 0.38], ['caldo', 0.22], ['sereno', 0.25], ['siccita', 0.15]],
@@ -192,27 +192,27 @@
     const P = G.Player, x = P.pos.x, z = P.pos.z;
     let T = C.airTemp(x, z, P.pos.y);
     const F = (C.factors = []); // cosa ti scalda e cosa ti raffredda (si vede a schermo)
-    { const L = C.localAt(x, z, _loc); if (L.snow > 0.2) F.push(['❄', 'neve', -1]); else if (L.rain > 0.2) F.push(['🌧', 'pioggia', -1]); if (C.windLevel() > 5) F.push(['🌬', 'vento forte', -1]); if (L.heat > 0.3) F.push(['☀', 'caldo torrido', 1]); if (G.sky && G.sky.day < 0.3 && T < 14) F.push(['🌙', 'notte fredda', -1]); }
-    if (P.swim || P.under) { const w = 12 + G.climate(x, z).t * 18 - (G.coldAt ? G.coldAt(x, z) * 14 : 0); if (w < T) { T = w; F.push(['💧', 'acqua fredda', -1]); } }
+    { const L = C.localAt(x, z, _loc); if (L.snow > 0.2) F.push(['neve', 'neve', -1]); else if (L.rain > 0.2) F.push(['pioggia', 'pioggia', -1]); if (C.windLevel() > 5) F.push(['vento', 'vento forte', -1]); if (L.heat > 0.3) F.push(['sole', 'caldo torrido', 1]); if (G.sky && G.sky.day < 0.3 && T < 14) F.push(['luna1', 'notte fredda', -1]); }
+    if (P.swim || P.under) { const w = 12 + G.climate(x, z).t * 18 - (G.coldAt ? G.coldAt(x, z) * 14 : 0); if (w < T) { T = w; F.push(['goccia', 'acqua fredda', -1]); } }
     // sottoterra: aria fresca e umida, quasi la stessa tutto l'anno (più fredda nelle terre gelate)
     if (P.underground) {
       const depth = Math.max(0, G.heightAt(x, z) - P.pos.y), cl = G.climate(x, z), Tc = Math.max(1, 7 + cl.t * 9 - (G.coldAt ? G.coldAt(x, z) * 7 : 0));
       const k = Math.min(1, depth / 6); const T0 = T; T = G.lerp(T, Tc, k);
-      if (Math.abs(T - T0) > 0.8 || k > 0.5) F.push(['🕳', T < T0 ? 'grotta: aria fresca e umida' : 'grotta: riparo dal gelo', T < T0 ? -1 : 1]);
+      if (Math.abs(T - T0) > 0.8 || k > 0.5) F.push(['grotta', T < T0 ? 'grotta: aria fresca e umida' : 'grotta: riparo dal gelo', T < T0 ? -1 : 1]);
     }
     // falò vicini
     let fire = 0;
     for (const p of G.Build.pieces) if (p.t === 'falo' || p.t === 'camino' || (p.t === 'fornace' && p.glow > 0.3)) { const d = Math.hypot(p.x - x, p.z - z); if (d < 7) fire = Math.max(fire, 1 - d / 7); }
     if (G.Structures && G.Structures.fireNear) fire = Math.max(fire, G.Structures.fireNear(x, z));
     // il fuoco scalda davvero: vicino al falò si sta bene anche nella neve
-    if (fire > 0) { T = Math.max(T, G.lerp(T, 24, Math.min(1, fire * 2))); F.push(['🔥', 'fuoco vicino', 1]); }
-    if (P.heldTorch) { T += 3; F.push(['🔦', 'torcia', 1]); }
+    if (fire > 0) { T = Math.max(T, G.lerp(T, 24, Math.min(1, fire * 2))); F.push(['fuoco', 'fuoco vicino', 1]); }
+    if (P.heldTorch) { T += 3; F.push(['torcia', 'torcia', 1]); }
     // sotto un tetto: niente pioggia e vento, al fresco col sole
     const roofed = G.Build.ceilingAt(x, z, P.pos.y + 1.8, 0.2) < P.pos.y + 7;
-    if (roofed) { const L = C.localAt(x, z, _loc); T += (L.rain * 4 + L.snow * 3) * 0.8 + (T < 15 ? 3 : 0) - (T > 28 ? 4 : 0); F.push(['⌂', 'al riparo', T < 20 ? 1 : -1]); }
+    if (roofed) { const L = C.localAt(x, z, _loc); T += (L.rain * 4 + L.snow * 3) * 0.8 + (T < 15 ? 3 : 0) - (T > 28 ? 4 : 0); F.push(['riparo', 'al riparo', T < 20 ? 1 : -1]); }
     const cl = C.clothes();
-    if (T < 16) { const T0 = T; T = Math.min(16, T + cl.warm * 2.6); if (T > T0 + 0.5) F.push(['🧥', 'vestiti caldi', 1]); }
-    else if (T > 27) { const T0 = T; T = Math.max(27, T - cl.cool * 3.5 + cl.warm * 1.2); if (T < T0 - 0.5) F.push(['👒', 'vestiti leggeri', -1]); else if (cl.warm) F.push(['🧥', 'vestiti troppo caldi', 1]); }
+    if (T < 16) { const T0 = T; T = Math.min(16, T + cl.warm * 2.6); if (T > T0 + 0.5) F.push(['giacca', 'vestiti caldi', 1]); }
+    else if (T > 27) { const T0 = T; T = Math.max(27, T - cl.cool * 3.5 + cl.warm * 1.2); if (T < T0 - 0.5) F.push(['cappello', 'vestiti leggeri', -1]); else if (cl.warm) F.push(['giacca', 'vestiti troppo caldi', 1]); }
     C._roofed = roofed;
     return T;
   };

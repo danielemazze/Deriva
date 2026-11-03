@@ -64,7 +64,7 @@
     else {
       if (!G.Skills.chance('allevatore', 0.008)) P.take(it.id, 1); G.Skills.add('allevatore', 4);
       if (r === 'freed') G.UI.toast(`Animale liberato: ora è tuo e ti segue se tieni in mano ${G.ITEMS[foods[0]].n.toLowerCase()}`, 'good');
-      else { G.UI.toast(`${G.SPECIES[a.sp].n}: in amore ❤ Nutrine un altro esemplare vicino per avere un cucciolo`, 'good'); G.FX.burst(a.pos.x, a.pos.y + 1, a.pos.z, [1, 0.4, 0.6], 14, 1.4); }
+      else { G.UI.toast(`${G.SPECIES[a.sp].n}: in amore! Nutrine un altro esemplare vicino per avere un cucciolo`, 'good'); G.FX.burst(a.pos.x, a.pos.y + 1, a.pos.z, [1, 0.4, 0.6], 14, 1.4); }
       if (G.Audio) G.Audio.eat();
       G.saveSoon();
     }
@@ -72,7 +72,7 @@
   };
   PT.label = function (a) {
     const st = a.st; const bits = [];
-    if (st.pet) bits.push('tua'); if (st.age !== undefined && st.age < 1) bits.push('cucciolo'); if (st.trapped) bits.push('in trappola'); if (st.love > 0) bits.push('in amore ❤');
+    if (st.pet) bits.push('tua'); if (st.age !== undefined && st.age < 1) bits.push('cucciolo'); if (st.trapped) bits.push('in trappola'); if (st.love > 0) bits.push('in amore');
     return bits.join(' · ');
   };
 })();

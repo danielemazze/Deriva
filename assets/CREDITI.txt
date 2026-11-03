@@ -1,5 +1,6 @@
 Texture fotografiche (cartella acg): ambientCG (ambientcg.com), licenza CC0 1.0 (pubblico dominio).
 Foglie, fili d'erba e rametti delle carte di fogliame composti dagli atlanti ambientCG (CC0).
+Modelli 3D fotografati di frutta, pane e bastone (cartella m3d): ambientCG, licenza CC0 1.0.
 
 Texture fotografiche: Babylon.js Assets (https://github.com/BabylonJS/Assets), licenza Creative Commons Attribution 4.0. Normal map di erba, sabbia e terra ricavate dalle foto.
 

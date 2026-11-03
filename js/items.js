@@ -26,6 +26,13 @@
     flauto: { n: 'Flauto d’osso', d: 'Clic sinistro suona; guarda in su o in giù per cambiare nota.', cat: 'tool', stack: 1 },
     osso_gallina: { n: 'Ossa di gallina', d: 'Le lasciano le galline. Con il coltello ne fai un flauto.', cat: 'res' },
     mela: { n: 'Mela', d: 'Croccante: dal banco di un mercante.', cat: 'food', food: 8, water: 5 },
+    pane: { n: 'Pane', d: 'Pagnotta ai semi: sfama molto.', cat: 'food', food: 16, water: 0 },
+    limone: { n: 'Limone', d: 'Aspro ma dissetante.', cat: 'food', food: 3, water: 9 },
+    pera: { n: 'Pera', d: 'Dolce e succosa.', cat: 'food', food: 7, water: 7 },
+    mango: { n: 'Mango', d: 'Frutto tropicale maturo.', cat: 'food', food: 9, water: 8 },
+    melone: { n: 'Anguria', d: 'Grande e piena d’acqua: disseta tantissimo.', cat: 'food', food: 6, water: 22 },
+    avocado: { n: 'Avocado', d: 'Morbido e nutriente.', cat: 'food', food: 12, water: 2 },
+    kiwi: { n: 'Kiwi', d: 'Piccolo, acidulo e dissetante.', cat: 'food', food: 4, water: 6 },
     arancia: { n: 'Arancia', d: 'Succosa: disseta e sfama.', cat: 'food', food: 6, water: 10 },
     polpa_cactus: { n: 'Polpa di cactus', d: 'Amara ma piena d’acqua: salva la vita nel deserto.', cat: 'food', food: 3, water: 16 },
     funghi: { n: 'Funghi', d: 'Crescono all’ombra dei boschi. Meglio cuocerli.', cat: 'food', food: 4, water: 1 },
@@ -99,7 +106,7 @@
     progetto_catamarano: { n: 'Progetto: catamarano', d: 'Clic destro per impararlo: il catamarano comparirà nel libro.', cat: 'blueprint', stack: 1, boat: 'catamarano' },
     progetto_galeone: { n: 'Progetto: galeone', d: 'Clic destro per impararlo: il galeone comparirà nel libro.', cat: 'blueprint', stack: 1, boat: 'galeone' },
     progetto_vascello: { n: 'Progetto: vascello', d: 'Clic destro per impararlo: la nave più grande, con il ponte di sotto.', cat: 'blueprint', stack: 1, boat: 'vascello' },
-    cannone: { n: 'Cannone', d: 'Parte del galeone. Si trova nei relitti o dai mercanti.', cat: 'part' },
+    cannone: { n: 'Cannone', d: 'Parte del galeone, oppure da piazzare a terra su un affusto: tasto destro per posarlo e per usarlo. Si trova nei relitti o dai mercanti.', cat: 'part' },
     // vestiti (temperatura): wear = 1 testa, 2 corpo, 3 piedi; warm = calore, cool = riparo dal sole
     cappello_lana: { n: 'Berretto di lana', d: 'Tiene calda la testa. Indossalo nello slot Testa (inventario).', cat: 'wear', stack: 1, wear: 1, warm: 2 },
     maglione_lana: { n: 'Maglione di lana', d: 'Il capo più caldo: indispensabile tra la neve.', cat: 'wear', stack: 1, wear: 2, warm: 4 },
@@ -542,6 +549,7 @@
   });
   G.icon = function (id) {
     if (G.iconCache[id]) return G.iconCache[id];
+    if (G.M3D && G.M3D.has(id)) return (G.iconCache[id] = 'assets/m3d/' + id + '.png'); // foto del modello 3D
     const cv = document.createElement('canvas'); cv.width = cv.height = ICON;
     const ctx = cv.getContext('2d');
     ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;

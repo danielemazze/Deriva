@@ -77,6 +77,45 @@
     G.FX.burst(from.x, from.y, from.z, [0.75, 0.72, 0.7], 14, 2.5, { size: 1.6 });
     if (G.Audio) { const dist = from.distanceTo(G.Player.pos); G.Audio.cannon ? G.Audio.cannon(dist) : G.Audio.hit('stone'); }
   };
+  /* ---------- l'impatto di una palla di cannone: un cratere che dipende dal materiale ---------- */
+  S.impact = function (p, v) {
+    const sp = v ? v.length() : 30, k = G.clamp(sp / 35, 0.6, 1.4);
+    const surf = G.heightAt(p.x, p.z) - p.y, n = G.normalAt(p.x, p.z), bio = G.biomeAt(p.x, p.z);
+    // sabbia e terra cedono molto, la roccia poco
+    const rocky = n[1] < 0.82 || surf > 1.6 || bio === G.BIOME.MONTAGNA || bio === G.BIOME.VULCANO;
+    const sandy = !rocky && (bio === G.BIOME.DESERTO || G.heightAt(p.x, p.z) < 3);
+    const r = (rocky ? 0.85 : sandy ? 1.7 : 1.35) * k;
+    let ok = true;
+    for (const bx of G.Build.boxes) if (p.x > bx.x0 - 1.5 && p.x < bx.x1 + 1.5 && p.z > bx.z0 - 1.5 && p.z < bx.z1 + 1.5 && p.y > bx.y0 - 2 && p.y < bx.y1 + 1) { ok = false; break; } // non sotto le case
+    if (ok && G.Dig && p.y > -40) { const d = v ? v.clone().normalize() : new V3(0, -1, 0); G.Dig.add([p.x + d.x * r * 0.35, p.y + d.y * r * 0.35, p.z + d.z * r * 0.35, r]); if (G.Dig.gemsDirtyNear) G.Dig.gemsDirtyNear(p.x, p.y, p.z); }
+    G.FX.burst(p.x, p.y + 0.3, p.z, rocky ? [0.55, 0.53, 0.5] : sandy ? [0.86, 0.76, 0.52] : [0.42, 0.31, 0.2], 34, 6.5, { size: 1.5 });
+    G.FX.burst(p.x, p.y + 0.6, p.z, [0.95, 0.6, 0.25], 10, 4);
+    if (G.Audio) { G.Audio.hit(rocky ? 'stone' : 'soft'); if (G.Audio.boom) G.Audio.boom(Math.hypot(p.x - G.Player.pos.x, p.z - G.Player.pos.z)); }
+    // spinta e danno a chi è vicino
+    const P = G.Player, dd = Math.hypot(P.pos.x - p.x, P.pos.y + 1 - p.y, P.pos.z - p.z);
+    if (dd < 4) { P.hurt((4 - dd) * 9); const dx = (P.pos.x - p.x) / (dd || 1), dz = (P.pos.z - p.z) / (dd || 1); P.vel.x += dx * 7; P.vel.z += dz * 7; P.vel.y += 4; }
+    // rocce, cespugli e alberi piccoli lì attorno si spezzano
+    if (G.World && G.World.nearby) { const gone = []; G.World.nearby(p.x, p.z, r + 1.2, (res) => { const d = Math.hypot(res.x - p.x, res.z - p.z); if (d > r + 1 || Math.abs(res.y - p.y) > 4) return; if (res.type === 'bush' || res.type === 'plant' || (res.type === 'rock' && !res.vein && (res.size || 1) < 1.6 * k) || (res.type === 'tree' && (res.height || 6) < 5)) gone.push(res); }); for (const res of gone) G.World.removeResource(res); }
+    if (G.saveSoon) G.saveSoon();
+  };
+  // pezzi costruiti dal giocatore e grosse rocce: la palla si ferma lì
+  S.impactSolid = function (b) {
+    const p = b.pos;
+    for (const pc of G.Build.pieces) {
+      if (pc.gen || Math.abs(pc.x - p.x) > 2 || Math.abs(pc.z - p.z) > 2 || Math.abs(pc.y + 1 - p.y) > 2.2) continue;
+      // pietra più resistente del legno
+      const stone = G.Build.isStone && G.Build.isStone(pc.t);
+      pc.hp = (pc.hp === undefined ? (stone ? 6 : 3) : pc.hp) - (stone ? 2.5 : 3.5);
+      G.FX.burst(p.x, p.y, p.z, stone ? [0.6, 0.58, 0.55] : [0.6, 0.42, 0.25], 22, 5);
+      if (G.Audio) G.Audio.hit(stone ? 'stone' : 'wood');
+      if (pc.hp <= 0) { if (G.Net && G.Net.on) G.Net.send({ t: 'bdel', id: pc.id }); G.Build.remove(pc); G.saveSoon && G.saveSoon(); }
+      return true;
+    }
+    let solid = null;
+    if (G.World && G.World.nearby) G.World.nearby(p.x, p.z, 3, (res) => { if (solid || !res.solid) return; if (Math.hypot(res.x - p.x, res.z - p.z) < res.r + 0.2 && p.y > res.y - 0.5 && p.y < res.y + (res.height || 2)) solid = res; });
+    if (solid) { if (solid.type !== 'cliff' && !(solid.type === 'tree' && (solid.height || 6) > 8)) G.World.removeResource(solid); G.FX.burst(p.x, p.y, p.z, solid.type === 'tree' ? [0.5, 0.36, 0.2] : [0.55, 0.53, 0.5], 26, 5); if (G.Audio) G.Audio.hit(solid.type === 'tree' ? 'wood' : 'stone'); if (solid.type === 'cliff') S.impact(p, b.vel); return true; }
+    return false;
+  };
   function updateBalls(dt) {
     const P = G.Player;
     for (let i = S.balls.length - 1; i >= 0; i--) {
@@ -95,7 +134,9 @@
       if (!hit && b.owner !== 'pirate') for (const e of S.enc) { if (e.type !== 'kraken' || e.dead) continue; const h = krakenRay(e, b.pos, null, 0); if (h) { S.hitEnc(e, 55, b.pos); hit = true; if (b.owner === 'player') G.Skills.add('fuoco', 5); break; } }
       const wy = G.waveHeight(b.pos.x, b.pos.z, G.clock);
       if (!hit && b.pos.y < wy) { G.FX.burst(b.pos.x, wy + 0.2, b.pos.z, [0.85, 0.93, 0.97], 18, 4, { size: 1.4 }); if (G.Audio) G.Audio.splash(); hit = true; }
-      if (!hit && b.pos.y < G.World.groundAt(b.pos.x, b.pos.z)) { G.FX.burst(b.pos.x, b.pos.y + 0.3, b.pos.z, [0.5, 0.45, 0.4], 14, 3); hit = true; }
+      // contro le costruzioni del giocatore e le rocce/alberi: la palla si ferma e fa danni
+      if (!hit && b.owner !== 'pirate' && S.impactSolid(b)) hit = true;
+      if (!hit && b.pos.y < (G.Dig ? G.Dig.ground(b.pos.x, b.pos.z, b.pos.y + 0.3) : G.World.groundAt(b.pos.x, b.pos.z))) { S.impact(b.pos, b.vel); hit = true; b._fx = 1; }
       if (hit || b.t > 8) { if (hit && b.owner !== 'pirate' && !b._fx) G.FX.burst(b.pos.x, b.pos.y, b.pos.z, [0.9, 0.55, 0.2], 10, 3); G.scene.remove(b.m); S.balls.splice(i, 1); }
     }
   }
@@ -158,8 +199,26 @@
     document.body.classList.add('atcannon');
     return true;
   };
+  // cannone da terra (pezzo costruito): ti metti dietro l'affusto
+  S.landToggle = function (P, p) {
+    if (S.station) { S.stationLeave(P); return true; }
+    if (!p || !p.piv) return false;
+    S.station = { land: true, p, piv: p.piv, barrel: p.barrel, yo: p.yo || 0, pi: p.pi || 0.08, cd: 0, kick: 0 };
+    S.stationAim(P, 0); P._stYaw = P.yaw; P._stPit = P.pitch;
+    if (G.UI) G.UI.toast('Al cannone · A D ruota · W S alza · clic sinistro fuoco · tasto destro per lasciarlo');
+    document.body.classList.add('atcannon');
+    return true;
+  };
   S.stationLeave = function (P) {
     const st = S.station; if (!st) return;
+    if (st.land) {
+      st.p.yo = st.yo; st.p.pi = st.pi; st.barrel.position.z = 0;
+      S.station = null; document.body.classList.remove('atcannon');
+      const h = document.getElementById('cannhud'); if (h) h.hidden = true;
+      if (P) { const c = Math.cos(st.p.rot), sn = Math.sin(st.p.rot); P.pos.set(st.p.x - sn * 1.5, Math.max(P.pos.y, G.World.groundAt(st.p.x - sn * 1.5, st.p.z - c * 1.5)), st.p.z - c * 1.5); P.vel.set(0, 0, 0); P.pitch = G.clamp(P.pitch, -0.3, 0.3); }
+      if (G.saveSoon) G.saveSoon();
+      return;
+    }
     const pos = st.mesh.geometry.attributes.position;
     st.idx.forEach((i, k) => pos.setXYZ(i, st.orig[k][0], st.orig[k][1], st.orig[k][2])); pos.needsUpdate = true;
     st.b.inner.remove(st.piv); st.barrel.geometry.dispose();
@@ -169,6 +228,7 @@
   };
   // direzione della canna nella barca e nel mondo
   function stDir(st, out) {
+    if (st.land) { const cp = Math.cos(st.pi); return out.set(Math.sin(st.yo) * cp, Math.sin(st.pi), Math.cos(st.yo) * cp); }
     const sd = st.c.sd, cy = Math.cos(st.yo), sy = Math.sin(st.yo), cp = Math.cos(st.pi), sp = Math.sin(st.pi);
     out.set(sd * cy * cp, sp, sd * sy * cp); // fuori = (sd,0,0), destra = (0,0,sd)
     return out;
@@ -176,24 +236,28 @@
   const _sq = new THREE.Quaternion(), _sv = new V3(), _sw = new V3(), _sp = new V3(), _up = new V3(0, 1, 0), _z = new V3(0, 0, 1);
   S.stationAim = function (P, dt) {
     const st = S.station; if (!st) return;
-    stDir(st, _sv); st.piv.quaternion.setFromUnitVectors(_z, _sv);
+    stDir(st, _sv);
+    if (st.land) st.piv.rotation.set(-st.pi, st.yo, 0, 'YXZ'); else st.piv.quaternion.setFromUnitVectors(_z, _sv);
     st.kick = Math.max(0, st.kick - dt * 3); st.barrel.position.z = -st.kick * 0.35;
     st.piv.updateWorldMatrix(true, false);
-    st.piv.getWorldPosition(_sp); st.b.inner.getWorldQuaternion(_sq);
+    st.piv.getWorldPosition(_sp); (st.land ? st.p.mesh : st.b.inner).getWorldQuaternion(_sq);
     _sw.copy(_sv).applyQuaternion(_sq);
     P.yaw = Math.atan2(-_sw.x, -_sw.z); P.pitch = Math.asin(G.clamp(_sw.y, -1, 1));
     st.world = _sw; st.muzzle = _sp.clone().addScaledVector(_sw, 1.0);
   };
   S.stationUpdate = function (dt, P) {
     const st = S.station; if (!st) return false;
-    if (!P.boat || P.boat !== st.b || P.helm || st.b.sunk || P.health <= 0) { S.stationLeave(P); return false; }
+    if (st.land) {
+      if (P.boat || P.health <= 0 || !G.Build.pieces.includes(st.p)) { S.stationLeave(P); return false; }
+      const c = Math.cos(st.p.rot), sn = Math.sin(st.p.rot); P.pos.set(st.p.x - sn * 1.3, st.p.y, st.p.z - c * 1.3);
+    } else if (!P.boat || P.boat !== st.b || P.helm || st.b.sunk || P.health <= 0) { S.stationLeave(P); return false; }
     const k = P.keys;
-    if (st.byaw !== undefined && P._stYaw !== undefined) P._stYaw += G.angleDiff(st.byaw, st.b.yaw); st.byaw = st.b.yaw;
+    if (!st.land) { if (st.byaw !== undefined && P._stYaw !== undefined) P._stYaw += G.angleDiff(st.byaw, st.b.yaw); st.byaw = st.b.yaw; }
     // il mouse muove la canna come lo sguardo
     if (P._stYaw !== undefined) { let dy = P._stYaw - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yo += dy; st.pi += P.pitch - P._stPit; }
     st.yo += ((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0)) * dt * 0.6;
     st.pi += ((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0)) * dt * 0.35;
-    st.yo = G.clamp(st.yo, -0.62, 0.62); st.pi = G.clamp(st.pi, -0.09, 0.44);
+    st.yo = G.clamp(st.yo, st.land ? -0.8 : -0.62, st.land ? 0.8 : 0.62); st.pi = G.clamp(st.pi, -0.09, st.land ? 0.6 : 0.44);
     st.cd = Math.max(0, st.cd - dt);
     S.stationAim(P, dt); P._stYaw = P.yaw; P._stPit = P.pitch;
     S.stationHud(P);

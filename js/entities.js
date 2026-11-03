@@ -158,6 +158,12 @@
     for (const t of sea.turtles) E.addSeaTurtle(t, ch);
   };
   // st = stato condiviso (vedi shared.js)
+  // inclinazione sul terreno: davanti/dietro (beccheggio) e destra/sinistra (rollio), dalle quote sotto le zampe
+  E.slope = function (st, sc) {
+    const L = 0.7 * sc, Wd = 0.35 * sc, fx = Math.sin(st.yaw), fz = Math.cos(st.yaw), gA = (x, z) => W().groundAt(x, z);
+    const hF = gA(st.x + fx * L, st.z + fz * L), hB = gA(st.x - fx * L, st.z - fz * L), hR = gA(st.x + fz * Wd, st.z - fx * Wd), hL = gA(st.x - fz * Wd, st.z + fx * Wd);
+    return [G.clamp(-Math.atan2(hF - hB, 2 * L), -0.6, 0.6), G.clamp(Math.atan2(hR - hL, 2 * Wd) * 0.7, -0.35, 0.35)];
+  };
   E.addAnimal = function (st, ch, remote) {
     const m = buildAnimal(st.sp);
     m.root.scale.setScalar(st.scale);
@@ -223,8 +229,7 @@
       if (dP < 90) rg.mixer.update(dt);
       a.pos.set(st.x, gh + (st.hurt > 0 ? Math.sin(st.hurt * 40) * 0.02 : 0), st.z);
       a.root.rotation.y = st.yaw;
-      const n = G.normalAt(st.x, st.z);
-      rg.inner.rotation.x = G.lerp(rg.inner.rotation.x, -Math.atan2(n[2] * Math.cos(st.yaw) + n[0] * Math.sin(st.yaw), n[1]) * 0.8, 0.1);
+      { const t = E.slope(st, a.scale || 1); rg.inner.rotation.order = 'YXZ'; rg.inner.rotation.x = G.lerp(rg.inner.rotation.x, t[0], Math.min(1, dt * 8)); rg.inner.rotation.z = G.lerp(rg.inner.rotation.z, t[1], Math.min(1, dt * 8)); }
       if (dP < 40 && Math.random() < dt * 0.05 && G.Audio) G.Audio.animal(a.sp, dP, a.pos, st.age !== undefined && st.age < 1);
       return;
     }
@@ -232,6 +237,7 @@
     const bob = def.hop ? Math.abs(Math.sin(a.phase)) * 0.12 * Math.min(st.speed, 1) : 0;
     a.pos.set(st.x, gh + bob + (st.hurt > 0 ? Math.sin(st.hurt * 40) * 0.02 : 0), st.z);
     a.root.rotation.y = st.yaw;
+    if (!def.sea && !def.fly) { const t = E.slope(st, a.scale || 1); a.root.rotation.order = 'YXZ'; a.root.rotation.x = G.lerp(a.root.rotation.x, t[0], Math.min(1, dt * 8)); a.root.rotation.z = G.lerp(a.root.rotation.z, t[1], Math.min(1, dt * 8)); }
     if (def.sea) { a.body.rotation.z = Math.sin(a.phase * 0.5) * 0.08; a.body.rotation.y = Math.sin(a.phase * 0.7) * 0.12; a.legs.forEach(() => {}); return; }
     if (def.hostile && st.atkT > 0) a.head.position.z += 0; // morso: vedi sotto
     const n = G.normalAt(st.x, st.z);

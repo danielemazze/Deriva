@@ -162,7 +162,8 @@
         // due campionamenti a scale e orientamenti diversi: niente ripetizione evidente
         #ifdef ACG_T
         uniform highp sampler2DArray tAC; uniform highp sampler2DArray tAN;
-        vec4 triA(highp sampler2DArray t, vec2 uv, float l){ vec4 a = texture(t, vec3(uv, l)); if (uDual < 0.5) return a; vec2 r = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.317 + vec2(0.37, 0.11); return mix(a, texture(t, vec3(r, l)), 0.45); }
+        bool tFar = false; // lontano: un solo campionamento e niente rilievo (si risparmia scheda video, non si vede la differenza)
+        vec4 triA(highp sampler2DArray t, vec2 uv, float l){ vec4 a = texture(t, vec3(uv, l)); if (uDual < 0.5 || tFar) return a; vec2 r = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.317 + vec2(0.37, 0.11); return mix(a, texture(t, vec3(r, l)), 0.45); }
         #endif
         vec4 tri(sampler2D t, vec2 uv){ vec4 a = texture2D(t, uv); if (uDual < 0.5) return a; vec2 r = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.317 + vec2(0.37, 0.11); return mix(a, texture2D(t, r), 0.45); }
         ` + fs;
@@ -182,11 +183,13 @@
           float lushN = clamp(vBio.y * 0.8 + (tNoise(tp * 0.018) * 0.7 + tNoise(tp * 0.07) * 0.3 - 0.5) * 1.6 + 0.25, 0.0, 1.0);
           float floorK = clamp(vBio2.z * 1.3 - 0.15 + (tNoise(tp * 0.09) - 0.5) * 0.5, 0.0, 1.0);
           vec2 uvG2 = tp * 0.36;
+          float camD = length(vWPos - cameraPosition); tFar = camD > 80.0;
           vec4 cg = mix(triA(tAC, uvG, 0.0), triA(tAC, uvG2, 1.0), lushN), cs = triA(tAC, uvS, 2.0), cr = triA(tAC, uvR, 3.0), cd = mix(triA(tAC, uvD, 4.0), triA(tAC, uvD * 0.9, 5.0), floorK);
           vec4 cw = triA(tAC, uvW, 6.0);
-          vec4 aG = mix(triA(tAN, uvG, 0.0), triA(tAN, uvG2, 1.0), lushN), aS = mix(triA(tAN, uvS, 2.0), triA(tAN, uvW, 6.0), tUnder), aR = triA(tAN, uvR, 3.0), aD = mix(triA(tAN, uvD, 4.0), triA(tAN, uvD * 0.9, 5.0), floorK);
+          vec4 aG = vec4(0.5, 0.5, 0.85, 0.5), aS = aG, aR = aG, aD = aG;
+          if (!tFar) { aG = mix(triA(tAN, uvG, 0.0), triA(tAN, uvG2, 1.0), lushN); aS = mix(triA(tAN, uvS, 2.0), triA(tAN, uvW, 6.0), tUnder); aR = triA(tAN, uvR, 3.0); aD = mix(triA(tAN, uvD, 4.0), triA(tAN, uvD * 0.9, 5.0), floorK); }
           // passaggi naturali: dove due terreni si toccano vince quello più alto (sabbia nelle crepe, erba tra i sassi)
-          { vec4 hw = tw + vec4(aG.w, aS.w, aR.w, aD.w) * 0.6 * step(0.001, tw);
+          if (!tFar) { vec4 hw = tw + vec4(aG.w, aS.w, aR.w, aD.w) * 0.6 * step(0.001, tw);
             float hm = max(max(hw.x, hw.y), max(hw.z, hw.w)) - 0.25;
             vec4 w2 = max(hw - hm, 0.0) * step(0.001, tw); tw = w2 / (w2.x + w2.y + w2.z + w2.w + 1e-4); }
           float acgRough = aG.z * tw.x + aS.z * tw.y + aR.z * tw.z + aD.z * tw.w;
@@ -223,6 +226,7 @@
         fs = fs.replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;', `
           #ifdef ACG_T
           vec2 nxy = (aG.xy * tw.x + aS.xy * tw.y + aR.xy * tw.z + aD.xy * tw.w) * 2.0 - 1.0;
+          nxy *= 1.0 - smoothstep(55.0, 80.0, camD); // il rilievo sfuma prima del limite, così non si vede uno stacco
           vec3 mapN = vec3(nxy * 1.15, sqrt(max(0.0, 1.0 - dot(nxy, nxy))));
           #else
           vec3 nS = mix(tri(tSandN, uvS).xyz, tri(tSeaN, uvW).xyz, tUnder);
@@ -618,10 +622,13 @@
           } else {
             float dd = (c.a < 0.1) ? 6.0 : (c.a < 0.5 ? 60.0 : dist);
             // più si scende, più l'acqua diventa blu scuro
-            float deepK = exp(-max(uCamDepth, 0.0) * 0.11);
-            vec3 uw = mix(vec3(0.002, 0.02, 0.05), vec3(0.006, 0.058, 0.095), deepK) * clamp(dot(uAmb, vec3(0.3,0.5,0.2))*1.4 + dot(uSunCol, vec3(0.1)), 0.05, 1.2);
-            float f = 1.0 - exp(-dd * mix(0.13, 0.085, deepK));
-            col = mix(col * vec3(0.36, 0.74, 0.86), uw, f);
+            // sott'acqua «Frutiger Aero»: acqua turchese, limpida e luminosa, più chiara verso la superficie
+            float deepK = exp(-max(uCamDepth, 0.0) * 0.07);
+            float lightK = clamp(dot(uAmb, vec3(0.3,0.5,0.2))*1.4 + dot(uSunCol, vec3(0.1)), 0.05, 1.2);
+            vec3 uw = mix(vec3(0.004, 0.06, 0.11), vec3(0.03, 0.30, 0.40), deepK) * lightK;
+            uw = mix(uw, uw * vec3(1.5, 1.55, 1.35) + vec3(0.02, 0.06, 0.07) * lightK * deepK, smoothstep(-0.2, 0.7, ray.y));
+            float f = 1.0 - exp(-dd * mix(0.09, 0.038, deepK));
+            col = mix(col * vec3(0.55, 0.93, 1.0), uw, f);
           }
           // raggi di sole (godrays) in screen space, sopra l'acqua
           if (uGod > 0.5 && uSunVis > 0.001 && uUnder < 0.5) {
@@ -664,12 +671,31 @@
             float shafts = 0.5 + 0.5*sin(a2*13.0 + uTime*0.35) * sin(a2*7.0 - uTime*0.22 + 1.7);
             shafts = pow(shafts, 3.0) * pow(ang, 2.5);
             float lit = clamp(dot(uSunCol, vec3(0.3,0.5,0.2))*0.25, 0.0, 1.0);
-            col += vec3(0.45, 0.8, 0.9) * shafts * lit * (0.55 + uGodK) * smoothstep(0.0, 0.4, ray.y + 0.3);
+            col += vec3(0.6, 0.95, 1.0) * shafts * lit * (0.8 + uGodK) * smoothstep(0.0, 0.4, ray.y + 0.3);
           }
           col *= uExposure;
           col = mix(col, col * vec3(1.08, 1.0, 0.86), uHeat * 0.5);
           col = aces(col);
           col = pow(col, vec3(1.0/2.2));
+          if (uUnder > 0.5) {
+            // bollicine lucide che salgono, con il riflesso bianco in alto a sinistra
+            vec2 uvA = vec2(vUv.x * uRes.x / uRes.y, vUv.y);
+            for (int k = 0; k < 3; k++) {
+              float fk = float(k), sc = 5.0 + fk * 4.5;
+              vec2 g = uvA * sc; g.y -= uTime * (0.22 + 0.14 * fk); g.x += sin(g.y * 0.7 + fk) * 0.15;
+              vec2 id = floor(g), fr = fract(g) - 0.5; float r = h12(id + fk * 7.3);
+              if (r > 0.62) {
+                vec2 o = vec2(h12(id + 3.1) - 0.5, h12(id + 5.7) - 0.5) * 0.45; o.x += sin(uTime * 1.6 + r * 20.0) * 0.07;
+                float rad = 0.07 + 0.1 * h12(id + 9.2), d = length(fr - o);
+                float rim = smoothstep(rad, rad - 0.02, d) * smoothstep(rad - 0.06, rad - 0.015, d);
+                float body = smoothstep(rad, 0.0, d) * 0.12;
+                float hi = smoothstep(rad * 0.32, 0.0, length(fr - o - vec2(-rad * 0.38, rad * 0.38)));
+                col += vec3(0.78, 0.97, 1.0) * (rim * 0.45 + body + hi * 0.7) * (0.75 - 0.18 * fk);
+              }
+            }
+            // lucentezza: un velo chiaro e brillante, colori acquamarina
+            col = mix(col, col * vec3(0.96, 1.06, 1.1) + vec3(0.0, 0.025, 0.04), 0.7);
+          }
           // grading leggero
           float l = dot(col, vec3(0.299,0.587,0.114));
           col = mix(vec3(l), col, 1.08);

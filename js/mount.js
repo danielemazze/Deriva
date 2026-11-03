@@ -78,7 +78,7 @@
     if (sp > 0.4) m.hdg += G.angleDiff(m.hdg, Math.atan2(P.vel.x, P.vel.z)) * Math.min(1, dt * 6);
     if (m.rig) {
       const r = m.rig, y = P.pos.y;
-      r.root.position.set(P.pos.x + Math.sin(m.hdg) * 0.3, y, P.pos.z + Math.cos(m.hdg) * 0.3); r.root.rotation.y = m.hdg;
+      r.root.position.set(P.pos.x + Math.sin(m.hdg) * 0.3, y, P.pos.z + Math.cos(m.hdg) * 0.3); r.root.rotation.y = m.hdg; if (G.Entities && G.Entities.slope) { const t = G.Entities.slope({ x: P.pos.x, z: P.pos.z, yaw: m.hdg }, (m.scale || 1) * 1.5); r.root.rotation.order = 'YXZ'; r.root.rotation.x = G.lerp(r.root.rotation.x, t[0], Math.min(1, dt * 6)); r.root.rotation.z = G.lerp(r.root.rotation.z, t[1], Math.min(1, dt * 6)); }
       r.act(sp < 0.3 ? 'Idle' : gallop && r.acts.Run ? 'Run' : 'Walk');
       r.mixer.timeScale = G.clamp(sp < 0.3 ? 1 : gallop ? sp / 8.5 : sp / 3.2, 0.5, 2);
       r.mixer.update(dt);

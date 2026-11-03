@@ -82,18 +82,18 @@ G.PRESETS = {
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.20';
+G.VERSION = '1.21';
 // novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
-G.NEWS = { v: '1.20', t: 'Cavalli e stive', d: '3 novembre 2026', items: [
-  ['♞', 'Cavalli, zebre e lama si cavalcano: sella, galoppo, salto'],
-  ['🔒', 'Bauli dei villaggi chiusi col lucchetto: scassinali senza farti vedere'],
-  ['⚓', 'Il vascello: la nave più grande, con il ponte di sotto'],
-  ['☰', 'Sartie per salire sugli alberi fino alla coffa, vele che sventolano'],
-  ['♫', 'Chitarra e flauto d’osso da suonare'],
-  ['⇄', 'Partite pubbliche: trovale nella lista del Multigiocatore'],
-  ['▦', 'Texture fotografiche ovunque · nuova qualità «Patata»'],
-  ['✦', 'Shaders: luce, bagliore e foschia (Impostazioni → Grafica)'],
-  ['♪', 'Il tema di Deriva nella pagina principale'],
+G.NEWS = { v: '1.21', t: 'Navi da abitare', d: '3 novembre 2026', items: [
+  ['ancora', 'Galeone e vascello rifatti: cassero e castello con scale e cabine'],
+  ['sartie', 'Nella stiva del vascello si scende a piedi, dal boccaporto'],
+  ['esplosione', 'Cannone da piazzare a terra · le palle spaccano roccia e terreno'],
+  ['libro', 'Libro del costruttore da sfogliare, pagina per pagina'],
+  ['occhio', 'Terza persona con F5, anche di fronte'],
+  ['goccia', 'Sott\u2019acqua turchese, limpido e pieno di bollicine'],
+  ['frutto', 'Frutta e pane fotografati in 3D dai mercanti'],
+  ['scintilla', 'Nuovi simboli disegnati al posto delle emoji'],
+  ['fiore', 'Foreste più fitte, scavi più precisi, animali sui pendii'],
 ] };
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';

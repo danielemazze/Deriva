@@ -44,7 +44,7 @@
     }
     return best;
   };
-  const STALL = ['mela', 'mela', 'arancia', 'arancia', 'bacche', 'cocco'];
+  const STALL = ['mela', 'pera', 'arancia', 'limone', 'mango', 'kiwi', 'avocado', 'melone', 'pane', 'bacche', 'cocco'];
   ST.steal = function (P) {
     const tp = P.target; if (tp && tp.kind === 'piece' && G.Lockpick && G.Lockpick.locked(tp.piece)) return G.Lockpick.start(tp.piece);
     const t = ST.target(P); if (!t) return false;

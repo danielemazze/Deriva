@@ -16,6 +16,7 @@
     if (!geo) geo = new THREE.PlaneGeometry(0.42, 0.42);
     const g = new THREE.Group(), n = Math.min(3, Math.ceil(st.n / 16));
     // una pila mostra fino a tre copie sovrapposte
+    if (G.M3D && G.M3D.has(st.id)) { for (let i = 0; i < n; i++) { const m = G.M3D.mesh(st.id, 1.3); m.position.set(i * 0.09, -0.18, i * -0.05); m.rotation.y = i * 1.7; g.add(m); } return g; }
     for (let i = 0; i < n; i++) { const m = new THREE.Mesh(geo, matFor(st.id)); m.position.set(i * 0.05, i * 0.03, i * -0.04); m.castShadow = true; g.add(m); }
     return g;
   }

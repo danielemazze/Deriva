@@ -56,7 +56,7 @@
     MAT.scan = {};
     if (G.SCAN) for (const [mat, t] of Object.entries(G.SCAN.tex)) {
       const alpha = /moss_01/.test(mat), tree = /quiver/.test(mat);
-      const m = G.patch(std({ map: t.map, normalMap: t.normalMap || null, normalScale: new THREE.Vector2(1, 1), roughness: 0.92, alphaTest: alpha ? 0.4 : 0, side: alpha || tree ? THREE.DoubleSide : THREE.FrontSide }),
+      const m = G.patch(std({ map: t.map, normalMap: t.normalMap || null, normalScale: new THREE.Vector2(1, 1), roughness: 0.92, alphaTest: alpha ? 0.4 : 0, side: THREE.DoubleSide }), // le scansioni di rocce e scogliere sono gusci aperti: si vedono da entrambi i lati
         { key: 'scan_' + mat, wind: alpha ? { amp: 0.25, freq: 1.4, mode: 'tip' } : tree ? { amp: 0.004, freq: 1.0, mode: 'tip' } : undefined, backShade: alpha || tree });
       if (alpha) m.userData.depth = leafDepth(t.map);
       MAT.scan[mat] = m;
@@ -311,7 +311,7 @@
     const clr = poiNear.length ? (x, z) => G.POI.clearAt(x, z) : () => 0;
     if (ch.maxH > -1.5) {
       // alberi
-      const TS = G.lowQ() ? 5.6 : 4.8; // vegetazione fitta: molti più alberi
+      const TS = G.lowQ() ? 4.9 : 3.7; // vegetazione fitta: boschi e foreste molto più densi
       for (let gz = 0; gz < C / TS; gz++) for (let gx = 0; gx < C / TS; gx++) {
         const cellX = cx * 100 + gx, cellZ = cz * 100 + gz;
         const r0 = G.hash2(cellX, cellZ, 1);
@@ -328,7 +328,7 @@
         if (h < 3.2) { if (b !== B.NEVE && b !== B.VULCANO && r0 < (b === B.DESERTO ? 0.12 : hot ? 0.55 : 0.1)) kind = pick('palm'); }
         else {
           // densità e specie per bioma
-          const P = Math.min(0.96, ([0.08, 0.62 * (0.42 + forest), 0.92, 0.6 * (0.6 + forest * 0.6), 0.05, h < 30 ? 0.4 * (0.5 + forest) : 0, h < 26 ? 0.2 * (0.4 + forest) : 0, 0][b] || 0) * (b === B.PIANURA ? 1.15 : 1.3));
+          const P = Math.min(0.97, ([0.07, 0.7 * (0.5 + forest), 0.95, 0.66 * (0.65 + forest * 0.7), 0.05, h < 30 ? 0.48 * (0.55 + forest) : 0, h < 26 ? 0.24 * (0.45 + forest) : 0, 0][b] || 0) * (b === B.PIANURA ? 1.05 : 1.3) * (forest > 0.55 ? 1.25 : 1));
           if (r0 < P) {
             if (b === B.PIANURA) kind = v5 < 0.25 ? pick('birch') : v5 < 0.33 ? pick('pine') : pick('oak');
             else if (b === B.FORESTA) { kind = forest > 0.62 ? (v5 < 0.62 ? pick('pine') : v5 < 0.78 ? pick('birch') : pick('oak')) : v5 < 0.28 ? pick('birch') : v5 < 0.4 ? pick('pine') : pick('oak'); if (kind.startsWith('pine') && forest > 0.62) big = 1.25 + G.hash2(cellX, cellZ, 9) * 0.35; }

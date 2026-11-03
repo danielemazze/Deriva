@@ -75,7 +75,7 @@
     }
     // luoghi scoperti vicini
     x.font = `${Math.round(13 * dpr)}px serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
-    for (const q of MU.knownPOIs()) { const sx = cx + (q.poi.x - p.pos.x) * k, sy = cz + (q.poi.z - p.pos.z) * k; if (Math.hypot(sx - cx, sy - cz) > W / 2 - 8 * dpr) continue; x.lineWidth = 3 * dpr; x.strokeStyle = 'rgba(0,0,0,.7)'; x.strokeText(ICON[q.poi.type] || '•', sx, sy); x.fillStyle = q.seen ? '#f2e6c8' : '#b9b09a'; x.fillText(ICON[q.poi.type] || '•', sx, sy); }
+    for (const q of MU.knownPOIs()) { const sx = cx + (q.poi.x - p.pos.x) * k, sy = cz + (q.poi.z - p.pos.z) * k; if (Math.hypot(sx - cx, sy - cz) > W / 2 - 8 * dpr) continue; G.icoDraw(x, ICON[q.poi.type] || 'rombo', sx, sy, 15 * dpr, q.seen ? '#f2e6c8' : '#b9b09a', 'rgba(0,0,0,.8)'); }
     // le tue barche
     for (const b of G.Boats.list) { if (b.pirate) continue; const sx = cx + (b.x - p.pos.x) * k, sy = cz + (b.z - p.pos.z) * k; if (Math.hypot(sx - cx, sy - cz) > W / 2 - 6 * dpr) continue; x.fillStyle = '#c99a5a'; x.beginPath(); x.ellipse(sx, sy, 2.2 * dpr, 4.5 * dpr, -b.yaw, 0, 7); x.fill(); }
     // pericoli in mare
@@ -87,7 +87,7 @@
       x.fillStyle = G.Net.COLOR_CSS[r.slot % 4]; x.strokeStyle = '#000'; x.lineWidth = 1.5 * dpr; x.beginPath(); x.arc(sx, sy, 4.2 * dpr, 0, 7); x.fill(); x.stroke();
     }
     // tu: freccia al centro
-    x.translate(cx, cz); x.rotate(-p.yaw);
+    x.translate(cx, cz); x.rotate(-G.Player.heading());
     x.fillStyle = '#ff4a3a'; x.strokeStyle = '#fff'; x.lineWidth = 1.5 * dpr; x.beginPath(); x.moveTo(0, -8 * dpr); x.lineTo(5.5 * dpr, 6 * dpr); x.lineTo(0, 3 * dpr); x.lineTo(-5.5 * dpr, 6 * dpr); x.closePath(); x.fill(); x.stroke();
     x.restore();
     // N in alto
@@ -125,13 +125,14 @@
     }
     return out;
   };
-  const ICON = { village: '⌂', faro: '♜', relitto: '⚓', covo: '☠', tesoro: '✕', rovina: '⛫', miniera: '⛏', grotta: '◓', accampamento: '⛺', castello: '♚' };
+  const ICON = { village: 'casa', faro: 'faro', relitto: 'ancora', covo: 'teschio', tesoro: 'croce', rovina: 'rovine', miniera: 'piccone', grotta: 'grotta', accampamento: 'tenda', castello: 'castello' };
+  const IC = (n) => G.ico(n);
 
   /* ---------------- pannello mappa ---------------- */
   MU.open = function () { const p = P().pos; MU.view.x = p.x; MU.view.z = p.z; G.UI.openCustom('map'); };
   MU.render = function () {
     return `<div class="mapwrap"><canvas id="mapc"></canvas>
-      <div class="maplegend"><b>Mappa</b><span><i class="lg you"></i>tu</span><span>⌂ villaggio</span><span>♜ faro</span><span>⚓ relitto</span><span>☠ covo dei pirati</span><span>⛫ rovine</span><span>⛏ miniera</span><span>◓ grotta</span><span>⛺ accampamento</span><span>♚ castello</span><span class="x">✕ tesoro</span><span class="qq">◆ missione</span><small>Rotella: zoom · Trascina: sposta · ${(P().explored || new Set()).size} zone esplorate</small><button class="mini-btn" data-act="center">Centra su di me</button></div></div>`;
+      <div class="maplegend"><b>Mappa</b><span><i class="lg you"></i>tu</span><span>${IC('casa')} villaggio</span><span>${IC('faro')} faro</span><span>${IC('ancora')} relitto</span><span>${IC('teschio')} covo dei pirati</span><span>${IC('rovine')} rovine</span><span>${IC('piccone')} miniera</span><span>${IC('grotta')} grotta</span><span>${IC('tenda')} accampamento</span><span>${IC('castello')} castello</span><span class="x">${IC('croce')} tesoro</span><span class="qq">${G.ico('rombo', 'fill')} missione</span><small>Rotella: zoom · Trascina: sposta · ${(P().explored || new Set()).size} zone esplorate</small><button class="mini-btn" data-act="center">Centra su di me</button></div></div>`;
   };
   MU.mount = function () {
     const c = document.getElementById('mapc'); if (!c) return;
@@ -169,15 +170,15 @@
       const [sx, sy] = toS(poi.x, poi.z);
       x.font = `${poi.type === 'village' ? 22 : 18}px serif`;
       x.fillStyle = seen ? (poi.type === 'covo' ? '#ffb0a0' : '#fff2cc') : 'rgba(255,242,204,0.55)';
-      x.strokeStyle = 'rgba(0,0,0,0.75)'; x.lineWidth = 4; x.strokeText(ICON[poi.type], sx, sy); x.fillText(ICON[poi.type], sx, sy);
+      G.icoDraw(x, ICON[poi.type], sx, sy, 20, typeof x.fillStyle === 'string' ? x.fillStyle : '#f2e6c8', 'rgba(0,0,0,.8)');
       if (s > 0.25 || poi.type === 'village') { x.font = '600 12px Signika, sans-serif'; const nm = poi.type === 'village' ? poi.name : poi.type === 'relitto' ? poi.ship : poi.name; x.strokeText(nm + (seen ? '' : ' ?'), sx, sy + 17); x.fillText(nm + (seen ? '' : ' ?'), sx, sy + 17); }
     }
     // mappe del tesoro nell'inventario
     for (const st of P().inv) if (st && st.id === 'mappa_tesoro' && st.d && !G.state.removed.has('dig:' + st.d.id)) {
-      const [sx, sy] = toS(st.d.x, st.d.z); x.font = 'bold 22px serif'; x.fillStyle = '#ff5a40'; x.strokeStyle = '#000'; x.lineWidth = 4; x.strokeText('✕', sx, sy); x.fillText('✕', sx, sy);
+      const [sx, sy] = toS(st.d.x, st.d.z); G.icoDraw(x, 'croce', sx, sy, 24, '#ff5a40', '#000');
     }
     // obiettivi delle missioni
-    for (const t of MU.questTargets()) { const [sx, sy] = toS(t.x, t.z); x.font = 'bold 16px serif'; x.fillStyle = t.back ? '#9fe0ff' : '#ffd84a'; x.strokeStyle = '#000'; x.lineWidth = 4; x.strokeText('◆', sx + 14, sy - 12); x.fillText('◆', sx + 14, sy - 12); }
+    for (const t of MU.questTargets()) { const [sx, sy] = toS(t.x, t.z); G.icoDraw(x, 'rombo', sx + 14, sy - 12, 16, t.back ? '#9fe0ff' : '#ffd84a', '#000'); }
     // barche
     for (const b of G.Boats.list) { const [sx, sy] = toS(b.x, b.z); x.save(); x.translate(sx, sy); x.rotate(-b.yaw + Math.PI); x.fillStyle = '#c99558'; x.strokeStyle = '#2a170a'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(0, -7); x.lineTo(4, 5); x.lineTo(-4, 5); x.closePath(); x.fill(); x.stroke(); x.restore(); }
     // altri giocatori
@@ -194,10 +195,10 @@
       x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText(lab, sx, sy - 25);
     }
     // punto di rinascita
-    if (P().spawn) { const [sx, sy] = toS(P().spawn.x, P().spawn.z); x.font = '15px serif'; x.fillStyle = '#c9f0ff'; x.fillText('⛺', sx, sy); }
+    if (P().spawn) { const [sx, sy] = toS(P().spawn.x, P().spawn.z); G.icoDraw(x, 'tenda', sx, sy, 17, '#c9f0ff', 'rgba(0,0,0,.7)'); }
     // tu
     const [px, py] = toS(P().pos.x, P().pos.z);
-    x.save(); x.translate(px, py); x.rotate(-P().yaw); x.fillStyle = '#ff4a3a'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.moveTo(0, -10); x.lineTo(6, 7); x.lineTo(0, 3); x.lineTo(-6, 7); x.closePath(); x.fill(); x.stroke(); x.restore();
+    x.save(); x.translate(px, py); x.rotate(-P().heading()); x.fillStyle = '#ff4a3a'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.moveTo(0, -10); x.lineTo(6, 7); x.lineTo(0, 3); x.lineTo(-6, 7); x.closePath(); x.fill(); x.stroke(); x.restore();
     // scala
     const m = s > 1 ? 50 : s > 0.3 ? 200 : 1000;
     x.fillStyle = '#fff'; x.fillRect(20, H - 24, m * s, 3); x.font = '12px Signika'; x.textAlign = 'left'; x.fillText(m + ' m', 24 + m * s, H - 22);
@@ -217,12 +218,12 @@
         const ready = G.Quests.isReady(q);
         const where = t ? `${Math.round(d / 10) * 10} m verso ${G.Quests.dirName(t.x - p.pos.x, t.z - p.pos.z)}` : '';
         return `<div class="qrow"><div><div class="qt"><span class="stars">${G.Quests.stars(q.stars)}</span> ${esc(q.title)}</div><div class="qd">${esc(q.desc)}</div><div class="qr">Data da ${esc(q.from)} · ${ready && q.type !== 'esplora' ? '<b>pronta: torna da chi te l’ha data</b>' : esc(where)}</div></div></div>`;
-      }).join('') : '<p class="note">Nessuna missione attiva. Parla con i capivillaggio: te ne daranno di facili (★) e di difficili (★★★).</p>';
+      }).join('') : '<p class="note">Nessuna missione attiva. Parla con i capivillaggio: te ne daranno di facili e di difficili.</p>';
     } else if (MU.jtab === 'scoperte') {
       const known = MU.knownPOIs().filter((k) => k.seen);
       const cnt = (t) => known.filter((k) => k.poi.type === t).length;
-      body = `<div class="jstats"><span>⌂ Villaggi <b>${cnt('village')}</b></span><span>♜ Fari <b>${cnt('faro')}</b></span><span>⚓ Relitti <b>${cnt('relitto')}</b></span><span>☠ Covi <b>${cnt('covo')}</b></span><span>⛫ Rovine <b>${cnt('rovina')}</b></span><span>⛏ Miniere <b>${cnt('miniera')}</b></span><span>⛺ Accampamenti <b>${cnt('accampamento')}</b></span><span>♚ Castelli <b>${cnt('castello')}</b></span><span>✕ Tesori <b>${(p.stats || {}).treasures || 0}</b></span></div>
-        <div class="jlist">${known.sort((a, b) => (p.discovered[b.poi.id] || 0) - (p.discovered[a.poi.id] || 0)).map((k) => `<div>${ICON[k.poi.type]} <b>${esc(k.poi.type === 'village' ? k.poi.name : k.poi.name)}</b> <small>${k.poi.type === 'village' ? G.POI.STYLE_N[k.poi.style] + (k.poi.inhabited ? '' : ', abbandonato') : ''}</small></div>`).join('') || '<p class="note">Ancora niente. Prendi il mare!</p>'}</div>`;
+      body = `<div class="jstats"><span>${IC('casa')} Villaggi <b>${cnt('village')}</b></span><span>${IC('faro')} Fari <b>${cnt('faro')}</b></span><span>${IC('ancora')} Relitti <b>${cnt('relitto')}</b></span><span>${IC('teschio')} Covi <b>${cnt('covo')}</b></span><span>${IC('rovine')} Rovine <b>${cnt('rovina')}</b></span><span>${IC('piccone')} Miniere <b>${cnt('miniera')}</b></span><span>${IC('tenda')} Accampamenti <b>${cnt('accampamento')}</b></span><span>${IC('castello')} Castelli <b>${cnt('castello')}</b></span><span>${IC('croce')} Tesori <b>${(p.stats || {}).treasures || 0}</b></span></div>
+        <div class="jlist">${known.sort((a, b) => (p.discovered[b.poi.id] || 0) - (p.discovered[a.poi.id] || 0)).map((k) => `<div>${IC(ICON[k.poi.type])} <b>${esc(k.poi.type === 'village' ? k.poi.name : k.poi.name)}</b> <small>${k.poi.type === 'village' ? G.POI.STYLE_N[k.poi.style] + (k.poi.inhabited ? '' : ', abbandonato') : ''}</small></div>`).join('') || '<p class="note">Ancora niente. Prendi il mare!</p>'}</div>`;
     } else if (MU.jtab === 'collezione') {
       const rf = p.rareFound || {};
       body = `<p class="note">Oggetti rari trovati: <b>${Object.keys(rf).length}/${G.RARE.length}</b></p><div class="rares">${G.RARE.map((id) => `<div class="rare ${rf[id] ? 'got' : ''}"><img src="${G.icon(id)}" alt=""><div><b>${rf[id] ? esc(G.ITEMS[id].n) : '???'}</b><small>${rf[id] ? esc(G.ITEMS[id].d) : 'Si trova ' + RARE_HINT[id]}</small></div></div>`).join('')}</div>`;

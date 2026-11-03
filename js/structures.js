@@ -49,7 +49,8 @@
     const p = g.attributes.position, n = g.attributes.normal, uv = new Float32Array(p.count * 2);
     for (let i = 0; i < p.count; i++) {
       const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
-      let u, v; if (ay > ax && ay > az) { u = p.getX(i); v = p.getZ(i); } else if (ax > az) { u = p.getZ(i); v = p.getY(i); } else { u = p.getX(i); v = p.getY(i); }
+      // pareti: la u corre lungo la parete qualunque sia l'orientamento dell'edificio (prima, sugli edifici ruotati, la texture si stirava in strisce)
+      let u, v; if (ay > 0.7) { u = p.getX(i); v = p.getZ(i); } else { const hl = Math.hypot(n.getX(i), n.getZ(i)) || 1, tx = -n.getZ(i) / hl, tz = n.getX(i) / hl; u = p.getX(i) * tx + p.getZ(i) * tz; v = p.getY(i); }
       uv[i * 2] = u / scale; uv[i * 2 + 1] = v / scale;
     }
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
@@ -764,7 +765,7 @@
     const HOLE = [8.8, 12.2, 8.8, 22.2];
     const around = (a, fn) => { const [hx0, hx1, hz0, hz1] = HOLE; for (const [x0, x1, z0, z1] of [[-a, hx0, -a, a], [hx1, a, -a, a], [hx0, hx1, -a, hz0], [hx0, hx1, hz1, a]]) if (x1 > x0 && z1 > z0) fn(x0, x1, z0, z1); };
     around(HO + 5, (x0, x1, z0, z1) => P('stone', BOX(x1 - x0, dep, z1 - z0, (x0 + x1) / 2, -dep / 2, (z0 + z1) / 2), ST2));
-    P('stone', BOX(2 * HO + 10.6, 0.5, 2 * HO + 10.6, 0, -1.2, 0), ST3);
+    // (tolta la lastra intera a -1,2 m: sporgeva dal basamento e attraversava la scala della cripta senza collisione)
     around(HO + 3, (x0, x1, z0, z1) => P('stone', BOX(x1 - x0, 0.3, z1 - z0, (x0 + x1) / 2, 0.0, (z0 + z1) / 2), [0.7, 0.68, 0.64]));
     // pavimento: lastre calpestabili sottili (sotto, nella cripta, si passa)
     around(HO + 5, (x0, x1, z0, z1) => { const bx = wbox(b, y, x0, 0.15, z0, x1, 0.15, z1); bx.y0 = bx.y1 = y + 0.15; bx.shell = 1.4; bx.slope = { ax: 'x', a0: bx.x0, a1: bx.x0 + 1 }; cols.push(bx); });

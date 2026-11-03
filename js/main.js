@@ -240,7 +240,7 @@
   document.addEventListener('pointerlockchange', () => {
     G.locked = document.pointerLockElement === canvas;
     if (G.locked) { $('resume').hidden = true; G._lockTry = 0; }
-    else if (G.started && !G.UI.open && !G.UI.menu) { G.UI.showMenu('main'); G.save(); }
+    else if (G.started && !G.UI.open && !G.UI.menu && !(G.Cmd && G.Cmd.isOpen && G.Cmd.isOpen())) { G.UI.showMenu('main'); G.save(); } // la chat (T) non apre il menu di pausa
   });
   document.addEventListener('pointerlockerror', () => { if (G._lockTry && G._lockTry < 10 && G.started && !G.UI.open && !G.UI.menu) setTimeout(() => G.requestLock(), 250); });
 
@@ -371,6 +371,8 @@
     resize();
     const S = G.settings;
     G.initWorldGen(1337); G.state = { removed: new Set() };
+    // il tema di Deriva parte già durante il caricamento (nell'app non serve un clic)
+    if (G.Audio) { if (window.deriva) G.Audio.start(S.volume); G.Audio.preloadMenu('assets/audio/'); }
     $('loadText').textContent = 'Dipingo le texture…';
     await G.TEX.buildAll(S.texSize, (p, k) => { $('loadBar').style.transform = `scaleX(${p * 0.75})`; });
     $('loadText').textContent = 'Carico le texture fotografiche…';
@@ -531,6 +533,8 @@
 
     if (G.Atmo) G.Atmo.update(dt, P, S);
     if (G.noRender) return; // test: solo logica
+    const TPV = P._tp && !(G.Sea && G.Sea.station) ? P._tp : null; let eyeP = null, eyeR = null;
+    if (TPV) { eyeP = camera.position.clone(); eyeR = camera.rotation.clone(); camera.position.set(TPV.x, TPV.y, TPV.z); camera.rotation.set(TPV.rx, TPV.ry, 0, 'YXZ'); }
     camera.updateMatrixWorld(); _mt = performance.now();
     gateLights();
     if (G.MAT && G.MAT.uDual) G.MAT.uDual.value = G.lowQ() ? 0 : 1;
@@ -599,6 +603,7 @@
       post.fxaa.uniforms.t.value = rtC.texture; post.fxaa.uniforms.uRes.value.set(G.rtSize[0], G.rtSize[1]);
       post.quad.material = post.fxaa; renderer.setRenderTarget(null); renderer.render(post.scene, post.cam); mark('fxaa');
     }
+    if (TPV) { camera.position.copy(eyeP); camera.rotation.copy(eyeR); camera.updateMatrixWorld(); }
     // F2: istantanea dell'immagine appena disegnata (il buffer è ancora valido in questo momento)
     if (G.shotReq) { G.shotReq = false; try { G.saveShot(renderer.domElement.toDataURL('image/png')); } catch (e) { G.UI.toast('Istantanea non riuscita', 'warn'); } }
   };

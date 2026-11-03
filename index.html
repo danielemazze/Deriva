@@ -246,6 +246,12 @@ html.touch .tempinfo { top: calc(96px + env(safe-area-inset-top, 0px)); bottom: 
 .steal { color: #ff8a70; }
 .skillpop { position: absolute; right: calc(max(18px, env(safe-area-inset-right, 0px)) + 172px); top: 18px; background: rgba(9,26,33,.86); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; color: var(--brass-hi); font-size: 14px; opacity: 0; transform: translateY(-6px); transition: opacity .3s, transform .3s; pointer-events: none; }
 .skillpop.on { opacity: 1; transform: none; }
+.skillup { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; pointer-events: none; opacity: 0; transition: opacity .35s, transform .35s; background: radial-gradient(ellipse at center, rgba(9,26,33,.78), rgba(9,26,33,0) 72%); padding: 26px 70px; }
+.skillup.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.skillup .sic { font-size: 34px; color: var(--brass-hi); filter: drop-shadow(0 2px 6px #000); }
+.skillup small { display: block; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--kelp); margin-top: 4px; }
+.skillup b { display: block; font-family: var(--f-display); font-weight: 400; font-size: 38px; color: var(--brass-hi); text-shadow: 0 2px 10px #000; }
+.skillup span { font-size: 18px; color: #fff; text-shadow: 0 1px 4px #000; } .skillup em { font-style: normal; font-size: 26px; color: var(--brass-hi); }
 .skillpop em { color: var(--kelp); font-style: normal; }
 .skillpop i { display: block; width: 170px; height: 5px; background: rgba(0,0,0,.45); border-radius: 3px; margin-top: 5px; overflow: hidden; }
 .skillpop u { display: block; height: 100%; background: linear-gradient(90deg, #6b8d4a, #a8d07a); border-radius: 3px; transition: width .3s; }
@@ -540,6 +546,43 @@ body.spyglass #touch { z-index: 7; }
 .rare small { display: block; font-size: 12px; color: var(--mist); line-height: 1.35; }
 /* barche bloccate nel libro */
 .bcard.locked canvas { opacity: .35; } .bcard.locked strong { color: #7a6a52; }
+/* simboli disegnati (al posto delle emoji) */
+.ico { width: 1.15em; height: 1.15em; display: inline-block; vertical-align: -0.2em; flex: none; }
+.ico.fill path, .ico.fill circle { fill: currentColor; }
+.eqhint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; opacity: .32; pointer-events: none; }
+
+/* libro da sfogliare */
+.book { perspective: 2200px; height: min(680px, 90vh); }
+.book > .page { height: 100%; max-height: none; display: flex; flex-direction: column; }
+.book > .close-x { top: 12px; right: 14px; z-index: 6; }
+.pnum { margin-top: auto; padding-top: 10px; text-align: center; font-family: var(--f-display); font-size: 14px; color: var(--ink-soft); }
+.bturn { position: absolute; bottom: 12px; z-index: 6; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(58,39,20,.35); background: rgba(255,248,228,.75); color: #3a2714; font: 26px/1 var(--f-display); cursor: pointer; display: grid; place-items: center; padding-bottom: 3px; }
+.bturn.prev { left: 16px; } .bturn.next { right: 16px; }
+.bturn:hover:not([disabled]) { background: #3a2714; color: var(--paper); }
+.bturn[disabled] { opacity: .25; cursor: default; }
+.bindex { margin-top: 18px; display: grid; gap: 2px; }
+.bindex h2 { margin-bottom: 8px; }
+.bidx { display: flex; align-items: baseline; gap: 8px; border: 0; background: transparent; padding: 5px 2px; font: 17px var(--f-book); color: var(--ink); cursor: pointer; text-align: left; }
+.bidx i { flex: 1; border-bottom: 1px dotted rgba(58,39,20,.45); transform: translateY(-4px); }
+.bidx b { font: 400 16px var(--f-display); }
+.bidx:hover span { text-decoration: underline; text-underline-offset: 3px; }
+.bhint { margin-top: 18px; font-style: italic; color: var(--ink-soft); font-size: 14px; }
+.bname { font-size: 30px !important; }
+.bsketch { width: 100%; max-width: 440px; aspect-ratio: 480 / 280; height: auto; display: block; margin: 6px auto 14px; }
+.bsketch.locked { opacity: .35; }
+.book .partlist { font-size: 12px; line-height: 1.25; }
+.book .mats { gap: 3px; }
+.bend { margin-top: 40%; text-align: center; font-style: italic; color: var(--ink-soft); }
+.flip { position: absolute; top: 0; bottom: 0; width: 50%; transform-style: preserve-3d; z-index: 5; pointer-events: none; }
+.flip.fwd { left: 50%; transform-origin: left center; animation: flipF .6s cubic-bezier(.45,.05,.35,1) forwards; }
+.flip.bwd { left: 0; transform-origin: right center; animation: flipB .6s cubic-bezier(.45,.05,.35,1) forwards; }
+.flip .face { position: absolute; inset: 0; height: 100%; max-height: none; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; flex-direction: column; overflow: hidden; }
+.flip .face.back { transform: rotateY(180deg); }
+.flip .face::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3; background: linear-gradient(90deg, rgba(40,25,10,0), rgba(40,25,10,.35)); opacity: 0; animation: flipShade .6s ease-in-out forwards; }
+.flip.bwd .face::before { background: linear-gradient(270deg, rgba(40,25,10,0), rgba(40,25,10,.35)); }
+@keyframes flipF { from { transform: rotateY(0deg); } to { transform: rotateY(-180deg); } }
+@keyframes flipB { from { transform: rotateY(0deg); } to { transform: rotateY(180deg); } }
+@keyframes flipShade { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
 .lockmsg { font-style: italic; color: #6a4a2a; border: 1px dashed rgba(58,39,20,.4); padding: 10px; border-radius: 6px; }
 /* catalogo creativo */
 .catalog { display: grid; grid-template-columns: repeat(5, var(--slot)); gap: 4px; max-height: 300px; overflow: auto; padding-right: 4px; }
@@ -565,7 +608,7 @@ body.spyglass #touch { z-index: 7; }
 .equip { display: grid; grid-template-columns: repeat(4, var(--slot)); gap: 4px; margin-top: 10px; }
 .equip .eqs { position: relative; }
 .equip .eqs label { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--mist); }
-.equip .slot.empty-hint::after { content: attr(data-hint); position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; opacity: .28; }
+
 #console { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: 120px; width: min(640px, calc(100vw - 36px)); z-index: 40; display: grid; gap: 6px; }
 #conlog { display: grid; gap: 2px; font-size: 13px; color: var(--foam); text-shadow: 0 1px 2px #000; }
 #conlog div { background: rgba(6,18,23,.6); padding: 3px 8px; border-radius: 5px; justify-self: start; }
@@ -602,8 +645,11 @@ body.spyglass #touch { z-index: 7; }
 @media (max-width: 720px) {
   #menu { grid-template-columns: 1fr; background: rgba(6,18,23,.82); }
   .panel { grid-template-columns: 1fr; }
-  .book { grid-template-columns: 1fr; }
+  .book { grid-template-columns: 1fr; height: auto; max-height: 92vh; overflow: auto; }
+  .book > .page { height: auto; }
   .page.l, .page.r { border-radius: 10px; }
+  .flip { display: none; }
+  .bturn { position: fixed; bottom: 14px; }
   :root { --slot: 40px; }
   .meters { width: 150px; }
 }
@@ -726,6 +772,8 @@ html.touch #f3{top:calc(112px + env(safe-area-inset-top,0px));font-size:11px}
 
 <script src="js/three.min.js"></script>
 <script src="js/core.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/m3d.js"></script>
 <script src="js/worldgen.js"></script>
 <script src="js/pois.js"></script>
 <script src="js/shared.js"></script>
