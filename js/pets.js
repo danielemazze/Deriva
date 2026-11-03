@@ -16,6 +16,8 @@
     if (G.Net && G.Net.on) { PT.remote = arr || []; return; } // in partita li simula il server
     for (const o of arr || []) { const st = Object.assign(G.newAnimalState({ id: o.id, sp: o.sp, x: o.x, z: o.z, yaw: o.yaw }), o); spawn(st); }
   };
+  // un animale che torna nel mondo già tuo (es. il cavallo quando scendi)
+  PT.addPet = function (o) { const st = Object.assign(G.newAnimalState({ id: 'p:' + Math.random().toString(36).slice(2, 9), sp: o.sp, x: o.x, z: o.z, yaw: o.yaw || 0 }), { scale: o.scale || 1, scale0: o.scale || 1 }); spawn(st); if (G.saveSoon) G.saveSoon(); return st; };
   function spawn(st) { st.pet = true; PT.list.push(st); return G.Entities.addAnimal(st, null); }
   // un animale selvatico diventa tuo: non sparisce più col suo chunk e non rinasce dove era nato
   PT.adopt = function (a) {

@@ -109,7 +109,8 @@
       return `<div class="tname">${a.def.n}${lab ? ` <small>${lab}</small>` : ''}</div><div class="thint">${a.def.peaceful ? 'Lasciala in pace: depone le uova su questa spiaggia' : `${k('Clic sinistro')} caccia${a.def.shear ? ` · ${k(G.useKey())} tosa${a.wool ? '' : ' (lana in ricrescita)'}` : ''}${feed}`}</div>`;
     }
     if (tg.kind === 'piece') {
-      const pc = tg.piece; const h = PIECE_HINT[pc.t];
+      const pc = tg.piece;
+      if (G.Lockpick && G.Lockpick.locked(pc)) return `<div class="tname">🔒 Baule chiuso a chiave</div><div class="thint">${p.crouch ? `${k(G.isTouch ? 'Usa' : 'E')} <b class="steal">Scassina</b> · ${G.Stealth && G.Stealth.seen ? '<span class="steal">ti stanno guardando</span>' : 'nessuno ti vede'}` : `accovacciati (${k('Maiusc')}) per scassinarlo`} · ${G.Player.count('grimaldello')} grimaldelli</div>`; const h = PIECE_HINT[pc.t];
       const nm = G.ITEMS[pc.t] ? G.ITEMS[pc.t].n : pc.t === 'forziere' ? 'Forziere' : pc.t;
       return `<div class="tname">${nm}</div><div class="thint">${h ? `${k(G.useKey())} ${h}` : ''}${pc.gen ? '' : `${h ? ' · ' : ''}${k('Clic sinistro')} smonta`}</div>`;
     }
@@ -182,6 +183,7 @@
     if (G.Sea && G.Sea.station) html = '';
     else if (stl) html = `<div class="tname">${esc(stl.name)}</div><div class="thint"><kbd>${G.isTouch ? 'Usa' : 'E'}</kbd> <b class="steal">Ruba</b> · ${G.Stealth.seen || (stl.kind === 'pocket' && !stl.behind) ? '<span class="steal">ti vedranno: ti attaccheranno</span>' : 'nessuno ti vede'}</div>`;
     else if (!UI.open && !p.placing && !UI.boatPlacing) html = targetHTML(p.target);
+    if (!UI.open && p.boat && !html && !(G.Sea && G.Sea.station)) { const rh = G.Boats.rigHint(p); if (rh) html = `<div class="tname">${rh[0]}</div><div class="thint">${rh[1]}</div>`; }
     if (!html && !UI.open && G.Sea && !G.Sea.station && p.boat && !p.helm && G.Sea.nearCannon(p)) html = `<div class="tname">Cannone</div><div class="thint"><kbd>${G.useKey()}</kbd> usa il cannone</div>`;
     if (!UI.open && p.boat && !p.helm && p.inHelmZone() && !html && !(G.Sea && G.Sea.station)) html = `<div class="tname">${esc(p.boat.T.helmTxt)}</div><div class="thint"><kbd>${G.useKey()}</kbd> ${p.boat.T.oars ? 'siediti ai remi' : 'prendi il timone'}</div>`;
     if (html !== UI._tHTML) { UI._tHTML = html; $('target').innerHTML = html; }
@@ -345,6 +347,7 @@
     giocatori: { render: () => G.Admin.render(), click: (e) => G.Admin.click(e), mount: () => G.Admin.mount() },
     abilita: { render: () => G.Skills.render(), click: (e) => { if (e.target.closest('[data-act=tabinv]')) { UI.openInventory(3); return true; } return false; } },
     mappa: { render: () => G.Treasure.render(), mount: () => G.Treasure.draw() },
+    lockpick: { render: () => G.Lockpick.render(), mount: () => G.Lockpick.mount(), close: () => G.Lockpick.close(), click: () => true },
   };
   UI.openCustom = function (mode) { showPanel(mode); };
   UI.openInventory = function (n) { UI.craftN = n || 3; UI.craft = new Array(UI.craftN * UI.craftN).fill(null); showPanel('inv'); };
@@ -516,14 +519,14 @@
       if (UI.cursor && (UI.cursor.id !== out.id || UI.cursor.n + out.n > G.ITEMS[out.id].stack)) return false;
       UI.cursor = UI.cursor ? { id: out.id, n: UI.cursor.n + out.n } : out;
     } else P().give(out.id, out.n, true);
-    for (let i = 0; i < UI.craft.length; i++) { const s = UI.craft[i]; if (s) { s.n--; if (s.n <= 0) UI.craft[i] = null; } }
+    for (let i = 0; i < UI.craft.length; i++) { const s = UI.craft[i]; if (s && !(r.keep && r.keep.includes(s.id))) { s.n--; if (s.n <= 0) UI.craft[i] = null; } }
     if (G.Audio) G.Audio.craft();
     return true;
   }
 
   // creativa: inventario rapido a tema (tasti 1-8 con l'inventario aperto)
   const KITS = [
-    ['Barche', 'fasciame', ['fasciame', 'ponte_barca', 'zavorra', 'timone', 'albero_barca', 'vela', 'remo', 'panca', 'cannone', 'progetto_canoa', 'progetto_catamarano', 'progetto_galeone', 'vela_leggendaria', 'corda', 'stoffa', 'assi', 'chiodi', 'munizioni', 'baule', 'torcia', 'cannocchiale', 'bussola_oro']],
+    ['Barche', 'fasciame', ['fasciame', 'ponte_barca', 'zavorra', 'timone', 'albero_barca', 'vela', 'remo', 'panca', 'cannone', 'progetto_canoa', 'progetto_catamarano', 'progetto_galeone', 'progetto_vascello', 'vela_leggendaria', 'corda', 'stoffa', 'assi', 'chiodi', 'munizioni', 'baule', 'torcia', 'cannocchiale', 'bussola_oro']],
     ['Legno', 'muro', ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'scala', 'recinto', 'torcia', 'banco', 'baule', 'barile', 'letto', 'falo', 'trappola', 'assi', 'tronco', 'bastone', 'chiodi', 'corda', 'ascia_ferro']],
     ['Pietra', 'muro_pietra', ['pavimento_pietra', 'muro_pietra', 'muro_porta_pietra', 'muro_finestra_pietra', 'tetto_pietra', 'scala_pietra', 'pilastro', 'porta', 'torcia', 'camino', 'fornace', 'baule', 'letto', 'banco', 'pietra', 'carbone', 'lingotto_ferro', 'piccone_ferro']],
     ['Attrezzi', 'piccone_ferro', ['piccone_ferro', 'ascia_ferro', 'pala_ferro', 'coltello', 'canna', 'cannocchiale', 'scudo', 'ciotola', 'lanterna', 'bussola_oro', 'pinne', 'mappa_tesoro', 'piccone', 'ascia', 'pala', 'cappello_lana', 'maglione_lana', 'mantello_pelle', 'stivali_pelle', 'cappello_paglia']],
@@ -643,12 +646,12 @@
     }
     if (key === 'canoa') { x.beginPath(); x.moveTo(W * 0.18, wl - 8); x.quadraticCurveTo(W * 0.5, wl + 12, W * 0.82, wl - 8); x.quadraticCurveTo(W * 0.5, wl - 2, W * 0.18, wl - 8); x.fill(); x.stroke(); x.beginPath(); x.moveTo(W * 0.35, wl - 30); x.lineTo(W * 0.62, wl + 12); x.stroke(); return; }
     if (key === 'catamarano') { for (const dy of [0, 8]) { x.beginPath(); x.moveTo(W * 0.15, wl - 4 + dy); x.quadraticCurveTo(W * 0.5, wl + 8 + dy, W * 0.85, wl - 4 + dy); x.stroke(); } x.beginPath(); x.moveTo(W * 0.52, wl - 6); x.lineTo(W * 0.52, wl - H * 0.62); x.lineTo(W * 0.3, wl - 8); x.closePath(); x.fill(); x.stroke(); return; }
-    const L = key === 'galeone' ? 0.9 : key === 'veliero' ? 0.8 : key === 'barca_vela' ? 0.66 : 0.5, x0 = W * (0.5 - L / 2), x1 = W * (0.5 + L / 2);
-    const hh = key === 'galeone' ? 26 : key === 'veliero' ? 20 : 13;
+    const L = key === 'vascello' ? 0.95 : key === 'galeone' ? 0.9 : key === 'veliero' ? 0.8 : key === 'barca_vela' ? 0.66 : 0.5, x0 = W * (0.5 - L / 2), x1 = W * (0.5 + L / 2);
+    const hh = key === 'vascello' ? 32 : key === 'galeone' ? 26 : key === 'veliero' ? 20 : 13;
     x.beginPath(); x.moveTo(x0, wl - hh); x.quadraticCurveTo(W * 0.5, wl - hh + 4, x1 + 6, wl - hh - 5); x.quadraticCurveTo(x1, wl + 6, W * 0.5, wl + 8); x.quadraticCurveTo(x0 + 4, wl + 8, x0, wl - hh); x.fill(); x.stroke();
     for (let k = 1; k < 3; k++) { x.beginPath(); x.moveTo(x0 + 3, wl - hh + k * hh * 0.33); x.quadraticCurveTo(W * 0.5, wl - hh + 4 + k * hh * 0.33, x1, wl - hh - 2 + k * hh * 0.4); x.stroke(); }
     if (key === 'barca_remi') { x.beginPath(); x.moveTo(W * 0.45, wl - hh); x.lineTo(W * 0.3, wl + 10); x.stroke(); }
-    if (key === 'galeone') { for (const [t, sc] of [[0.72, 0.85], [0.5, 1], [0.28, 0.75]]) { const mx = x0 + (x1 - x0) * t, top = wl - hh - H * 0.58 * sc; x.beginPath(); x.moveTo(mx, wl - hh); x.lineTo(mx, top); x.stroke(); for (let k = 0; k < 2; k++) { const y0 = top + 6 + k * 22 * sc; x.fillRect(mx - 16 * sc, y0, 32 * sc, 18 * sc); x.strokeRect(mx - 16 * sc, y0, 32 * sc, 18 * sc); } } x.strokeRect(x0 + 4, wl - hh - 14, 30, 14); for (let i = 0; i < 5; i++) { x.beginPath(); x.arc(x0 + 50 + i * 22, wl - hh + 8, 2.5, 0, 7); x.stroke(); } return; }
+    if (key === 'galeone' || key === 'vascello') { for (const [t, sc] of [[0.72, 0.85], [0.5, 1], [0.28, 0.75]]) { const mx = x0 + (x1 - x0) * t, top = wl - hh - H * 0.58 * sc; x.beginPath(); x.moveTo(mx, wl - hh); x.lineTo(mx, top); x.stroke(); for (let k = 0; k < 2; k++) { const y0 = top + 6 + k * 22 * sc; x.fillRect(mx - 16 * sc, y0, 32 * sc, 18 * sc); x.strokeRect(mx - 16 * sc, y0, 32 * sc, 18 * sc); } } x.strokeRect(x0 + 4, wl - hh - 14, 30, 14); for (let i = 0; i < 5; i++) { x.beginPath(); x.arc(x0 + 50 + i * 22, wl - hh + 8, 2.5, 0, 7); x.stroke(); } return; }
     const masts = key === 'veliero' ? [[0.62, 0.9], [0.4, 1]] : key === 'barca_vela' ? [[0.6, 0.9]] : [];
     for (const [t, s] of masts) {
       const mx = x0 + (x1 - x0) * t, top = wl - hh - (H * 0.62) * s;
@@ -720,6 +723,65 @@
   /* ---------------- MENU ---------------- */
   const APP = () => !!window.deriva;
   UI.mpMsg = '';
+  // riquadro con le novità della versione e la musica del titolo
+  /* ---------- partite pubbliche ---------- */
+  UI.narrow = () => window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+  const LB = (UI.lobby = { list: [], t: 0, loading: false, f: 'tutte', q: '', err: '' });
+  function lobbyRows() {
+    const q = LB.q.trim().toLowerCase();
+    const rows = LB.list.filter((d) => (LB.f === 'tutte' || (LB.f === 'liberi' ? (d.p || 1) < (d.x || 4) : d.m === LB.f)) && (!q || String(d.n || '').toLowerCase().includes(q) || String(d.h || '').toLowerCase().includes(q)))
+      .sort((a, b) => (a.v === G.VERSION ? 0 : 1) - (b.v === G.VERSION ? 0 : 1) || ((a.p || 1) >= (a.x || 4)) - ((b.p || 1) >= (b.x || 4)) || (b.p || 1) - (a.p || 1));
+    if (!rows.length) return `<p class="note lbempty">${LB.loading && !LB.list.length ? 'Cerco le partite aperte…' : LB.err ? esc(LB.err) : LB.list.length ? 'Nessuna partita con questi filtri.' : 'Nessuna partita pubblica aperta in questo momento. Ospitane una tu!'}</p>`;
+    const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? m + ' min' : Math.round(m / 60) === 1 ? '1 ora' : Math.round(m / 60) + ' ore'; };
+    return rows.map((d) => {
+      const full = (d.p || 1) >= (d.x || 4), ver = d.v === G.VERSION, dots = Array.from({ length: d.x || 4 }, (_, i) => `<i class="${i < (d.p || 1) ? 'on' : ''}"></i>`).join('');
+      const sub = [d.h, d.m === 'creativa' ? 'creativa' : 'sopravvivenza', d.en === false ? 'mondo tranquillo' : ''].filter(Boolean).map(esc).join(' · ');
+      return `<div class="lbrow"><div class="lbn"><b>${esc(d.n || 'Mondo')}</b><small>${sub}</small></div><div class="lbp">${dots}<span>${d.p || 1}/${d.x || 4}</span></div><div class="lbv">${esc(d.v || '?')}</div><div class="lbt">${d.st ? ago(d.st) : ''}</div>
+        ${!ver ? '<button class="mini-btn" disabled>Versione diversa</button>' : full ? '<button class="mini-btn" disabled>Piena</button>' : `<button class="mini-btn primary" data-m="lbjoin" data-code="${esc(d.code)}">Entra</button>`}</div>`;
+    }).join('');
+  }
+  function lobbyHTML() {
+    return `<div class="lbhead"><h3>Partite pubbliche</h3><small>aperte ora da altri giocatori · si aggiorna da sola</small></div>
+      <div class="lbfilt">${[['tutte', 'Tutte'], ['sopravvivenza', 'Sopravvivenza'], ['creativa', 'Creativa'], ['liberi', 'Con posti liberi']].map(([k, l]) => `<button data-m="lbf" data-v="${k}" class="${LB.f === k ? 'on' : ''}">${l}</button>`).join('')}<input id="lobby-q" placeholder="Cerca per nome del mondo o di chi ospita" value="${esc(LB.q)}" autocomplete="off" spellcheck="false"></div>
+      <div class="lbcols"><span>Mondo</span><span>Giocatori</span><span>Versione</span><span>Aperta da</span><span></span></div>
+      <div class="lblist" id="lobbylist">${lobbyRows()}</div>`;
+  }
+  UI.lobbyRefresh = async function (force) {
+    if (!G.Relay || LB.loading || (!force && performance.now() - LB.t < 12000)) return;
+    LB.loading = true; LB.t = performance.now(); UI.lobbyDraw();
+    const r = await G.Relay.list();
+    LB.loading = false; LB.t = performance.now();
+    if (r.ok) { LB.list = r.list; LB.err = ''; } else LB.err = r.error;
+    UI.lobbyDraw();
+  };
+  UI.lobbyDraw = function () { const l = $('lobbylist'); if (l) l.innerHTML = lobbyRows(); };
+  UI.lobbyPanel = function () {
+    let el = $('lobby');
+    const on = UI.menu === 'mp' && !G.started;
+    clearInterval(UI._lbT);
+    if (on) { UI.lobbyRefresh(); UI._lbT = setInterval(() => { if (UI.menu === 'mp' && !G.started) UI.lobbyRefresh(); else clearInterval(UI._lbT); }, 4000); }
+    const wide = on && !UI.narrow();
+    if (!el) {
+      if (!wide) return;
+      el = document.createElement('div'); el.id = 'lobby'; $('menu').appendChild(el);
+    }
+    el.hidden = !wide; if (wide) el.innerHTML = lobbyHTML();
+  };
+  function lobbyInput(e) { if (e.target && e.target.id === 'lobby-q') { LB.q = e.target.value; UI.lobbyDraw(); } }
+  document.addEventListener('input', lobbyInput);
+  UI.newsCard = function () {
+    let el = $('newscard'), mu = $('menumusic');
+    const on = UI.menu === 'main' && !G.started && G.NEWS;
+    if (!el) { el = document.createElement('div'); el.id = 'newscard'; $('menu').appendChild(el); el.addEventListener('click', (e) => { if (e.target.closest('[data-news=close]')) { G.settings.newsSeen = G.NEWS.v; G.store.set('deriva_settings', G.settings); UI.newsCard(); } else if (e.target.closest('[data-news=open]')) { G.settings.newsSeen = ''; G.store.set('deriva_settings', G.settings); UI.newsCard(); } }); }
+    if (!mu) { mu = document.createElement('div'); mu.id = 'menumusic'; mu.innerHTML = '<b><i></i><i></i><i></i><i></i></b> Tema di Deriva'; $('menu').appendChild(mu); }
+    mu.hidden = !(UI.menu === 'main' && !G.started);
+    if (!on) { el.hidden = true; return; }
+    el.hidden = false;
+    const N = G.NEWS, seen = G.settings.newsSeen === N.v;
+    el.className = seen ? 'mini' : '';
+    el.innerHTML = seen ? `<button data-news="open">Novità della ${esc(N.v)} · ${esc(N.t)}</button>`
+      : `<small class="k">Novità della versione ${esc(N.v)}</small><h3>${esc(N.t)}</h3><div class="d">${esc(N.d)}</div><ul>${N.items.map(([i, t]) => `<li><i>${i}</i>${esc(t)}</li>`).join('')}</ul><div class="f"><span>${window.deriva ? 'Tutte le versioni nel diario (PDF) accanto a Deriva.exe' : 'Buon viaggio!'}</span><button data-news="close">Chiudi ✕</button></div>`;
+  };
   UI.showMenu = function (screen) {
     UI.menu = screen || 'main';
     $('menu').hidden = false; $('hud').hidden = true;
@@ -785,13 +847,15 @@
           ${started ? '' : `<div class="field"><label for="mp-world">Mondo</label><select id="mp-world">${worlds.map((w) => `<option value="${w.id}">${esc(w.name)} · ${G.Worlds.MODE_N[w.mode] || 'Sopravvivenza'}</option>`).join('')}<option value="__new">Nuovo mondo (sopravvivenza)</option><option value="__newc">Nuovo mondo (creativa)</option></select></div>`}
           <div class="row2"><div class="field"><label for="mp-port">Porta</label><input id="mp-port" inputmode="numeric" value="${S.port || 7777}"></div>
           <label class="check"><input type="checkbox" id="mp-ff" ${S.ff !== false ? 'checked' : ''}> Fuoco amico</label></div>
+          <div class="field"><label>Chi può entrare</label><div class="seg">${[[1, 'Pubblica', 'nella lista di tutti'], [0, 'Privata', 'solo con il codice']].map(([v, l, d]) => `<button data-m="setpub" data-v="${v}" class="${(S.pub !== false ? 1 : 0) === v ? 'on' : ''}">${l}<small>${d}</small></button>`).join('')}</div></div>
           <button class="mbtn primary" data-m="host">Ospita la partita<small>riceverai un codice da dare agli amici</small></button>
           ${window.deriva.platform === 'win32' ? `<button class="mbtn" data-m="fw">Sblocca nel firewall di Windows<small>serve solo per giocare sulla stessa rete con l’indirizzo IP</small></button>` : ''}` : `<p class="note">Per ospitare serve la versione per computer (Deriva.exe).</p>`}
         </div>
         ${started ? '' : `<div class="mpbox"><h3>Unisciti</h3>
           <div class="field"><label for="mp-addr">Codice partita <small>(oppure indirizzo IP sulla stessa rete)</small></label><input id="mp-addr" placeholder="ABC-234" value="${esc(S.lastAddr || (G.servedByHost ? location.host : ''))}" autocomplete="off" spellcheck="false"></div>
           <button class="mbtn" data-m="join">Unisciti</button>
-          <p class="note">Il codice funziona anche da case diverse, senza aprire porte. Chi ospita lo trova nel menu (Esc).</p></div>`}
+          <p class="note">Il codice funziona anche da case diverse, senza aprire porte. Chi ospita lo trova nel menu (Esc).</p></div>
+          ${UI.narrow() ? `<div class="mpbox lobby inl">${lobbyHTML()}</div>` : ''}`}
         <p class="mperr" id="mp-msg" role="status">${esc(UI.mpMsg)}</p>
         <div class="mbtns"><button class="mbtn" data-m="main">Indietro</button></div></div>`;
     } else if (UI.menu === 'settings' || UI.menu === 'controls') {
@@ -804,6 +868,7 @@
       if (tab === 'grafica') body = `<h5>Qualità</h5>
         <div class="presets">${Object.entries(G.PRESETS).map(([k, p]) => `<button data-preset="${k}" class="${S.preset === k ? 'on' : ''}">${p.label}</button>`).join('')}</div>
         <h5>Notte</h5><div class="sgrid">        <div class="opt"><label>Luna di notte<small>di notte il cielo diventa blu-viola, con nebulose e una grande luna</small></label><div class="seg small">${[['rossa', 'Rossa'], ['argento', 'Argento']].map(([k, n]) => `<button data-gmoon="${k}" class="${(S.moon || 'rossa') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div></div>
+        <h5>Shaders</h5><div class="sgrid">${chk('o-shaders', 'Shaders', !!S.shaders, 'stile «Complementary»: luce volumetrica, bagliore, pulviscolo nel sole, foschia in lontananza, colori caldi e vivi · pesa di più sulla scheda video')}</div>
         <h5>Dettagli</h5><div class="sgrid">
         ${chk('o-shadow', 'Ombre', S.shadows)}${chk('o-ao', 'Occlusione ambientale', S.ao !== false, 'ombre di contatto più realistiche')}${chk('o-god', 'Raggi di sole', S.godrays)}${chk('o-fx', 'Foglie e particelle', S.fx)}
         ${opt('o-view', 'Distanza visiva', 2, 7, 1, S.view, (v) => `${v * 64 * 2} m`)}
@@ -837,6 +902,7 @@
       h += `<div class="mscreen"><h2>Connessione…</h2><p class="note">${esc(UI.mpMsg)}</p></div>`;
     }
     side.innerHTML = h;
+    UI.newsCard(); UI.lobbyPanel();
     const first = side.querySelector('.mbtn.primary, .mbtn'); if (first && UI.menu !== 'mp') first.focus({ preventScroll: true });
   };
   const WIND_N = ['Bonaccia', 'Bava di vento', 'Brezza leggera', 'Brezza tesa', 'Vento moderato', 'Vento teso', 'Vento fresco', 'Vento forte', 'Burrasca moderata', 'Burrasca', 'Tempesta'];
@@ -863,7 +929,8 @@
       const lan = (hi.ips || []).filter((a) => !a.virt);
       const code = hi.code ? `<div class="mpcode"><span>Codice partita</span><b class="sel">${G.Relay.fmt(hi.code)}</b><button class="mini-btn" data-m="copycode">Copia</button></div><p class="note">Dai questo codice agli amici: funziona anche da case diverse.</p>`
         : `<p class="note">${hi.codeErr ? esc(hi.codeErr) + ' <button class="mini-btn" data-m="retrycode">Riprova</button>' : 'Preparo il codice partita…'}</p>`;
-      ips = code + `<p class="note">Sulla stessa rete Wi-Fi: ${lan.length ? lan.map((a) => `<b class="sel">${a.ip}:${hi.port}</b>${a.name ? ' <small>(' + esc(a.name) + ')</small>' : ''}`).join(' oppure ') : 'il tuo IP:' + hi.port}${N.ff ? ' · fuoco amico attivo' : ' · fuoco amico disattivato'}</p>`
+      const pubN = hi.code ? `<p class="note">${G.settings.pub !== false ? 'Partita <b>pubblica</b>: compare nella lista di tutti' : 'Partita <b>privata</b>: si entra solo con il codice'} <button class="mini-btn" data-m="pubtoggle">${G.settings.pub !== false ? 'Rendi privata' : 'Rendi pubblica'}</button></p>` : '';
+      ips = code + pubN + `<p class="note">Sulla stessa rete Wi-Fi: ${lan.length ? lan.map((a) => `<b class="sel">${a.ip}:${hi.port}</b>${a.name ? ' <small>(' + esc(a.name) + ')</small>' : ''}`).join(' oppure ') : 'il tuo IP:' + hi.port}${N.ff ? ' · fuoco amico attivo' : ' · fuoco amico disattivato'}</p>`
         + `<p class="note">Da telefono: apri <b class="sel">${G.WEB_URL}</b> e scrivi il codice${lan.length ? `, oppure sulla stessa Wi-Fi apri <b class="sel">http://${lan[0].ip}:${hi.port}</b>` : ''}.</p>`;
     }
     return `<div class="plist"><h3>Giocatori ${N.remotes.size + 1}/4</h3><ul>${me}${others}</ul>${ips}</div>`;
@@ -920,10 +987,17 @@
     hi.code = null; hi.codeErr = null; if (UI.menu === 'main') UI.showMenu('main');
     const r = await G.Relay.host(hi.port);
     if (UI.hostInfo !== hi) { if (r.ok) G.Relay.stopHost(); return; }
-    if (r.ok) { hi.code = r.code; G.UI.toast('Codice partita: ' + G.Relay.fmt(r.code) + ' · dallo agli amici', 'good'); }
+    if (r.ok) { hi.code = r.code; hi.since = hi.since || Date.now(); applyPub(); G.UI.toast('Codice partita: ' + G.Relay.fmt(r.code) + ' · dallo agli amici' + (G.settings.pub !== false ? ' · è anche nella lista pubblica' : ''), 'good'); }
     else hi.codeErr = r.error;
     if (UI.menu === 'main') UI.showMenu('main');
   }
+  // partita pubblica: annuncio nella lista (si rinnova da solo)
+  function applyPub() {
+    const hi = UI.hostInfo; if (!G.Relay || !hi || !hi.code) return;
+    if (G.settings.pub !== false) G.Relay.announce(() => ({ n: G.worldName || 'Mondo', h: G.settings.name || 'Capitano', m: G.mode, en: !G.enemiesOff, p: G.Net && G.Net.on ? G.Net.remotes.size + 1 : 1, x: 4, v: G.VERSION, st: hi.since }));
+    else G.Relay.unannounce();
+  }
+  UI.applyPub = applyPub;
   async function doJoin() {
     const name = readName(); if (!name) return;
     let addr = ($('mp-addr').value || '').trim().replace(/^ws:\/\//, '');
@@ -940,6 +1014,7 @@
     UI.mpMsg = '';
   }
   UI.refreshPlayers = function () {
+    if (G.Net && G.Net.isHost && G.Relay && G.Relay.announceNow) { clearTimeout(UI._annT); UI._annT = setTimeout(() => G.Relay.announceNow && G.Relay.announceNow(), 800); }
     if (UI.menu === 'main' && G.started) UI.showMenu('main');
     const box = $('plist'); if (!box) return;
     const N = G.Net;
@@ -987,6 +1062,10 @@
     else if (m === 'togglemode') { UI.toggleMode(); UI.showMenu('main'); }
     else if (m === 'tools') { UI.hideMenu(); UI.openCustom('strumenti'); }
     else if (m === 'host') doHost();
+    else if (m === 'setpub') { G.settings.pub = b.dataset.v === '1'; G.store.set('deriva_settings', G.settings); b.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }
+    else if (m === 'pubtoggle') { G.settings.pub = G.settings.pub === false; G.store.set('deriva_settings', G.settings); applyPub(); UI.showMenu('main'); }
+    else if (m === 'lbf') { UI.lobby.f = b.dataset.v; b.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); UI.lobbyDraw(); }
+    else if (m === 'lbjoin') { const a = $('mp-addr'); if (a) { a.value = G.Relay.fmt(b.dataset.code); doJoin(); } }
     else if (m === 'retrycode') startCode();
     else if (m === 'copycode') { if (UI.hostInfo && UI.hostInfo.code) { try { navigator.clipboard.writeText(G.Relay.fmt(UI.hostInfo.code)); G.UI.toast('Codice copiato', 'good'); } catch (e) {} } }
     else if (m === 'fw') { UI.mpMsg = 'Windows ti chiederà il permesso: premi Sì.'; $('mp-msg').textContent = UI.mpMsg; window.deriva.firewall().then((r) => { UI.mpMsg = r && r.ok ? 'Fatto: Deriva è sbloccato nel firewall, anche sulle reti pubbliche.' : (r && r.error) || 'Operazione annullata.'; if (UI.menu === 'mp') $('mp-msg').textContent = UI.mpMsg; }); }
@@ -1016,7 +1095,7 @@
     }
     const base = G.PRESETS[S.preset] || G.PRESETS.media;
     const map = { 'o-shadow': ['shadows', v ? (base.shadows || 1024) : 0], 'o-god': ['godrays', v], 'o-fx': ['fx', v], 'o-view': ['view', v], 'o-grass': ['grass', v], 'o-pixel': ['pixel', v], 'o-fov': ['fov', v], 'o-sens': ['sens', v], 'o-vol': ['volume', v],
-      'o-ao': ['ao', v], 'o-f3': ['f3', v], 'o-minimap': ['minimap', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
+      'o-ao': ['ao', v], 'o-shaders': ['shaders', v], 'o-f3': ['f3', v], 'o-minimap': ['minimap', v], 'o-dyn': ['dynres', v], 'o-fps': ['showFps', v], 'o-ping': ['showPing', v], 'o-hints': ['hints', v], 'o-full': ['fullscreen', v], 'o-vsync': ['vsync', v] };
     if (!map[t.id]) return;
     const [k, val] = map[t.id];
     if (['shadows', 'godrays', 'ao', 'view', 'pixel'].includes(k) && G.adaptReset) G.adaptReset();
@@ -1154,7 +1233,7 @@
       else if (t.dataset.act === 'close') UI.close();
       else if (t.dataset.act === 'placeboat' && G.Boats.unlocked(UI.bookBoat)) UI.startBoatPlace(UI.bookBoat);
     });
-    $('menuSide').addEventListener('click', onMenuClick);
+    $('menu').addEventListener('click', onMenuClick);
     $('menuSide').addEventListener('input', onMenuInput);
     $('resume').addEventListener('click', () => { $('resume').hidden = true; G.requestLock(); });
   }

@@ -179,6 +179,7 @@
   C.netFx = function (m) {
     if (m.k === 'arrow') C.shootArrow(new V3(...m.o), new V3(...m.v), 0, true);
     else if (m.k === 'love') { const a = G.Entities.byId.get(m.id); if (a) G.FX.burst(a.pos.x, a.pos.y + 1, a.pos.z, [1, 0.4, 0.6], 14, 1.4); }
+    else if (m.k === 'note') { if (G.Music) G.Music.netNote(m); }
     else if (m.k === 'gun') { G.FX.burst(m.o[0], m.o[1], m.o[2], [0.85, 0.85, 0.85], 10, 1.2); if (G.Audio) G.Audio.gun(); }
   };
   C.clear = function () { for (const a of C.arrows) G.scene.remove(a.m); C.arrows = []; };

@@ -51,9 +51,28 @@
     }
     return M.merge([g, ...rail]);
   }
-  function deckGeo(L, W, D, sheer, yOff) {
+  function deckGeo(L, W, D, sheer, yOff, hole) {
     const H = hullShape(L, W, D, sheer), NS = 24, pos = [], uv = [], idx = [];
     const y = D * 0.38 - (yOff || 0.25);
+    if (hole) {
+      // ponte con il boccaporto: le fasce che toccano l'apertura si dividono in due
+      const zs = []; for (let i = 0; i <= NS; i++) zs.push((i / NS - 0.5) * L);
+      zs.push(hole.z - hole.hz, hole.z + hole.hz); zs.sort((a, b) => a - b);
+      const quad = (x0, x1, z0, z1) => { const n = pos.length / 3; const w0 = (x) => x; pos.push(x0, y, z0, x1, y, z0, x0, y, z1, x1, y, z1); uv.push(x0 / 2, (z0 / L + 0.5) * L / 2, x1 / 2, (z0 / L + 0.5) * L / 2, x0 / 2, (z1 / L + 0.5) * L / 2, x1 / 2, (z1 / L + 0.5) * L / 2); idx.push(n, n + 2, n + 1, n + 1, n + 2, n + 3); };
+      for (let i = 0; i < zs.length - 1; i++) {
+        const z0 = zs[i], z1 = zs[i + 1]; if (z1 - z0 < 1e-4) continue;
+        const w0 = H.hw(z0 / L + 0.5) * 0.96, w1 = H.hw(z1 / L + 0.5) * 0.96, w = Math.min(w0, w1);
+        const zm = (z0 + z1) / 2;
+        if (zm > hole.z - hole.hz && zm < hole.z + hole.hz) { quad(-w, -hole.hx, z0, z1); quad(hole.hx, w, z0, z1); }
+        else quad(-w, w, z0, z1);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx); g.computeVertexNormals();
+      // bordo rialzato attorno all'apertura
+      const fr = [box(hole.hx * 2 + 0.3, 0.16, 0.15, 0, y + 0.08, hole.z - hole.hz - 0.07), box(hole.hx * 2 + 0.3, 0.16, 0.15, 0, y + 0.08, hole.z + hole.hz + 0.07), box(0.15, 0.16, hole.hz * 2, -hole.hx - 0.07, y + 0.08, hole.z), box(0.15, 0.16, hole.hz * 2, hole.hx + 0.07, y + 0.08, hole.z)];
+      return M.merge([M.colorize(g, 1, 1, 1), ...fr.map((b) => M.colorize(b, 0.6, 0.45, 0.32))]);
+    }
     for (let i = 0; i <= NS; i++) {
       const t = i / NS, z = (t - 0.5) * L, w = H.hw(t) * 0.96;
       pos.push(-w, y, z, w, y, z); uv.push(-w / 2, t * L / 2, w / 2, t * L / 2);
@@ -64,6 +83,50 @@
     g.setIndex(idx); g.computeVertexNormals();
     return M.colorize(g, 1, 1, 1);
   }
+  // mezza larghezza interna dello scafo a una certa altezza (per il ponte di sotto)
+  function hullXAt(H, t, y) { const kd = H.kd(t), gw = H.gw(t); const f = G.clamp((y + kd) / (gw + kd), 0, 1); const s = Math.pow(f, 0.8); return H.hw(t) * Math.pow(Math.sin((s * Math.PI) / 2), 0.55); }
+  // un segmento di corda (cilindro sottile) da a a b
+  function seg(a, b, r) { const d = new V3().subVectors(b, a), len = d.length(); const g = new THREE.CylinderGeometry(r, r, len, 5); g.translate(0, len / 2, 0); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), d.normalize())); g.translate(a.x, a.y, a.z); return g; }
+  // altezza della coffa (piattaforma) su un albero
+  function rigTop(T, t, h) { return T.D && (T === TPL.galeone || T === TPL.vascello) ? T.D * 0.38 - 0.18 + (h - 3) * 0.5 + 2 : T.D * 0.38 - 0.18 + (h - 2.4) * 0.55 + 1.75; }
+  // sartie con le griselle (la scala di corda) su un lato
+  function ratlines(r, sd) {
+    const out = [], n = 5, bot = [], top = [];
+    for (let i = 0; i < n; i++) { const f = i / (n - 1) - 0.5; bot.push(new V3(sd * r.bx, r.by, r.bz + f * 1.6)); top.push(new V3(sd * 0.55, r.top, r.tz + f * 0.3)); out.push(seg(bot[i], top[i], 0.03)); }
+    for (let y = r.by + 0.42; y < r.top - 0.2; y += 0.42) { const k = (y - r.by) / (r.top - r.by); out.push(seg(bot[0].clone().lerp(top[0], k), bot[n - 1].clone().lerp(top[n - 1], k), 0.018)); }
+    return M.colorize(M.merge(out), 0.42, 0.34, 0.24);
+  }
+  // ponte di sotto del vascello: pavimento, paratie, scala al boccaporto, cannoni, barili, tavolo
+  function lowerDeckGeo(T) {
+    const H = T.H, L = T.L, y = T.lowerY, [z0, z1] = T.lowerZ, out = [];
+    const NS = 16, fl = [], uv = [], idx = [];
+    for (let i = 0; i <= NS; i++) { const z = z0 + (z1 - z0) * i / NS, t = z / L + 0.5, w = hullXAt(H, t, y) * 0.97; fl.push(-w, y, z, w, y, z); uv.push(-w / 2, z / 2, w / 2, z / 2); if (i < NS) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(fl, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); out.push(M.colorize(g, 0.55, 0.45, 0.36));
+    for (const z of [z0, z1]) { const t = z / L + 0.5, w = hullXAt(H, t, T.deck) * 0.98, hgt = T.deck - y; out.push(M.colorize(box(w * 2, hgt, 0.12, 0, y + hgt / 2, z), 0.42, 0.33, 0.25)); }
+    // travi del soffitto
+    for (let z = z0 + 1; z < z1; z += 1.8) { const t = z / L + 0.5, w = hullXAt(H, t, T.deck - 0.3); out.push(M.colorize(box(w * 2, 0.2, 0.2, 0, T.deck - 0.28, z), 0.3, 0.22, 0.15)); }
+    // scala verso il boccaporto
+    const [hx, hz] = T.hatch, hgt = T.deck - y;
+    for (const sx of [-0.28, 0.28]) { const r = box(0.07, Math.hypot(hgt, 0.9), 0.07, 0, 0, 0); r.rotateX(-Math.atan2(0.9, hgt)); r.translate(hx + sx, y + hgt / 2, hz - 0.35); out.push(M.colorize(r, 0.45, 0.33, 0.2)); }
+    for (let i = 0; i < 6; i++) { const k = (i + 0.5) / 6; out.push(M.colorize(box(0.56, 0.05, 0.18, hx, y + k * hgt, hz + 0.1 - k * 0.9), 0.6, 0.45, 0.3)); }
+    // cannoni ai portelli (lato sinistro e destro) e portelli chiusi
+    for (let i = 0; i < 6; i++) for (const sd of [-1, 1]) {
+      const z = z0 + 1.2 + i * (z1 - z0 - 2.4) / 5, t = z / L + 0.5, w = hullXAt(H, t, y + 0.9);
+      out.push(M.colorize(box(0.6, 0.35, 0.6, sd * (w - 0.95), y + 0.22, z), 0.32, 0.2, 0.11));
+      out.push(M.colorize(box(0.06, 0.55, 0.6, sd * (w - 0.04), y + 1.0, z), 0.12, 0.08, 0.05));
+    }
+    // barili, casse e un tavolo
+    for (const [bx, bz] of [[-1.4, z1 - 0.7], [-0.6, z1 - 0.6], [1.3, z0 + 0.7], [0.6, z0 + 0.6]]) { out.push(M.colorize(cyl(0.34, 0.38, 0.85, bx, y + 0.43, bz), 0.42, 0.26, 0.13)); out.push(M.colorize(cyl(0.37, 0.37, 0.06, bx, y + 0.62, bz), 0.12, 0.12, 0.12)); }
+    for (const [cx, cy, cz] of [[1.4, 0.35, z1 - 0.8], [2.0, 0.35, z1 - 0.8], [1.7, 0.95, z1 - 0.8]]) out.push(M.colorize(box(0.6, 0.6, 0.6, cx, y + cy, cz), 0.55, 0.4, 0.26));
+    out.push(M.colorize(box(1.6, 0.08, 0.9, 0, y + 0.8, z0 + 2.4), 0.55, 0.4, 0.26)); for (const [lx, lz] of [[-0.7, -0.35], [0.7, -0.35], [-0.7, 0.35], [0.7, 0.35]]) out.push(M.colorize(box(0.08, 0.8, 0.08, lx, y + 0.4, z0 + 2.4 + lz), 0.3, 0.22, 0.15));
+    return M.merge(out);
+  }
+  function lowerCannonsGeo(T) {
+    const H = T.H, L = T.L, y = T.lowerY, [z0, z1] = T.lowerZ, out = [];
+    for (let i = 0; i < 6; i++) for (const sd of [-1, 1]) { const z = z0 + 1.2 + i * (z1 - z0 - 2.4) / 5, w = hullXAt(H, z / L + 0.5, y + 0.9); out.push(M.colorize(cyl(0.13, 0.17, 1.4, sd * (w - 0.75), y + 0.62, z, 0, -sd * Math.PI / 2), 0.07, 0.07, 0.075)); }
+    return M.merge(out);
+  }
+  function lanternsGeo(T) { const out = []; for (const z of [T.lowerZ[0] + 2.2, T.hatch[1] - 2.2, T.lowerZ[1] - 2.2]) { out.push(M.colorize(box(0.2, 0.28, 0.2, 1.1, T.deck - 0.6, z), 1, 1, 1)); out.push(M.colorize(cyl(0.015, 0.015, 0.3, 1.1, T.deck - 0.32, z), 0.2, 0.2, 0.2)); } return M.merge(out); }
   function keelGeo(L, W, D, sheer) {
     const H = hullShape(L, W, D, sheer), parts = [];
     for (let i = 0; i < 16; i++) {
@@ -103,6 +166,7 @@
     canoa: { n: 'Canoa', d: 'Leggera e velocissima: si pagaia con A e D. Progetto da trovare.', L: 4.6, W: 0.95, D: 0.55, sheer: 0.22, draft: 0.25, lift: 0.14, speed: 6.6, turn: 1.5, sail: false, seat: [0, 0.2, -0.3], cam3: 7, locked: true, canoe: true },
     catamarano: { n: 'Catamarano', d: 'Due scafi e una grande vela: il più veloce col vento. Progetto da trovare.', L: 8.4, W: 4.6, D: 0.9, sheer: 0.2, draft: 0.45, lift: 0.4, speed: 13.5, turn: 0.9, sail: true, seat: [0, 0.8, -3.2], cam3: 12, locked: true, cat: true },
     galeone: { n: 'Galeone', d: 'Tre alberi, cannoni e una stiva da 54 posti: la nave dei pirati. Progetto da trovare.', L: 19, W: 5.6, D: 3.0, sheer: 0.55, draft: 1.6, lift: 1.25, speed: 14.5, turn: 0.42, sail: true, seat: [0, 2.4, -6.5], cam3: 26, hold: true, holdN: 54, locked: true },
+    vascello: { n: 'Vascello', d: 'La nave più grande: tre alberi alti, cannoni e un ponte di sotto dove ripararsi e stivare (boccaporto al centro). Progetto da trovare.', L: 25, W: 7.2, D: 5.6, sheer: 0.6, draft: 2.1, lift: 1.6, speed: 13.5, turn: 0.32, sail: true, seat: [0, 2.6, -8.8], cam3: 36, hold: true, holdN: 81, locked: true, lower: true },
   });
   BT.unlocked = (k) => !TPL[k].locked || (G.creative && G.creative()) || !!(G.Player.known && G.Player.known[k]);
   // ponte calpestabile: altezza locale, timone (zona guida) e ostacoli
@@ -113,13 +177,22 @@
     v.deck = v.D * 0.38 - 0.18; v.helm = [0, -v.L / 2 + 0.95]; v.helmTxt = 'Timone';
     w.deck = w.D * 0.38 - 0.18; w.helm = [0, -2.25]; w.helmTxt = 'Timone';
     v.obst = [{ c: [0, (0.62 - 0.5) * v.L], r: 0.32 }];
-    const c = TPL.canoa, k = TPL.catamarano, g = TPL.galeone;
+    const c = TPL.canoa, k = TPL.catamarano, g = TPL.galeone, vs = TPL.vascello;
     c.deck = -0.12; c.helm = [0, -0.2]; c.helmTxt = 'Sedile'; c.sit = 0.08; c.oars = true;
     k.deck = 0.55; k.helm = [0, -k.L / 2 + 1.1]; k.helmTxt = 'Timone'; k.obst = [{ c: [0, 0.6], r: 0.3 }];
     g.deck = g.D * 0.38 - 0.18; g.helm = [0, -g.L * 0.3]; g.helmTxt = 'Timone';
     g.obst = [{ c: [0, (0.7 - 0.5) * g.L], r: 0.4 }, { c: [0, (0.5 - 0.5) * g.L], r: 0.45 }, { c: [0, (0.3 - 0.5) * g.L], r: 0.4 }, { box: [-g.W * 0.4, -g.L / 2 + 0.3, g.W * 0.4, -g.L * 0.36] }, { box: [-g.W * 0.36, g.L * 0.34, g.W * 0.36, g.L / 2 - 0.6] }, { box: [-0.6, g.L * 0.08 - 0.4, 0.6, g.L * 0.08 + 0.4] }];
+    vs.deck = vs.D * 0.38 - 0.18; vs.helm = [0, -vs.L * 0.31]; vs.helmTxt = 'Timone';
+    vs.hatch = [0, vs.L * 0.02]; vs.lowerY = vs.deck - 2.3; vs.lowerZ = [-vs.L * 0.3, vs.L * 0.3];
+    vs.obst = [{ c: [0, (0.72 - 0.5) * vs.L], r: 0.45 }, { c: [0, 0], r: 0.5 }, { c: [0, (0.28 - 0.5) * vs.L], r: 0.42 }, { box: [-vs.W * 0.4, -vs.L / 2 + 0.3, vs.W * 0.4, -vs.L * 0.36] }, { box: [-vs.W * 0.36, vs.L * 0.34, vs.W * 0.36, vs.L / 2 - 0.6] }, { box: [-0.6, vs.L * 0.12 - 0.4, 0.6, vs.L * 0.12 + 0.4] }, { box: [-0.8, vs.hatch[1] - 0.95, 0.8, vs.hatch[1] + 0.95] }];
     w.obst = [{ c: [0, (0.62 - 0.5) * w.L], r: 0.32 }, { c: [0, (0.36 - 0.5) * w.L], r: 0.34 }, { box: [-w.W * 0.39, -w.L * 0.33 - 1.65, w.W * 0.39, -w.L * 0.33 + 1.65] }, { box: [-0.55, w.L * 0.05 - 0.38, 0.55, w.L * 0.05 + 0.38] }];
     for (const T of Object.values(TPL)) if (T.D) T.H = hullShape(T.L, T.W, T.D, T.sheer);
+    // sartie scalabili: dove partono sulla murata e dove arrivano (la coffa)
+    const MASTS = { veliero: [[0.62, 9.5], [0.36, 11]], galeone: [[0.7, 13], [0.5, 15.5], [0.3, 11]], vascello: [[0.72, 16], [0.5, 19], [0.28, 13.5]] };
+    for (const [key, ms] of Object.entries(MASTS)) {
+      const T = TPL[key], aft = key !== 'veliero' ? -1 : 1;
+      T.rigs = ms.map(([t, h]) => { const z = (t - 0.5) * T.L; return { t, z, h, top: rigTop(T, t, h), R: key === 'veliero' ? 0.7 : 0.9, bx: T.H.hw(t) * 0.98, by: T.H.gw(t) + 0.08, bz: z + aft * 1.9, tz: z + aft * 0.7 }; });
+    }
   })();
   // mezza larghezza calpestabile alla coordinata z (locale, prua = +z)
   BT.deckHalfW = function (T, z) {
@@ -142,6 +215,79 @@
         if (v.x > X0 && v.x < X1 && v.z > Z0 && v.z < Z1) { const m = [v.x - X0, X1 - v.x, v.z - Z0, Z1 - v.z], i = m.indexOf(Math.min(...m)); if (i === 0) v.x = X0; else if (i === 1) v.x = X1; else if (i === 2) v.z = Z0; else v.z = Z1; } }
     }
     return side;
+  };
+  /* ---------- sartie, coffa e ponte di sotto ----------
+     Contro la murata accanto a un albero, W (o Spazio) per arrampicarsi sulle griselle;
+     in cima si sta sulla coffa (Maiusc per riscendere). Nel vascello il boccaporto porta
+     al ponte di sotto (tasto destro). Restituisce true se ha mosso lui il giocatore. */
+  BT.rigMove = function (b, P, dt, k, lx, lz, l, sp) {
+    const T = b.T, H = T.H;
+    if (P.rig && T.rigs) {
+      const r = T.rigs[P.rig.i], sd = P.rig.sd;
+      const up = (k.KeyW || k.Space) ? 1 : 0, dn = (k.KeyS || k.ShiftLeft || k.ShiftRight) ? 1 : 0;
+      const len = Math.hypot(r.top - T.deck, r.bx - 0.55, r.bz - r.tz);
+      const k0 = P.rig.k; P.rig.k += (up - dn) * dt * 1.7 / len;
+      if (Math.floor(k0 * len / 0.42) !== Math.floor(P.rig.k * len / 0.42) && G.Audio) G.Audio.step('wood');
+      if (P.rig.k >= 1) { P.top = { i: P.rig.i }; P.rig = null; P.local.set(sd * 0.45, r.top + 0.08, r.z - 0.2); return true; }
+      if (P.rig.k <= 0) { P.rig = null; P.local.set(sd * (BT.deckHalfW(T, r.bz) - 0.4), T.deck, r.bz); return true; }
+      const q = P.rig.k;
+      P.local.set(G.lerp(sd * (BT.deckHalfW(T, r.bz) - 0.15), sd * 0.3, q), G.lerp(T.deck, r.top + 0.08, q), G.lerp(r.bz, r.tz - 0.1, q));
+      return true;
+    }
+    if (P.top && T.rigs) {
+      const r = T.rigs[P.top.i];
+      if (k.ShiftLeft || k.ShiftRight) { const sd = Math.sign(P.local.x) || 1, i = P.top.i; P.top = null; P.rig = { i, sd, k: 0.97 }; return true; }
+      P.local.x += lx * sp * 0.5 * dt; P.local.z += lz * sp * 0.5 * dt;
+      const dx = P.local.x, dz = P.local.z - r.z, d = Math.hypot(dx, dz), RM = r.R - 0.22, Rin = 0.42;
+      if (d > RM) { P.local.x = dx / d * RM; P.local.z = r.z + dz / d * RM; } else if (d < Rin && d > 1e-4) { P.local.x = dx / d * Rin; P.local.z = r.z + dz / d * Rin; }
+      P.local.y = r.top + 0.08; P.lvy = 0;
+      return true;
+    }
+    if (P.lower && T.lower) {
+      P.local.x += lx * sp * dt; P.local.z += lz * sp * dt;
+      const [z0, z1] = T.lowerZ; P.local.z = G.clamp(P.local.z, z0 + 0.35, z1 - 0.35);
+      const w = Math.max(0.5, hullXAt(H, P.local.z / T.L + 0.5, T.lowerY + 0.8) - 1.3); P.local.x = G.clamp(P.local.x, -w, w);
+      // la scala del boccaporto
+      const [hx, hz] = T.hatch, X0 = hx - 0.5, X1 = hx + 0.5, Z0 = hz - 1.15, Z1 = hz + 0.25;
+      if (P.local.x > X0 && P.local.x < X1 && P.local.z > Z0 && P.local.z < Z1) { const m = [P.local.x - X0, X1 - P.local.x, P.local.z - Z0, Z1 - P.local.z], i = m.indexOf(Math.min(...m)); if (i === 0) P.local.x = X0; else if (i === 1) P.local.x = X1; else if (i === 2) P.local.z = Z0; else P.local.z = Z1; }
+      P.local.y = T.lowerY; P.lvy = 0;
+      if (l > 0) { P.bob += dt * 8; if (Math.floor(P.bob / Math.PI) !== Math.floor((P.bob - dt * 8) / Math.PI) && G.Audio) G.Audio.step('wood'); }
+      return true;
+    }
+    // inizio dell'arrampicata: contro la murata, accanto alle sartie
+    if (T.rigs && l > 0 && P.local.y <= T.deck + 0.05 && hasRig(b)) {
+      for (let i = 0; i < T.rigs.length; i++) { const r = T.rigs[i]; for (const sd of [-1, 1]) {
+        if (Math.abs(P.local.z - r.bz) < 0.9 && sd * P.local.x > BT.deckHalfW(T, P.local.z) - 0.4 && lx * sd > 0.45 && (k.KeyW || P.ax.f > 0.3)) { P.rig = { i, sd, k: 0.02 }; return true; }
+      } }
+    }
+    return false;
+  };
+  const hasRig = (b) => { const i = b.parts.findIndex((p) => p.name === 'Sartie'); return i >= 0 && b.filled[i]; };
+  BT.rigReset = function (P) { P.rig = null; P.top = null; P.lower = false; };
+  // boccaporto: scendi o sali
+  BT.hatchUse = function (P) {
+    const b = P.boat; if (!b || !b.T.lower || P.helm || !BT.isComplete(b)) return false;
+    const T = b.T, [hx, hz] = T.hatch;
+    if (P.lower) { if (Math.hypot(P.local.x - hx, P.local.z - (hz - 0.4)) < 1.8) { P.lower = false; P.local.set(hx + 1.25, T.deck, hz); if (G.Audio) G.Audio.step('wood'); return true; } return false; }
+    if (!P.rig && !P.top && Math.hypot(P.local.x - hx, P.local.z - hz) < 1.9) { P.lower = true; P.local.set(hx, T.lowerY, hz - 1.6); P.yaw = b.yaw; if (G.Audio) G.Audio.step('wood'); return true; }
+    return false;
+  };
+  // cosa suggerire (sartie, coffa, boccaporto)
+  BT.rigHint = function (P) {
+    const b = P.boat; if (!b || P.helm) return null; const T = b.T;
+    if (P.rig) return ['Sartie', '<kbd>W</kbd> sali · <kbd>S</kbd> scendi'];
+    if (P.top) return ['Coffa', '<kbd>Maiusc</kbd> riscendi dalle sartie'];
+    if (T.lower && BT.isComplete(b)) { const [hx, hz] = T.hatch;
+      if (P.lower && Math.hypot(P.local.x - hx, P.local.z - (hz - 0.4)) < 1.8) return ['Scala del boccaporto', `<kbd>${G.useKey()}</kbd> sali sul ponte`];
+      if (!P.lower && Math.hypot(P.local.x - hx, P.local.z - hz) < 1.9) return ['Boccaporto', `<kbd>${G.useKey()}</kbd> scendi sottocoperta`]; }
+    if (T.rigs && !P.lower && hasRig(b)) for (const r of T.rigs) if (Math.abs(P.local.z - r.bz) < 1.1 && Math.abs(P.local.x) > BT.deckHalfW(T, P.local.z) - 0.8) return ['Sartie', 'cammina contro la murata con <kbd>W</kbd> per arrampicarti'];
+    return null;
+  };
+  // luci delle lanterne quando sei sotto
+  BT.lowerLights = function (b, on) {
+    if (!b.T.lower) return;
+    if (on && !b._ll) { b._ll = []; const T = b.T; for (const z of [T.lowerZ[0] + 2.2, T.hatch[1] - 2.2, T.lowerZ[1] - 2.2]) { const l = new THREE.PointLight(0xffa850, 1.4, 9, 1.6); l.position.set(1.1, T.deck - 0.8, z); b.inner.add(l); b._ll.push(l); } }
+    if (b._ll) for (const l of b._ll) l.visible = !!on;
   };
   BT.inHelmZone = (b, v) => Math.hypot(v.x - b.T.helm[0], v.z - b.T.helm[1]) < 1.0;
   // locale (scafo) -> mondo
@@ -183,7 +329,7 @@
         for (const z of [-T.L * 0.3, 0, T.L * 0.3]) deck.push(box(T.W, 0.16, 0.2, 0, T.deck - 0.15, z));
         add('Ponte e traverse', 'assi', 10, M.merge(deck), 'planks');
         const h = 9;
-        add('Albero', 'albero_barca', 1, M.merge([cyl(0.1, 0.14, h, 0, T.deck + h / 2, 0.6), cyl(0.05, 0.05, 3.8, 0, T.deck + 1.4, 0.6 - 1.8, Math.PI / 2, 0)].map((g) => M.colorize(g, 1, 1, 1))), 'logs');
+        add('Albero', 'albero_barca', 1, M.merge([cyl(0.1, 0.14, h, 0, T.deck + h / 2, 0.6), cyl(0.05, 0.05, 3.8, 0, T.deck + 1.4, 0.6 - 1.8, Math.PI / 2, 0)].map((g) => M.colorize(g, 1, 1, 1))), 'spar');
         const sh = new THREE.BufferGeometry(); sh.setAttribute('position', new THREE.Float32BufferAttribute([0, T.deck + 1.5, 0.45, 0, T.deck + h - 0.3, 0.45, 0, T.deck + 1.5, 0.6 - 3.7], 3)); sh.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 0], 2)); sh.computeVertexNormals();
         add('Vela latina', 'vela', 2, M.colorize(sh, 1, 1, 1), 'cloth');
         add('Timoni', 'timone', 1, M.merge([box(0.08, 0.9, 0.5, -off, -0.1, -T.L / 2 - 0.1), box(0.08, 0.9, 0.5, off, -0.1, -T.L / 2 - 0.1), box(T.W * 0.9, 0.06, 0.06, 0, T.deck + 0.4, -T.L / 2 + 0.4)]), 'planks');
@@ -192,9 +338,10 @@
       }
     } else {
       const { L, W, D, sheer } = T;
-      add('Chiglia', 'tronco', key === 'galeone' ? 14 : key === 'veliero' ? 8 : key === 'barca_vela' ? 4 : 3, keelGeo(L, W, D, sheer), 'logs');
-      const rows = key === 'galeone' ? 14 : key === 'veliero' ? 10 : 6;
-      const per = key === 'galeone' ? 36 : key === 'veliero' ? 20 : key === 'barca_vela' ? 12 : 8;
+      const GAL = key === 'galeone' || key === 'vascello', VAS = key === 'vascello';
+      add('Chiglia', 'tronco', VAS ? 20 : key === 'galeone' ? 14 : key === 'veliero' ? 8 : key === 'barca_vela' ? 4 : 3, keelGeo(L, W, D, sheer), 'logs');
+      const rows = VAS ? 18 : key === 'galeone' ? 14 : key === 'veliero' ? 10 : 6;
+      const per = VAS ? 52 : key === 'galeone' ? 36 : key === 'veliero' ? 20 : key === 'barca_vela' ? 12 : 8;
       add('Fasciame sinistro', 'assi', per, hullSide(L, W, D, sheer, -1, rows), 'planks');
       add('Fasciame destro', 'assi', per, hullSide(L, W, D, sheer, 1, rows), 'planks');
       const H = hullShape(L, W, D, sheer);
@@ -207,29 +354,29 @@
         add('Remo destro', 'remo', 1, oar(H.hw(0.45) + 0.9, D * 0.4, -0.25, 1, 2.6), 'planks');
         P[P.length - 1].oar = 1; P[P.length - 1].pivot = new V3(H.hw(0.45), D * 0.4 + 0.3, -0.25);
       } else {
-        add('Ponte', 'assi', key === 'galeone' ? 28 : key === 'veliero' ? 16 : 8, deckGeo(L, W, D, sheer, 0.18), 'planks');
+        add('Ponte', 'assi', VAS ? 40 : key === 'galeone' ? 28 : key === 'veliero' ? 16 : 8, VAS ? deckGeo(L, W, D, sheer, 0.18, { z: T.hatch[1], hz: 0.85, hx: 0.7 }) : deckGeo(L, W, D, sheer, 0.18), 'planks');
         const deckY = D * 0.38 - 0.18;
-        const masts = key === 'galeone' ? [[0.7, 13, 'Albero di trinchetto', 'Vele di trinchetto', 5.2], [0.5, 15.5, 'Albero maestro', 'Vele maestre', 6.2], [0.3, 11, 'Albero di mezzana', 'Vela di mezzana', 4.4]] : key === 'veliero' ? [[0.62, 9.5, 'Albero di trinchetto', 'Vela di trinchetto', 3.6], [0.36, 11, 'Albero maestro', 'Vela maestra', 4.4]] : [[0.62, 7.2, 'Albero', 'Vela', 3.2]];
+        const masts = VAS ? [[0.72, 16, 'Albero di trinchetto', 'Vele di trinchetto', 6.6], [0.5, 19, 'Albero maestro', 'Vele maestre', 7.8], [0.28, 13.5, 'Albero di mezzana', 'Vela di mezzana', 5.6]] : key === 'galeone' ? [[0.7, 13, 'Albero di trinchetto', 'Vele di trinchetto', 5.2], [0.5, 15.5, 'Albero maestro', 'Vele maestre', 6.2], [0.3, 11, 'Albero di mezzana', 'Vela di mezzana', 4.4]] : key === 'veliero' ? [[0.62, 9.5, 'Albero di trinchetto', 'Vela di trinchetto', 3.6], [0.36, 11, 'Albero maestro', 'Vela maestra', 4.4]] : [[0.62, 7.2, 'Albero', 'Vela', 3.2]];
         for (const [t, h, mn, vn, sw] of masts) {
           const z = (t - 0.5) * L;
-          if (key === 'galeone') {
+          if (GAL) {
             // vele quadre su pennoni trasversali, con coffa
             const yards = [0.35, 0.62, 0.86].map((f) => deckY + 2 + (h - 3) * f);
-            add(mn, 'albero_barca', 2, M.merge([cyl(0.2, 0.3, h, 0, deckY + h / 2, z), ...yards.map((y, i) => cyl(0.07, 0.07, sw * (1.15 - i * 0.22), 0, y, z, 0, Math.PI / 2)), cyl(0.9, 0.9, 0.15, 0, deckY + (h - 3) * 0.5 + 2, z)].map((g) => M.colorize(g, 1, 1, 1))), 'logs');
+            add(mn, 'albero_barca', VAS ? 3 : 2, M.merge([cyl(0.2, 0.3, h, 0, deckY + h / 2, z), ...yards.map((y, i) => cyl(0.07, 0.07, sw * (1.15 - i * 0.22), 0, y, z, 0, Math.PI / 2)), cyl(0.9, 0.9, 0.15, 0, deckY + (h - 3) * 0.5 + 2, z)].map((g) => M.colorize(g, 1, 1, 1))), 'spar');
             const sails = yards.slice(0, 2).map((y, i) => { const g = new THREE.PlaneGeometry(sw * (1.1 - i * 0.25), (yards[i + 1] - y) * 0.95, 8, 6); const pp = g.attributes.position; for (let k = 0; k < pp.count; k++) { const u = pp.getX(k) / (sw * 1.1) + 0.5, v = pp.getY(k) / ((yards[i + 1] - y)) + 0.5; pp.setZ(k, Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.6); } g.computeVertexNormals(); g.translate(0, (yards[i + 1] + y) / 2, z + 0.25); return M.colorize(g, 1, 1, 1); });
             const low = new THREE.PlaneGeometry(sw * 1.15, yards[0] - deckY - 2.45, 8, 4); low.translate(0, (yards[0] + deckY + 2.45) / 2, z + 0.25); sails.push(M.colorize(low, 1, 1, 1)); // la vela bassa parte sopra la testa di chi cammina sul ponte
             add(vn, 'vela', 3, M.merge(sails), 'cloth');
           } else {
-          add(mn, 'albero_barca', 1, M.merge([cyl(0.12, 0.17, h, 0, deckY + h / 2, z), cyl(0.06, 0.06, sw * 0.95, 0, deckY + 1.6, z - sw * 0.45, Math.PI / 2, 0), cyl(0.05, 0.05, sw * 0.8, 0, deckY + h - 0.6, z - sw * 0.38, Math.PI / 2, 0)].map((g) => M.colorize(g, 1, 1, 1))), 'logs');
+          add(mn, 'albero_barca', 1, M.merge([cyl(0.12, 0.17, h, 0, deckY + h / 2, z), ...(key === 'veliero' ? [cyl(0.7, 0.7, 0.12, 0, rigTop(T, t, h), z)] : []), cyl(0.06, 0.06, sw * 0.95, 0, deckY + 1.6, z - sw * 0.45, Math.PI / 2, 0), cyl(0.05, 0.05, sw * 0.8, 0, deckY + h - 0.6, z - sw * 0.38, Math.PI / 2, 0)].map((g) => M.colorize(g, 1, 1, 1))), 'spar');
           add(vn, 'vela', 1, sailGeo(sw * 0.92, h - 2.4, 0.45, 0, deckY + 1.75 + (h - 2.4) / 2, z - sw * 0.46), 'cloth');
           }
         }
-        if (key === 'galeone') {
-          add('Cassero di poppa', 'assi', 20, M.merge([box(W * 0.8, 2.6, L * 0.14, 0, deckY + 1.3, -L * 0.43), box(W * 0.86, 0.16, L * 0.16, 0, deckY + 2.68, -L * 0.43), box(W * 0.7, 0.9, 0.08, 0, deckY + 3.2, -L * 0.36), box(0.8, 1.8, 0.06, 0, deckY + 0.9, -L * 0.36 + 0.02)]), 'planks');
-          add('Castello di prua', 'assi', 12, M.merge([box(W * 0.72, 1.8, L * 0.16, 0, deckY + 0.9, L * 0.42), box(W * 0.76, 0.14, L * 0.17, 0, deckY + 1.85, L * 0.42)]), 'planks');
+        if (GAL) {
+          add('Cassero di poppa', 'assi', VAS ? 30 : 20, M.merge([box(W * 0.8, 2.6, L * 0.14, 0, deckY + 1.3, -L * 0.43), box(W * 0.86, 0.16, L * 0.16, 0, deckY + 2.68, -L * 0.43), box(W * 0.7, 0.9, 0.08, 0, deckY + 3.2, -L * 0.36), box(0.8, 1.8, 0.06, 0, deckY + 0.9, -L * 0.36 + 0.02)]), 'planks');
+          add('Castello di prua', 'assi', VAS ? 18 : 12, M.merge([box(W * 0.72, 1.8, L * 0.16, 0, deckY + 0.9, L * 0.42), box(W * 0.76, 0.14, L * 0.17, 0, deckY + 1.85, L * 0.42)]), 'planks');
           const cannons = []; for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) { const t = 0.28 + i * 0.1, z = (t - 0.5) * L, x = sd * (H.hw(t) - 0.35); const c = cyl(0.13, 0.17, 1.4, x, deckY + 0.55, z, 0, -sd * Math.PI / 2); c.translate(0, 0, 0); cannons.push(M.colorize(c, 0.07, 0.07, 0.075)); cannons.push(M.colorize(new THREE.BoxGeometry(0.5, 0.35, 0.6).translate(x - sd * 0.4, deckY + 0.2, z), 0.32, 0.2, 0.11)); }
           add('Cannoni', 'cannone', 6, M.merge(cannons), 'cannon');
-          const fl = new THREE.PlaneGeometry(2.2, 1.4); fl.translate(1.1, deckY + 15.5 + 0.6, (0.5 - 0.5) * L); add('Bandiera', 'stoffa', 2, M.colorize(fl, 0.12, 0.12, 0.12), 'cloth');
+          const fl = new THREE.PlaneGeometry(2.2, 1.4); fl.translate(1.1, deckY + (VAS ? 19 : 15.5) + 0.6, (0.5 - 0.5) * L); add('Bandiera', 'stoffa', 2, M.colorize(fl, 0.12, 0.12, 0.12), 'cloth');
         }
         if (key === 'veliero') add('Cassero', 'assi', 12, M.merge([box(W * 0.75, 1.9, 3.2, 0, deckY + 0.95, -L * 0.33), box(W * 0.85, 0.14, 3.5, 0, deckY + 1.95, -L * 0.33), box(0.7, 1.4, 0.06, 0, deckY + 0.7, -L * 0.33 + 1.62)]), 'planks');
         add('Timone', 'timone', 1, M.merge([box(0.1, D * 1.1, 0.7, 0, -D * 0.1, -L / 2 - 0.35), cyl(0.04, 0.04, 1.4, 0, D * 0.55, -L / 2 + 0.3, Math.PI / 2 - 0.25, 0, [1, 1, 1])]), 'planks');
@@ -238,8 +385,11 @@
           const z = (t - 0.5) * L, top = new V3(0, deckY + h - 0.2, z);
           rp.push(rope(top, new V3(0, D * 0.38 + 0.1, L / 2 - 0.1)), rope(top, new V3(-H.hw(t) * 0.95, H.gw(t), z - 0.6)), rope(top, new V3(H.hw(t) * 0.95, H.gw(t), z - 0.6)), rope(top, new V3(0, H.gw(0.05) + 0.2, -L / 2 + 0.4)));
         }
-        add('Sartiame', 'corda', key === 'galeone' ? 16 : key === 'veliero' ? 8 : 4, M.merge(rp), 'rope');
-        if (key === 'veliero' || key === 'galeone') add('Stiva', 'baule', key === 'galeone' ? 2 : 1, box(key === 'galeone' ? 1.2 : 1.0, 0.6, 0.65, 0, deckY + 0.3, L * (key === 'galeone' ? 0.08 : 0.05)), 'planks');
+        add('Sartiame', 'corda', VAS ? 22 : key === 'galeone' ? 16 : key === 'veliero' ? 8 : 4, M.merge(rp), 'rope');
+        // sartie con griselle: scale di corda dalla murata alla coffa (dietro le vele quadre, davanti a quelle auriche)
+        if (T.rigs) { const rg = []; for (const r of T.rigs) for (const sd of [-1, 1]) rg.push(ratlines(r, sd)); add('Sartie', 'corda', VAS ? 14 : key === 'galeone' ? 10 : 6, M.merge(rg), 'rope'); }
+        if (key === 'veliero' || GAL) add('Stiva', 'baule', VAS ? 3 : key === 'galeone' ? 2 : 1, box(GAL ? 1.2 : 1.0, 0.6, 0.65, 0, deckY + 0.3, L * (VAS ? 0.12 : key === 'galeone' ? 0.08 : 0.05)), 'planks');
+        if (VAS) { add('Ponte di sotto', 'assi', 30, lowerDeckGeo(T), 'planks'); add('Cannoni di sotto', 'cannone', 4, lowerCannonsGeo(T), 'cannon'); add('Lanterne', 'torcia', 3, lanternsGeo(T), 'lantern'); }
       }
     }
     for (const p of P) { p.geo.computeBoundingBox(); }

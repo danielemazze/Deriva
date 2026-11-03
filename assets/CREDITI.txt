@@ -1,3 +1,6 @@
+Texture fotografiche (cartella acg): ambientCG (ambientcg.com), licenza CC0 1.0 (pubblico dominio).
+Foglie, fili d'erba e rametti delle carte di fogliame composti dagli atlanti ambientCG (CC0).
+
 Texture fotografiche: Babylon.js Assets (https://github.com/BabylonJS/Assets), licenza Creative Commons Attribution 4.0. Normal map di erba, sabbia e terra ricavate dalle foto.
 
 Modelli 3D scansionati (cartella models): rocce "rock_moss_set_01/02", scogliere

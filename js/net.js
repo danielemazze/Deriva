@@ -110,6 +110,7 @@
       case 'time': if (!N.isHost) { N.targetTime = m.time; if (m.vg !== undefined) G.voiceGlobal = !!m.vg; if (m.ki !== undefined) G.keepInv = !!m.ki; if (m.wind !== undefined) G.Boats.wind.dir = m.wind; if (m.lv !== undefined && m.lv !== G.WIND.level) G.setWind(m.lv); if (m.mode && m.mode !== G.mode) G.setMode(m.mode); if (m.en !== undefined && !!m.en === !!G.enemiesOff) G.setEnemies(!!m.en); if (m.wx && G.Climate) { const C = G.Climate; if (m.wx.kind !== C.state.kind) C.setWeather(m.wx.kind, m.wx.lock, false); C.state.t = m.wx.t; C.state.lock = !!m.wx.lock; G.moonOffset = m.wx.moon || 0; } } break;
       case 'chat': G.UI.toast(`${m.from}: ${m.text}`); break;
       case 'padm': if (G.Admin) G.Admin.onCmd(m); break;
+      case 'agone': { const a = G.Entities.byId.get(m.id); if (a) G.Entities.removeAnimal(a); (G.state.killed = G.state.killed || new Set()).add(m.id); break; }
       case 'kicked': G.UI.toast(`Sei stato espulso dalla partita da ${m.by}`, 'warn'); setTimeout(() => N.leave(true), 300); break;
       case 'pinfo': if (G.Admin) G.Admin.onInfo(m.id, m.d); break;
       case 'oplog': if (G.Admin) G.Admin.log(m.text); break;
@@ -172,7 +173,7 @@
       N.stT = 1 / 15;
       const held = P.held();
       N.send({ t: 'st', p: [+P.pos.x.toFixed(2), +P.pos.y.toFixed(2), +P.pos.z.toFixed(2)], yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(2),
-        h: held ? held.id : null, lh: P.equip && P.equip[0] ? P.equip[0].id : null, bl: P.blocking ? 1 : 0, sw: P.swingT > 0.5 ? 1 : 0, sm: P.swim ? 1 : 0, b: P.boat ? P.boat.id : null, cr: G.creative() || P.ghost ? 1 : 0, hm: P.boat && P.helm && P.boat.T.sit ? 1 : 0, hp: Math.round(P.health), ping: N.ping });
+        h: held ? held.id : null, lh: P.equip && P.equip[0] ? P.equip[0].id : null, bl: P.blocking ? 1 : 0, sw: P.swingT > 0.5 ? 1 : 0, sm: P.swim ? 1 : 0, b: P.boat ? P.boat.id : null, cr: G.creative() || P.ghost ? 1 : 0, mt: P.mount ? P.mount.sp : 0, hm: P.boat && P.helm && P.boat.T.sit ? 1 : 0, hp: Math.round(P.health), ping: N.ping });
     }
     if (N.pingT <= 0) { N.pingT = 2; N.send({ t: 'ping', c: now }); }
     if (N.pdT <= 0) { N.pdT = 8; N.send({ t: 'pdata', data: P.serialize() }); }
@@ -236,11 +237,11 @@
     N.remotes.set(id, r);
     if (st) N.applyState(r, st);
   };
-  N.removeRemote = function (id) { const r = N.remotes.get(id); if (!r) return; if (G.Voice) G.Voice.closePeer(id); G.scene.remove(r.g); N.remotes.delete(id); };
+  N.removeRemote = function (id) { const r = N.remotes.get(id); if (!r) return; if (r.horse) G.scene.remove(r.horse.rig.root); if (G.Voice) G.Voice.closePeer(id); G.scene.remove(r.g); N.remotes.delete(id); };
   N.applyState = function (r, m) {
     r.target.set(m.p[0], m.p[1], m.p[2]);
     if (!r.seen) { r.pos.copy(r.target); r.seen = true; }
-    r.tyaw = m.yaw; r.pitch = m.pitch; r.swimming = !!m.sm; r.boat = m.b; r.sit = !!m.hm; r.ping = m.ping || 0; r.hp = m.hp;
+    r.tyaw = m.yaw; r.pitch = m.pitch; r.swimming = !!m.sm; r.boat = m.b; r.sit = !!m.hm || !!m.mt; r.mt = m.mt || 0; r.ping = m.ping || 0; r.hp = m.hp;
     if (m.sw) r.swing = 1;
     r.blocking = !!m.bl;
     if (r.lheld !== (m.lh || null)) {
@@ -260,6 +261,7 @@
     const sp = prev.distanceTo(r.pos) / Math.max(dt, 1e-3);
     r.speed += (Math.min(sp, 7) - r.speed) * Math.min(1, dt * 8);
     r.g.position.copy(r.pos);
+    if (G.Mount) { const seat = G.Mount.remote(r, dt); if (seat) r.g.position.y += seat - 0.25; }
     r.g.rotation.y = r.yaw;
     const sitting = !!r.sit;
     if (r.person) {

@@ -88,6 +88,7 @@
   };
   function toolMesh(id) {
     const MAT = G.MAT;
+    if (G.Music && G.Music.is(id)) return G.Music.mesh(id);
     const det = G.Tools && G.Tools.build(id);
     if (det) { det.rotation.x += -0.25; det.position.set(0.02, 0.0, -0.06); return det; }
     const g = new THREE.Group();
@@ -159,10 +160,13 @@
       _dir.set(0, 0, 0).addScaledVector(_f, inputF).addScaledVector(_r, inputR);
       if (_dir.lengthSq() > 0) _dir.normalize();
       const runK = !!(k.ControlLeft || k.ControlRight), down = !!(k.KeyC || k.ShiftLeft || k.ShiftRight);
-      P.crouch = !P.fly && !P.swim && !!(k.ShiftLeft || k.ShiftRight);
+      P.crouch = !P.fly && !P.swim && !P.mount && !!(k.ShiftLeft || k.ShiftRight);
+      // a cavallo Maiusc fa scendere
+      if (P.mount && (k.ShiftLeft || k.ShiftRight) && !P._shiftHeld && G.Mount) G.Mount.dismount(P);
+      P._shiftHeld = !!(k.ShiftLeft || k.ShiftRight);
       if (!runK || P.stamina <= 0) P._runOK = P.stamina > 15; // senza fiato: si riparte solo dopo aver recuperato un po'
-      const sprint = runK && P.hunger > 5 && !P.crouch && (P._runOK !== false) && (P.stamina > 0 || G.creative());
-      P.sprinting = sprint && _dir.lengthSq() > 0 && !P.fly;
+      const sprint = P.mount ? runK && G.Mount.canGallop(P) : runK && P.hunger > 5 && !P.crouch && (P._runOK !== false) && (P.stamina > 0 || G.creative());
+      P.sprinting = sprint && _dir.lengthSq() > 0 && !P.fly && !P.mount;
       if (P.fly) {
         const sp = runK ? 24 : 10;
         const want = new V3(_dir.x * sp, (k.Space ? 1 : 0) * sp * 0.7 - (down ? 1 : 0) * sp * 0.7, _dir.z * sp);
@@ -189,7 +193,7 @@
         if (Math.random() < dt * 2 && P.under) G.FX.bubble(P.pos.x + _f.x * 0.3, P.pos.y + EYE - 0.1, P.pos.z + _f.z * 0.3);
       } else {
         const wading = depth > 0.4;
-        const sp = (sprint ? 6.4 * G.Skills.mul('corsa', 0.004) : P.crouch ? 2.1 : 4.2) * (wading ? 0.6 : 1) * (G.Climate ? G.Climate.speedMul() : 1);
+        const sp = (P.mount ? G.Mount.speed(P, sprint) : sprint ? 6.4 * G.Skills.mul('corsa', 0.004) : P.crouch ? 2.1 : 4.2) * (wading ? 0.6 : 1) * (G.Climate ? G.Climate.speedMul() : 1);
         const acc = P.onGround ? 14 : 3;
         P.vel.x += (_dir.x * sp - P.vel.x) * Math.min(1, dt * acc);
         P.vel.z += (_dir.z * sp - P.vel.z) * Math.min(1, dt * acc);
@@ -212,7 +216,7 @@
           P.fallFrom = P.pos.y;
         } else P.vel.y -= 22 * dt;
         }
-        if (k.Space && P.onGround && !P.climbing) { P.vel.y = 7.4; P.onGround = false; }
+        if (k.Space && P.onGround && !P.climbing) { P.vel.y = P.mount ? 8.2 : 7.4; P.onGround = false; }
         // salite realistiche: sui pendii troppo ripidi (oltre ~42°) non si sale, si scivola giù
         if (P.onGround && !P.climbing && !P.swim) {
           const nx = P.pos.x + P.vel.x * dt, nz = P.pos.z + P.vel.z * dt, g0 = G.World.groundAt(P.pos.x, P.pos.z), g1 = G.World.groundAt(nx, nz), run = Math.hypot(nx - P.pos.x, nz - P.pos.z);
@@ -263,7 +267,7 @@
       }
     }
     P.crouchK = G.lerp(P.crouchK || 0, P.crouch && !P.boat ? 1 : 0, Math.min(1, dt * 10));
-    P.eye.set(P.pos.x, P.pos.y + (P.boat && P.helm && P.boat.T.sit ? 0.95 : EYE - 0.55 * P.crouchK), P.pos.z);
+    P.eye.set(P.pos.x, P.pos.y + (P.boat && P.helm && P.boat.T.sit ? 0.95 : EYE - 0.55 * P.crouchK + (P.mount && G.Mount ? G.Mount.seat(P) : 0)), P.pos.z);
     P.under = P.eye.y < (G.waterLevelAt ? G.waterLevelAt(P.eye.x, P.eye.z, t, P.eye.y) : G.waveHeight(P.eye.x, P.eye.z, t)) - 0.05;
     P.inLake = P.under && G.lakeLevelAt && G.lakeLevelAt(P.eye.x, P.eye.z) !== null;
     P.underground = !!(G.Dig && G.Dig.activeAt(P.pos.x, P.pos.z) && G.heightAt(P.pos.x, P.pos.z) - P.eye.y > 1.2);
@@ -359,6 +363,7 @@
       let lx = wx * c - wz * s, lz = wx * s + wz * c;
       const l = Math.hypot(lx, lz); if (l > 0) { lx /= l; lz /= l; }
       const sp = (k.ControlLeft || k.ControlRight) ? 4.4 : 2.9;
+      if (G.Boats.rigMove(b, P, dt, k, lx, lz, l, sp)) { G.Boats.localToWorld(b, P.local, P.pos); P.vel.set(0, 0, 0); G.Boats.lowerLights(b, P.lower); return; }
       P.local.x += lx * sp * dt; P.local.z += lz * sp * dt;
       // salto sul ponte
       if (k.Space && P.local.y <= T.deck + 0.001) P.lvy = 5.2;
@@ -516,6 +521,7 @@
     if (G.Sea && G.Sea.station) { G.Sea.stationFire(P); P.actionCd = 0.3; return; }
     if (P.boat && P.helm && G.Sea && G.Sea.broadside(P)) { P.actionCd = 0.4; return; }
     if (P.boat && !P.helm && G.Sea && (!P.held() || P.held().id === 'munizioni') && G.Sea.fireCannonNear(P)) { P.actionCd = 0.4; return; }
+    if (G.Music && G.Music.play(P)) return;
     if (tool === 'arco') return; // l'arco si tende tenendo premuto (vedi combat.js)
     if (tool === 'pistola' || tool === 'pistola_capitano') { if (!P.boat || !P.helm) G.Combat.fire(P, tool); P.actionCd = 0.3; return; }
     const W = G.ITEMS[toolId] || {};
@@ -613,7 +619,7 @@
     const grp = new THREE.Group();
     if (info.scanMat) { const m1 = new THREE.Mesh(info.trunk, info.scanMat); m1.castShadow = true; grp.add(m1); }
     else {
-      const m1 = new THREE.Mesh(info.trunk, info.leafTex === 'frond' ? G.MAT.palmBark : G.MAT.bark), m2 = new THREE.Mesh(info.leaves, G.MAT.leaves[info.leafTex]);
+      const m1 = new THREE.Mesh(info.trunk, G.MAT.barkFor ? G.MAT.barkFor(info.leafTex) : G.MAT.bark), m2 = new THREE.Mesh(info.leaves, G.MAT.leaves[info.leafTex]);
       m1.castShadow = m2.castShadow = true; grp.add(m1, m2);
     }
     const e = res.entry; const s = e.s;
@@ -638,7 +644,10 @@
   P.secondary = function () {
     const it = P.held(), id = it ? it.id : null, tg = P.target;
     if (P.placing) { G.UI.placeConfirm(); return; }
+    if (G.Mount && G.Mount.trySecondary(P)) return;
+    if (!P.target && G.Music && G.Music.secondary(P)) return;
     if (G.Stealth && P.crouch && G.Stealth.steal(P)) return;
+    if (P.boat && G.Boats.hatchUse(P)) return;
     if (G.Sea && P.boat && !P.helm && (!P.held() || P.held().id === 'munizioni' || !G.Build.isPlaceable(P.held().id)) && G.Sea.stationToggle(P)) return;
     if (G.FreeBoat && G.FreeBoat.cur && G.FreeBoat.tryPlace(P)) return;
     if (P.wantsInteract()) { P.interact(); return; }
@@ -711,6 +720,7 @@
       const p = tg.piece;
       if (p.t === 'porta') { p.open = !p.open; G.Build.refresh(p); if (G.Net && G.Net.on) G.Net.send({ t: 'bupd', id: p.id, open: p.open ? 1 : 0 }); if (G.Audio) G.Audio.door(); return; }
       if (p.t === 'baule' || p.t === 'forziere') {
+        if (G.Lockpick && G.Lockpick.locked(p)) { if (P.crouch) G.Lockpick.start(p); else G.UI.toast('Chiuso a chiave: accovacciati (Maiusc) per scassinarlo, senza farti vedere'); return; }
         if (p.gen && G.Structures) G.Structures.openChest(p);
         else G.UI.openChest(p.inv, 'Baule', { piece: p });
         return;
@@ -733,6 +743,8 @@
     }
   };
   P.boardBoat = function (b, climbed) {
+    if (P.mount && G.Mount) G.Mount.dismount(P, true);
+    G.Boats.rigReset(P);
     // sali nel punto del ponte più vicino a te
     P.boat = b; P.helm = false; P.cam3 = false; P.endFish(); P._boatYaw = b.yaw;
     G.Boats.worldToLocal(b, P.pos, P.local); P.local.y = b.T.deck; P.lvy = 0;
@@ -740,6 +752,7 @@
     if (!P._boardTip || performance.now() - P._boardTip > 60000) { P._boardTip = performance.now(); G.UI.toast(`${climbed ? 'Sei salito a bordo' : 'A bordo'} · il segno dorato indica ${b.T.helmTxt.toLowerCase()}: vai lì e ${G.useHow()} per guidare`, 'good'); }
   };
   P.leaveBoat = function (silent) {
+    if (P.boat) G.Boats.lowerLights(P.boat, false); G.Boats.rigReset(P);
     const b = P.boat; if (!b) return;
     if (!silent && !b.anchored && !b.ai && !b.pirate && (!P._anchorTip || performance.now() - P._anchorTip > 90000)) { P._anchorTip = performance.now(); setTimeout(() => G.UI.toast('Senza ancora la barca va lentamente dove la porta il vento · torna a bordo e premi X per gettarla', ''), 400); }
     P.boat = null; P.helm = false; P._boatYaw = undefined; G.UI.setBoatHud(false);
@@ -816,7 +829,7 @@
   }
 
   P.serialize = () => ({ pos: [P.pos.x, P.pos.y, P.pos.z], yaw: P.yaw, pitch: P.pitch, health: P.health, hunger: P.hunger, thirst: P.thirst, inv: P.inv, sel: P.sel, spawn: P.spawn,
-    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina, pw: { god: !!P.god, pc: !!P.pcreative, fly: !!P.allowFly, nn: !!P.noNeeds, gh: !!P.ghost } });
+    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina, picked: P.picked || {}, mount: G.Mount ? G.Mount.serialize(P) : null, pw: { god: !!P.god, pc: !!P.pcreative, fly: !!P.allowFly, nn: !!P.noNeeds, gh: !!P.ghost } });
   P.resetProgress = function () { P.god = P.pcreative = P.allowFly = P.noNeeds = P.ghost = false; P.quests = []; P.questsDone = {}; P.discovered = {}; P.revealed = {}; P.explored = new Set(); P.kills = {}; P.rareFound = {}; P.stats = {}; P.known = {}; };
   P.load = function (d) {
     if (!d) return;
@@ -827,6 +840,8 @@
     P.equip = Array.isArray(d.equip) ? d.equip.slice(0, 4).concat([null, null, null, null]).slice(0, 4) : [null, null, null, null];
     if (typeof d.temp === 'number') P.temp = d.temp;
     G.Skills.load(d.skills); if (typeof d.stamina === 'number') P.stamina = d.stamina;
+    if (G.Mount) G.Mount.load(P, d.mount);
+    P.picked = d.picked || {};
     { const w = d.pw || {}; P.god = !!w.god; P.pcreative = !!w.pc; P.allowFly = !!w.fly; P.noNeeds = !!w.nn; P.ghost = !!w.gh; }
     // il libro non sta più nell'inventario: si apre con B
     P.inv = P.inv.map((st) => (st && st.id === 'libro' ? null : st)); P.equip = P.equip.map((st) => (st && st.id === 'libro' ? null : st));

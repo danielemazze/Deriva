@@ -117,8 +117,8 @@
 
   /* ---------------- commercio ---------------- */
   const SHOP = {
-    base: [['freccia', 8, 3], ['munizioni', 4, 6], ['pala', 1, 12], ['mappa_tesoro', 1, 35], ['corda', 4, 3], ['torcia', 4, 2]],
-    coloniale: [['pistola', 1, 95], ['sciabola', 1, 45], ['cannocchiale', 1, 140], ['progetto_catamarano', 1, 120], ['progetto_galeone', 1, 420], ['cannone', 1, 30], ['stoffa', 4, 5]],
+    base: [['freccia', 8, 3], ['grimaldello', 3, 9], ['munizioni', 4, 6], ['pala', 1, 12], ['mappa_tesoro', 1, 35], ['corda', 4, 3], ['torcia', 4, 2]],
+    coloniale: [['pistola', 1, 95], ['sciabola', 1, 45], ['cannocchiale', 1, 140], ['progetto_catamarano', 1, 120], ['progetto_galeone', 1, 420], ['progetto_vascello', 1, 750], ['cannone', 1, 30], ['stoffa', 4, 5]],
     alberi: [['arco', 1, 20], ['freccia', 16, 5], ['cocco', 3, 2], ['progetto_canoa', 1, 30], ['pinne', 1, 160]],
     palafitte: [['lancia', 1, 12], ['canna', 1, 6], ['pesce_cotto', 3, 3], ['progetto_canoa', 1, 30]],
     fattoria: [['manzo_cotto', 2, 4], ['lana', 4, 3], ['stoffa', 4, 4], ['uovo', 4, 2], ['letto', 1, 15]],

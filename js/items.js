@@ -20,6 +20,11 @@
     conchiglia: { n: 'Conchiglia', d: 'Un ricordo della spiaggia.', cat: 'res' },
     cocco: { n: 'Noce di cocco', d: 'Dissetante e nutriente.', cat: 'food', food: 6, water: 20 },
     bacche: { n: 'Bacche', d: 'Raccolte dai cespugli.', cat: 'food', food: 6, water: 3 },
+    sella: { n: 'Sella e briglie', d: 'In mano, tasto destro su un cavallo, una zebra o un lama per cavalcarli.', cat: 'tool', stack: 1 },
+    grimaldello: { n: 'Grimaldello', d: 'Per scassinare i lucchetti dei bauli: accovacciato, E. Si spezza se forzi.', cat: 'tool', stack: 20 },
+    chitarra: { n: 'Chitarra', d: 'Clic sinistro pizzica le corde, clic destro cambia accordo.', cat: 'tool', stack: 1 },
+    flauto: { n: 'Flauto d’osso', d: 'Clic sinistro suona; guarda in su o in giù per cambiare nota.', cat: 'tool', stack: 1 },
+    osso_gallina: { n: 'Ossa di gallina', d: 'Le lasciano le galline. Con il coltello ne fai un flauto.', cat: 'res' },
     mela: { n: 'Mela', d: 'Croccante: dal banco di un mercante.', cat: 'food', food: 8, water: 5 },
     arancia: { n: 'Arancia', d: 'Succosa: disseta e sfama.', cat: 'food', food: 6, water: 10 },
     polpa_cactus: { n: 'Polpa di cactus', d: 'Amara ma piena d’acqua: salva la vita nel deserto.', cat: 'food', food: 3, water: 16 },
@@ -93,6 +98,7 @@
     progetto_canoa: { n: 'Progetto: canoa', d: 'Clic destro per impararlo: la canoa comparirà nel libro.', cat: 'blueprint', stack: 1, boat: 'canoa' },
     progetto_catamarano: { n: 'Progetto: catamarano', d: 'Clic destro per impararlo: il catamarano comparirà nel libro.', cat: 'blueprint', stack: 1, boat: 'catamarano' },
     progetto_galeone: { n: 'Progetto: galeone', d: 'Clic destro per impararlo: il galeone comparirà nel libro.', cat: 'blueprint', stack: 1, boat: 'galeone' },
+    progetto_vascello: { n: 'Progetto: vascello', d: 'Clic destro per impararlo: la nave più grande, con il ponte di sotto.', cat: 'blueprint', stack: 1, boat: 'vascello' },
     cannone: { n: 'Cannone', d: 'Parte del galeone. Si trova nei relitti o dai mercanti.', cat: 'part' },
     // vestiti (temperatura): wear = 1 testa, 2 corpo, 3 piedi; warm = calore, cool = riparo dal sole
     cappello_lana: { n: 'Berretto di lana', d: 'Tiene calda la testa. Indossalo nello slot Testa (inventario).', cat: 'wear', stack: 1, wear: 1, warm: 2 },
@@ -168,7 +174,7 @@
   /* ----------------- RICETTE -----------------
      Le lettere mappano gli oggetti; '.' è vuoto.
      size: griglia minima richiesta (3 = inventario, 5 = banco) */
-  const K = { T: 'tronco', A: 'assi', B: 'bastone', F: 'fibra', C: 'corda', P: 'pietra', L: 'lana', S: 'stoffa', O: 'foglie', X: 'baule', W: 'piume', H: 'pelle', N: 'carbone', Y: 'ossidiana', I: 'lingotto_ferro', R: 'chiodi' };
+  const K = { G: 'osso_gallina', K: 'coltello', T: 'tronco', A: 'assi', B: 'bastone', F: 'fibra', C: 'corda', P: 'pietra', L: 'lana', S: 'stoffa', O: 'foglie', X: 'baule', W: 'piume', H: 'pelle', N: 'carbone', Y: 'ossidiana', I: 'lingotto_ferro', R: 'chiodi' };
   const R = (out, n, rows, extra) => Object.assign({ out, n, rows }, extra || {});
   G.RECIPES = [
     R('assi', 4, ['T']),
@@ -216,6 +222,10 @@
     R('stivali_pelle', 1, ['H.H', 'H.H']),
     R('cappello_paglia', 1, ['.F.', 'FFF', 'F.F']),
     R('scudo', 1, ['AHA', 'AAA', '.A.']),
+    R('sella', 1, ['HHH', 'C.C']),
+    R('grimaldello', 4, ['I', 'B']),
+    R('chitarra', 1, ['.B.', 'ACA', 'ACA', '.C.'], { size: 5 }),
+    R('flauto', 1, ['KGG'], { keep: ['coltello'] }),
     R('trappola', 1, ['B.B', 'CPC', 'B.B']),
     R('torcia', 8, ['N', 'B']),
     R('coltello_ossidiana', 1, ['Y', 'B']),
@@ -378,6 +388,15 @@
     piume(c) { c.save(); c.translate(32, 32); c.rotate(0.6); c.beginPath(); c.moveTo(0, 26); c.quadraticCurveTo(14, 0, 0, -26); c.quadraticCurveTo(-14, 0, 0, 26); c.fillStyle = lg(c, -10, 0, 10, 0, ['#f6f2ea', '#d8d0c2']); c.fill(); outline(c, 1.5); c.strokeStyle = '#9a8f80'; c.beginPath(); c.moveTo(0, 28); c.lineTo(0, -24); c.stroke(); c.restore(); },
     conchiglia(c) { c.beginPath(); c.moveTo(32, 52); for (let a = -1.3; a <= 1.3; a += 0.26) c.lineTo(32 + Math.sin(a) * 24, 48 - Math.cos(a) * 34); c.closePath(); c.fillStyle = lg(c, 0, 14, 0, 52, ['#fbe1cf', '#f0b494', '#d98c6a']); c.fill(); outline(c);
       c.strokeStyle = 'rgba(150,80,50,0.5)'; for (let a = -1.0; a <= 1.0; a += 0.26) { c.beginPath(); c.moveTo(32, 52); c.lineTo(32 + Math.sin(a) * 22, 48 - Math.cos(a) * 31); c.stroke(); } },
+    sella(c) { c.beginPath(); c.moveTo(12, 30); c.quadraticCurveTo(32, 14, 52, 30); c.quadraticCurveTo(50, 44, 32, 46); c.quadraticCurveTo(14, 44, 12, 30); c.fillStyle = lg(c, 0, 16, 0, 46, ['#8a4a20', '#4a2410']); c.fill(); outline(c);
+      c.beginPath(); c.moveTo(40, 22); c.quadraticCurveTo(46, 12, 50, 16); c.lineWidth = 4; c.strokeStyle = '#4a2410'; c.stroke(); c.strokeStyle = '#c9a25e'; c.lineWidth = 2; c.beginPath(); c.arc(32, 50, 5, 0, 7); c.stroke(); c.beginPath(); c.moveTo(32, 46); c.lineTo(32, 40); c.stroke(); },
+    grimaldello(c) { c.strokeStyle = '#3a3a3e'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(14, 50); c.lineTo(46, 18); c.lineTo(50, 22); c.stroke(); c.strokeStyle = '#c8ccd2'; c.lineWidth = 2; c.beginPath(); c.moveTo(14, 50); c.lineTo(46, 18); c.lineTo(50, 22); c.stroke();
+      c.strokeStyle = '#6b4a22'; c.lineWidth = 7; c.beginPath(); c.moveTo(12, 52); c.lineTo(22, 42); c.stroke(); c.strokeStyle = '#9aa0a6'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(20, 54); c.lineTo(40, 34); c.lineTo(44, 38); c.stroke(); },
+    chitarra(c) { c.save(); c.translate(32, 34); c.rotate(-0.6); c.beginPath(); c.ellipse(0, 10, 12, 13, 0, 0, 7); c.ellipse(0, -4, 9, 9, 0, 0, 7); c.fillStyle = rg(c, 0, 6, 14, ['#e0a050', '#9a5a24', '#5a3010']); c.fill(); outline(c, 1.5);
+      c.beginPath(); c.arc(0, 4, 3.5, 0, 7); c.fillStyle = '#2a1608'; c.fill(); c.fillStyle = '#3a2010'; c.fillRect(-2, -30, 4, 24); c.fillRect(-3.5, -34, 7, 6); c.strokeStyle = 'rgba(240,230,200,.8)'; c.lineWidth = 0.6; for (const x of [-1.2, 0, 1.2]) { c.beginPath(); c.moveTo(x, -30); c.lineTo(x, 16); c.stroke(); } c.restore(); },
+    flauto(c) { c.save(); c.translate(32, 32); c.rotate(-0.75); c.fillStyle = lg(c, 0, -4, 0, 4, ['#f6efdc', '#d4c8a8']); c.beginPath(); c.roundRect ? c.roundRect(-24, -4, 48, 8, 4) : c.rect(-24, -4, 48, 8); c.fill(); outline(c, 1.5);
+      c.fillStyle = '#e8dfc8'; c.beginPath(); c.ellipse(-24, 0, 4, 6, 0, 0, 7); c.ellipse(24, 0, 4, 6, 0, 0, 7); c.fill(); outline(c, 1.2); c.fillStyle = '#3a2a18'; for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(-10 + i * 6, 0, 1.6, 0, 7); c.fill(); } c.restore(); },
+    osso_gallina(c) { const bone = (x, y, r) => { c.save(); c.translate(x, y); c.rotate(r); c.fillStyle = '#efe6d0'; c.fillRect(-14, -2.5, 28, 5); for (const sx of [-14, 14]) { c.beginPath(); c.arc(sx, -3, 3.5, 0, 7); c.arc(sx, 3, 3.5, 0, 7); c.fill(); } c.strokeStyle = 'rgba(80,60,30,.5)'; c.lineWidth = 1; c.strokeRect(-14, -2.5, 28, 5); c.restore(); }; bone(30, 26, -0.5); bone(34, 40, 0.4); },
     mela(c) { c.beginPath(); c.arc(25, 36, 15, 0, 7); c.arc(39, 36, 15, 0, 7); c.fillStyle = rg(c, 30, 34, 22, ['#ff8a70', '#d8321e', '#7a1408']); c.fill(); outline(c);
       c.strokeStyle = '#5a3a1e'; c.lineWidth = 3; c.beginPath(); c.moveTo(32, 24); c.quadraticCurveTo(33, 16, 36, 12); c.stroke();
       c.beginPath(); c.moveTo(34, 16); c.quadraticCurveTo(44, 10, 48, 16); c.quadraticCurveTo(40, 20, 34, 16); c.fillStyle = '#5c9a32'; c.fill(); },
@@ -419,7 +438,7 @@
       rr(c, 16, 6, 32, 12, 5); c.fillStyle = 'rgba(160,220,240,0.85)'; c.fill(); outline(c, 1.5); },
     lanterna(c) { rr(c, 20, 16, 24, 34, 4); c.fillStyle = rg(c, 32, 34, 18, ['#fff8c0', '#ffc94a', '#c06a10']); c.fill(); outline(c); c.strokeStyle = '#2a2a2a'; c.lineWidth = 2; c.beginPath(); c.moveTo(32, 16); c.lineTo(32, 50); c.moveTo(20, 33); c.lineTo(44, 33); c.stroke();
       c.beginPath(); c.arc(32, 12, 6, Math.PI, 0); c.stroke(); c.fillStyle = '#3a3a3a'; c.fillRect(18, 48, 28, 5); },
-    progetto_canoa(c) { blueprint(c, 'canoa'); }, progetto_catamarano(c) { blueprint(c, 'cat'); }, progetto_galeone(c) { blueprint(c, 'gal'); },
+    progetto_canoa(c) { blueprint(c, 'canoa'); }, progetto_catamarano(c) { blueprint(c, 'cat'); }, progetto_galeone(c) { blueprint(c, 'gal'); }, progetto_vascello(c) { blueprint(c, 'gal'); c.strokeStyle = 'rgba(255,220,140,0.95)'; c.lineWidth = 2; c.strokeRect(12, 40, 40, 6); },
     cannone(c) { c.save(); c.translate(32, 34); c.rotate(-0.4); c.fillStyle = lg(c, 0, -8, 0, 8, ['#6a6e74', '#2a2d31']); c.fillRect(-20, -7, 40, 14); outline(c); c.beginPath(); c.arc(-20, 0, 8, 0, 7); c.fill(); outline(c); c.restore();
       for (const x of [20, 42]) { c.beginPath(); c.arc(x, 48, 7, 0, 7); c.fillStyle = '#7a4e26'; c.fill(); outline(c); } },
     polpa_cactus(c) { c.beginPath(); c.ellipse(32, 34, 17, 21, 0.3, 0, 7); c.fillStyle = rg(c, 30, 30, 22, ['#c9e39a', '#7fae4e', '#4f7a2a']); c.fill(); outline(c); c.fillStyle = '#e9f5d0'; for (const [x, y] of [[26, 26], [36, 30], [30, 40], [40, 42], [24, 36]]) { c.beginPath(); c.arc(x, y, 1.6, 0, 7); c.fill(); } },

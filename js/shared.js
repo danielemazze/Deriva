@@ -12,7 +12,7 @@
   G.DAY_SECONDS = 1320;
 
   G.SPECIES = {
-    gallina: { n: 'Gallina', hp: 2, speed: 1.4, flee: 3.6, size: 0.45, drops: [['pollo_crudo', 1, 1], ['piume', 1, 2]] },
+    gallina: { n: 'Gallina', hp: 2, speed: 1.4, flee: 3.6, size: 0.45, drops: [['pollo_crudo', 1, 1], ['piume', 1, 2], ['osso_gallina', 1, 2]] },
     pecora: { n: 'Pecora', hp: 4, speed: 1.1, flee: 3.4, size: 1.0, drops: [['montone_crudo', 1, 2], ['lana', 1, 1]], shear: true },
     mucca: { n: 'Mucca', hp: 6, speed: 1.0, flee: 3.0, size: 1.4, drops: [['manzo_crudo', 2, 3]] },
     maiale: { n: 'Maiale', hp: 4, speed: 1.1, flee: 3.4, size: 0.9, drops: [['maiale_crudo', 1, 2]] },

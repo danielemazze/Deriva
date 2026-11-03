@@ -62,14 +62,14 @@
   /* ---------------- palle di cannone ---------------- */
   let ballGeo = null, ballMat = null;
   S.fireBallV = function (from, v, owner) {
-    if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.4, metalness: 0.6 }); }
+    if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial((G.ACG ? G.ACG.mat : (k, o) => o)('iron', { color: 0x2a2a2d, roughness: 0.8, metalness: 0.6 })); }
     const m = new THREE.Mesh(ballGeo, ballMat); m.position.copy(from); m.castShadow = true; G.scene.add(m);
     S.balls.push({ m, pos: from.clone(), vel: v.clone(), owner, t: 0 });
     G.FX.burst(from.x, from.y, from.z, [0.75, 0.72, 0.7], 16, 2.8, { size: 1.7 });
     if (G.Audio) { const dist = from.distanceTo(G.Player.pos); G.Audio.cannon ? G.Audio.cannon(dist) : G.Audio.hit('stone'); }
   };
   S.fireBall = function (from, to, owner, spread) {
-    if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.4, metalness: 0.6 }); }
+    if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial((G.ACG ? G.ACG.mat : (k, o) => o)('iron', { color: 0x2a2a2d, roughness: 0.8, metalness: 0.6 })); }
     const d = _a.subVectors(to, from), hd = Math.hypot(d.x, d.z), T = Math.max(0.6, hd / 42);
     const v = new V3(d.x / T + (Math.random() - 0.5) * spread, (d.y + 0.5 * 9.8 * T * T) / T + (Math.random() - 0.5) * spread * 0.4, d.z / T + (Math.random() - 0.5) * spread);
     const m = new THREE.Mesh(ballGeo, ballMat); m.position.copy(from); m.castShadow = true; G.scene.add(m);
@@ -426,7 +426,7 @@
     b.meshes.forEach((m, i) => { const p = parts[i]; m.castShadow = true; m.material = p.name === 'Bandiera' ? skullFlag() : p.mat === 'cloth' ? KM.sail : G.Boats.matFor(p); });
     // bottino nella stiva: quando affonda galleggia
     const loot = [['doblone', 35 + ((Math.random() * 30) | 0)], ['munizioni', 6 + ((Math.random() * 8) | 0)], ['corda', 4], ['assi', 10], ['chiodi', 6]];
-    if (Math.random() < 0.4) loot.push(['pistola', 1]); if (Math.random() < 0.3) loot.push(['mappa_tesoro', 1]); if (Math.random() < 0.2) loot.push(['progetto_galeone', 1]);
+    if (Math.random() < 0.4) loot.push(['pistola', 1]); if (Math.random() < 0.3) loot.push(['mappa_tesoro', 1]); if (Math.random() < 0.2) loot.push(['progetto_galeone', 1]); else if (Math.random() < 0.08) loot.push(['progetto_vascello', 1]);
     b.inv = new Array(54).fill(null); loot.forEach(([id, n], i) => { if (G.ITEMS[id]) b.inv[i] = { id, n }; });
     // equipaggio sul ponte
     const crew = [];

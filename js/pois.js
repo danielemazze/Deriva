@@ -377,7 +377,7 @@
   const T2 = [['doblone', 6, 18, 1], ['freccia', 6, 14, 0.6], ['munizioni', 2, 6, 0.4], ['sciabola', 1, 1, 0.16], ['arco', 1, 1, 0.14], ['lancia', 1, 1, 0.15], ['pala', 1, 1, 0.18], ['stoffa', 2, 4, 0.4], ['corda', 2, 5, 0.4], ['mappa_tesoro', 1, 1, 0.32], ['perla', 1, 3, 0.3], ['cannocchiale', 1, 1, 0.08], ['pinne', 1, 1, 0.08], ['progetto_catamarano', 1, 1, 0.07], ['progetto_canoa', 1, 1, 0.1], ['cannone', 1, 2, 0.12]];
   const T3 = [['doblone', 20, 55, 1], ['munizioni', 4, 10, 0.6], ['pistola', 1, 1, 0.25], ['sciabola', 1, 1, 0.3], ['perla', 2, 5, 0.5], ['mappa_tesoro', 1, 1, 0.35], ['bussola_oro', 1, 1, 0.16], ['vela_leggendaria', 1, 1, 0.13], ['lanterna', 1, 1, 0.1], ['progetto_galeone', 1, 1, 0.12], ['progetto_catamarano', 1, 1, 0.12], ['cannone', 2, 4, 0.25]];
   // tesoro della cripta del castello: il premio più ricco del gioco
-  const T4 = [['doblone', 70, 140, 1], ['lingotto_oro', 3, 8, 1], ['perla', 4, 9, 0.8], ['spada_ferro', 1, 1, 0.7], ['pistola_capitano', 1, 1, 0.3], ['bussola_oro', 1, 1, 0.35], ['vela_leggendaria', 1, 1, 0.3], ['lanterna', 1, 1, 0.45], ['progetto_galeone', 1, 1, 0.4], ['munizioni', 8, 16, 0.7], ['pinne', 1, 1, 0.25], ['cannocchiale', 1, 1, 0.3]];
+  const T4 = [['doblone', 70, 140, 1], ['lingotto_oro', 3, 8, 1], ['perla', 4, 9, 0.8], ['spada_ferro', 1, 1, 0.7], ['pistola_capitano', 1, 1, 0.3], ['bussola_oro', 1, 1, 0.35], ['vela_leggendaria', 1, 1, 0.3], ['lanterna', 1, 1, 0.45], ['progetto_galeone', 1, 1, 0.4], ['munizioni', 8, 16, 0.7], ['pinne', 1, 1, 0.25], ['cannocchiale', 1, 1, 0.3], ['progetto_vascello', 1, 1, 0.12]];
   P.TIERS = [null, T1, T2, T3, T4];
   P.loot = function (id, tier, extra) {
     const rnd = G.mulberry32(hashR(id.length, [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7), 91));

@@ -41,7 +41,7 @@
       let ws, buf = new Uint8Array(0), done = false, ping = null, pid = 1;
       const m = { url, onmsg: null, onclose: null, open: false,
         sub(topic) { if (ws.readyState !== 1) return; const id = pid++; ws.send(packet(0x82, new Uint8Array([id >> 8, id & 255, ...str(topic), 0]))); },
-        pub(topic, text) { if (ws.readyState !== 1) return false; const t = str(topic), p = enc.encode(text), b = new Uint8Array(t.length + p.length); b.set(t, 0); b.set(p, t.length); ws.send(packet(0x30, b)); return true; },
+        pub(topic, text, retain) { if (ws.readyState !== 1) return false; const t = str(topic), p = enc.encode(text), b = new Uint8Array(t.length + p.length); b.set(t, 0); b.set(p, t.length); ws.send(packet(retain ? 0x31 : 0x30, b)); return true; },
         close() { m.open = false; clearInterval(ping); try { if (ws.readyState === 1) ws.send(new Uint8Array([0xe0, 0])); ws.close(); } catch (e) {} },
         buffered() { return ws ? ws.bufferedAmount : 0; } };
       const to = setTimeout(() => { if (!done) { done = true; try { ws.close(); } catch (e) {} reject(new Error('timeout')); } }, 6000);
@@ -105,6 +105,7 @@
     b.onclose = () => { const url = b.url, code = R.code; setTimeout(async function retry() { if (R.state !== 'on' || R.code !== code) return; try { const nb = await mqtt(url); R.brokers = R.brokers.filter((x) => x !== b).concat(nb); attachHost(nb); } catch (e) { setTimeout(retry, 5000); } }, 2000); };
   }
   R.stopHost = function () {
+    R.unannounce();
     R.state = 'off'; R.code = null;
     for (const p of R.peers.values()) p.close();
     R.peers.clear();
@@ -166,6 +167,45 @@
     const watch = setInterval(() => { if (closed) return clearInterval(watch); if (mode !== 'p2p' && performance.now() - peer.seen > (mode ? 40000 : 30000)) { clearInterval(watch); peer.close(); } }, 5000);
     return peer;
   }
+
+  /* ---------- partite pubbliche: annunci "trattenuti" sul broker ----------
+     Chi ospita una partita pubblica lascia sul broker un piccolo annuncio
+     (nome, giocatori, versione, codice) e lo rinnova ogni 40 s; chi apre il
+     menu Multigiocatore li legge tutti. Gli annunci vecchi (partita chiusa
+     male) si scartano dall'orario. */
+  R.LOBBY = 'deriva/lobby/v1/';
+  let annT = null, annId = null, annInfo = null;
+  R.announce = function (getInfo) {
+    annInfo = getInfo; annId = annId || ID();
+    const send = () => {
+      if (R.state !== 'on' || !R.code || !annInfo) return;
+      const d = Object.assign({ code: R.code, ts: Date.now() }, annInfo());
+      for (const b of R.brokers) b.pub(R.LOBBY + annId, JSON.stringify(d), true);
+    };
+    clearInterval(annT); send(); annT = setInterval(send, 40000);
+    R.announceNow = send;
+  };
+  R.unannounce = function () {
+    clearInterval(annT); annT = null; annInfo = null; R.announceNow = null;
+    if (annId) for (const b of R.brokers) b.pub(R.LOBBY + annId, '', true);
+  };
+  R.list = async function (wait) {
+    const seen = new Map();
+    const res = await Promise.allSettled(R.BROKERS.map((u) => mqtt(u)));
+    const ok = res.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    if (!ok.length) return { ok: false, error: 'Il server delle partite non risponde: controlla la connessione a internet.' };
+    for (const b of ok) {
+      b.onmsg = (t, txt) => {
+        if (!txt) return; let d; try { d = JSON.parse(txt); } catch (e) { return; }
+        if (!d || !R.isCode(d.code) || Math.abs(Date.now() - (d.ts || 0)) > 150000) return;
+        const o = seen.get(d.code); if (!o || o.ts < d.ts) seen.set(d.code, d);
+      };
+      b.sub(R.LOBBY + '+');
+    }
+    await new Promise((r) => setTimeout(r, wait || 2200));
+    for (const b of ok) b.close();
+    return { ok: true, list: [...seen.values()] };
+  };
 
   /* ---------- chi si unisce: restituisce un oggetto simile a un WebSocket ---------- */
   R.join = function (code) {

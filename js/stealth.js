@@ -46,6 +46,7 @@
   };
   const STALL = ['mela', 'mela', 'arancia', 'arancia', 'bacche', 'cocco'];
   ST.steal = function (P) {
+    const tp = P.target; if (tp && tp.kind === 'piece' && G.Lockpick && G.Lockpick.locked(tp.piece)) return G.Lockpick.start(tp.piece);
     const t = ST.target(P); if (!t) return false;
     const caught = ST.seen || (t.kind === 'pocket' && !t.behind);
     const lvl = G.Skills.lv('furto');

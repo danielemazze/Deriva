@@ -137,6 +137,7 @@
     setTimeout(() => { try { g.disconnect(); f.disconnect(); if (p) p.disconnect(); } catch (e) {} }, (life || 4) * 1000 + 500);
     return g;
   }
+  A.spot = (bus, pos, dist, life) => (A.ctx ? spot(bus, pos, dist, life) : null);
   // l'ascoltatore è la testa del giocatore (posizione e direzione della camera)
   const _lf = new THREE.Vector3(), _lu = new THREE.Vector3();
   function updateListener(P) {
@@ -449,6 +450,15 @@
     s.connect(g); g.connect(A.bus.mus); s.start(); mus = { name, s, g };
   };
   let musT = 0;
+  // pagina principale: il tema di Deriva (l'audio parte al primo clic o tasto)
+  A.title = function () {
+    if (!A.ctx) {
+      if (!A._tHook) { A._tHook = true; const go = () => { if (!A.ctx && !G.started) A.start(G.settings.volume); }; for (const ev of ['mousedown', 'keydown', 'touchend']) document.addEventListener(ev, go, { once: true }); }
+      return;
+    }
+    if (smRaw) decodeAll();
+    A.music(G.UI && G.UI.menu ? 'menu' : null);
+  };
   function musicUpdate(dt, P) {
     if ((musT -= dt) > 0) return; musT = 1.5;
     let want = null;

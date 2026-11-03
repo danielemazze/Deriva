@@ -87,7 +87,8 @@
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = G.shared.uTime; sh.uniforms.uSunInt = G.shared.uSunInt; sh.uniforms.uWind = G.shared.uWind;
       sh.uniforms.uWaterY = G.shared.uWaterY; sh.uniforms.uCamPos = G.shared.uCamPos; sh.uniforms.uGrassDist = G.shared.uGrassDist; sh.uniforms.uWet = G.shared.uWet; sh.uniforms.uDry = G.shared.uDry;
-      if (opt.terrain) { Object.assign(sh.uniforms, opt.terrain); if (G.Dig) Object.assign(sh.uniforms, G.Dig.U); }
+      const acgT = opt.terrain && G.ACG && G.ACG.terrain;
+      if (opt.terrain) { Object.assign(sh.uniforms, opt.terrain); if (G.Dig) Object.assign(sh.uniforms, G.Dig.U); if (acgT) { sh.uniforms.tAC = { value: acgT.C }; sh.uniforms.tAN = { value: acgT.N }; } }
       let vs = sh.vertexShader, fs = sh.fragmentShader;
       vs = 'varying vec3 vWPos; varying vec3 vWN; uniform float uTime; uniform float uWind; uniform vec3 uCamPos; uniform float uGrassDist;\n' + vs;
       let windCode = '';
@@ -104,7 +105,11 @@
           float h = max(transformed.y, 0.0);
           float gust = 0.6 + 0.4*sin(uTime*0.35 + _wp0.x*0.02);
           float sway = (sin(uTime*${w.freq.toFixed(2)} + ph) * 0.6 + sin(uTime*${(w.freq * 2.3).toFixed(2)} + ph*1.7)*0.25) * gust * uWind;
-          ${w.mode === 'anchor' ? `
+          ${w.mode === 'sail' ? `
+          // vele: ondeggiano lungo la loro normale (z della barca), di più dove il vento è forte
+          float _sv = sin(uTime*${w.freq.toFixed(2)} + position.x*0.75 + position.y*0.55) * 0.65 + sin(uTime*${(w.freq * 2.4).toFixed(2)} + position.x*1.9 + position.y*1.6) * 0.3;
+          transformed.z += _sv * ${w.amp.toFixed(3)} * (0.35 + min(uWind, 2.5) * 0.45);
+          transformed.x += sin(uTime*${(w.freq * 1.7).toFixed(2)} + position.y*1.1 + position.z*0.9) * ${w.amp.toFixed(3)} * 0.35 * min(uWind, 2.5);` : w.mode === 'anchor' ? `
           // stoffe ancorate: increspano sul posto (pochi centimetri), non si spostano mai
           float _r = position.x*2.3 + position.z*1.9 + position.y*1.3 + ph;
           transformed += vec3(sin(uTime*${w.freq.toFixed(2)} + _r), sin(uTime*${(w.freq * 1.3).toFixed(2)} + _r*1.4)*0.5, cos(uTime*${(w.freq * 0.9).toFixed(2)} + _r*0.8)) * ${w.amp.toFixed(3)} * gust * min(uWind, 2.0);` : `
@@ -155,6 +160,10 @@
           vec4 w = vec4(grass, sand, rock, dirt); return w / (w.x + w.y + w.z + w.w + 1e-4);
         }
         // due campionamenti a scale e orientamenti diversi: niente ripetizione evidente
+        #ifdef ACG_T
+        uniform highp sampler2DArray tAC; uniform highp sampler2DArray tAN;
+        vec4 triA(highp sampler2DArray t, vec2 uv, float l){ vec4 a = texture(t, vec3(uv, l)); if (uDual < 0.5) return a; vec2 r = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.317 + vec2(0.37, 0.11); return mix(a, texture(t, vec3(r, l)), 0.45); }
+        #endif
         vec4 tri(sampler2D t, vec2 uv){ vec4 a = texture2D(t, uv); if (uDual < 0.5) return a; vec2 r = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.317 + vec2(0.37, 0.11); return mix(a, texture2D(t, r), 0.45); }
         ` + fs;
       } else fs = fsHead + fs;
@@ -167,8 +176,24 @@
           vec4 tw = terrainW4(tUnder, tSnow);
           vec2 tp = vWPos.xz;
           vec2 uvG = tp * 0.42, uvS = tp * 0.33, uvR = vec2(tp.x + vWPos.y * 0.35, tp.y + vWPos.y * 0.2) * 0.22, uvD = tp * 0.3, uvW = tp * 0.14;
+          #ifdef ACG_T
+          // texture ambientCG: 0 erba selvatica, 1 erba fitta, 2 sabbia, 3 roccia, 4 terra, 5 sottobosco, 6 fondale
+          // l'erba cambia a chiazze larghe (e nei biomi umidi è più fitta); sotto gli alberi foglie e rametti
+          float lushN = clamp(vBio.y * 0.8 + (tNoise(tp * 0.018) * 0.7 + tNoise(tp * 0.07) * 0.3 - 0.5) * 1.6 + 0.25, 0.0, 1.0);
+          float floorK = clamp(vBio2.z * 1.3 - 0.15 + (tNoise(tp * 0.09) - 0.5) * 0.5, 0.0, 1.0);
+          vec2 uvG2 = tp * 0.36;
+          vec4 cg = mix(triA(tAC, uvG, 0.0), triA(tAC, uvG2, 1.0), lushN), cs = triA(tAC, uvS, 2.0), cr = triA(tAC, uvR, 3.0), cd = mix(triA(tAC, uvD, 4.0), triA(tAC, uvD * 0.9, 5.0), floorK);
+          vec4 cw = triA(tAC, uvW, 6.0);
+          vec4 aG = mix(triA(tAN, uvG, 0.0), triA(tAN, uvG2, 1.0), lushN), aS = mix(triA(tAN, uvS, 2.0), triA(tAN, uvW, 6.0), tUnder), aR = triA(tAN, uvR, 3.0), aD = mix(triA(tAN, uvD, 4.0), triA(tAN, uvD * 0.9, 5.0), floorK);
+          // passaggi naturali: dove due terreni si toccano vince quello più alto (sabbia nelle crepe, erba tra i sassi)
+          { vec4 hw = tw + vec4(aG.w, aS.w, aR.w, aD.w) * 0.6 * step(0.001, tw);
+            float hm = max(max(hw.x, hw.y), max(hw.z, hw.w)) - 0.25;
+            vec4 w2 = max(hw - hm, 0.0) * step(0.001, tw); tw = w2 / (w2.x + w2.y + w2.z + w2.w + 1e-4); }
+          float acgRough = aG.z * tw.x + aS.z * tw.y + aR.z * tw.z + aD.z * tw.w;
+          #else
           vec4 cg = tri(map, uvG), cs = tri(tSand, uvS), cr = tri(tRock, uvR), cd = tri(tDirt, uvD);
           vec4 cw = tri(tSea, uvW);
+          #endif
           // tinte di bioma: giungla e foresta pluviale più scure e sature, prateria più gialla, deserto più caldo
           cg.rgb *= mix(vec3(1.0), vec3(0.68, 0.86, 0.58), vBio.y) * mix(vec3(1.0), vec3(1.14, 1.06, 0.74), vBio.z);
           cg.rgb = mix(cg.rgb, cg.rgb * vec3(1.3, 1.08, 0.52), uDry * 0.75);
@@ -196,10 +221,16 @@
           tcol.rgb = mix(tcol.rgb, ash, smoothstep(0.02, 0.22, ashW) * (1.0 - tSnow * 0.7));
           diffuseColor *= tcol;`);
         fs = fs.replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;', `
+          #ifdef ACG_T
+          vec2 nxy = (aG.xy * tw.x + aS.xy * tw.y + aR.xy * tw.z + aD.xy * tw.w) * 2.0 - 1.0;
+          vec3 mapN = vec3(nxy * 1.15, sqrt(max(0.0, 1.0 - dot(nxy, nxy))));
+          #else
           vec3 nS = mix(tri(tSandN, uvS).xyz, tri(tSeaN, uvW).xyz, tUnder);
           vec3 mapN = (tri(normalMap, uvG).xyz*tw.x + nS*tw.y + tri(tRockN, uvR).xyz*tw.z + tri(tDirtN, uvD).xyz*tw.w) * 2.0 - 1.0;
+          #endif
           mapN = mix(mapN, vec3(0.0, 0.0, 1.0), tSnow * 0.7);`);
-        fs = fs.replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(roughness, 0.3, wet);');
+        fs = fs.replace('#include <roughnessmap_fragment>', acgT ? 'float roughnessFactor = mix(max(acgRough, 0.62), 0.3, wet);' : 'float roughnessFactor = mix(roughness, 0.3, wet);');
+        if (acgT) fs = '#define ACG_T\n' + fs;
         // crepe di lava incandescente vicino al cratere
         fs = fs.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           { float lv = smoothstep(0.86, 0.97, vBio2.y);
@@ -245,7 +276,7 @@
       if (opt.alphaTag) fs = fs.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = ' + opt.alphaTag.toFixed(2) + ';');
       sh.vertexShader = vs; sh.fragmentShader = fs;
     };
-    mat.customProgramCacheKey = () => JSON.stringify(opt.key || opt.wind || '') + (opt.terrain ? 'T' : '') + (opt.backShade ? 'B' : '') + (opt.fadeDist ? 'F' : '') + (opt.alphaTag ? 'A' : '') + (opt.moss ? 'M' : '');
+    mat.customProgramCacheKey = () => JSON.stringify(opt.key || opt.wind || '') + (opt.terrain ? (G.ACG && G.ACG.terrain ? 'TA' : 'T') : '') + (opt.backShade ? 'B' : '') + (opt.fadeDist ? 'F' : '') + (opt.alphaTag ? 'A' : '') + (opt.moss ? 'M' : '');
     return mat;
   };
 
@@ -525,11 +556,11 @@
         uSunCol: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uZen: { value: new THREE.Color() }, uFogDen: { value: 0.002 },
         uUnder: { value: 0 }, uTime: G.shared.uTime, uGod: { value: 1 }, uExposure: { value: 1 }, uAmb: { value: new THREE.Color() }, uRes: { value: new THREE.Vector2() },
         uDamage: { value: 0 }, uSleep: { value: 0 }, uAO: { value: 1 },
-        uMist: { value: 0 }, uMistH: { value: 4 }, uGodK: { value: 0.3 }, uCamDepth: { value: 0 }, uHeat: { value: 0 }, uDark: { value: 0 },
+        uMist: { value: 0 }, uMistH: { value: 4 }, uGodK: { value: 0.3 }, uCamDepth: { value: 0 }, uHeat: { value: 0 }, uDark: { value: 0 }, uShader: { value: 0 }, uSeaY: { value: 0 },
       },
       vertexShader: QUAD_VS,
       fragmentShader: `
-        uniform sampler2D tColor, tScene, tDepth; uniform mat4 uInvProj, uCamWorld; uniform float uNear, uFar, uSunVis, uFogDen, uUnder, uTime, uGod, uExposure, uDamage, uSleep, uAO, uMist, uMistH, uGodK, uCamDepth, uHeat, uDark;
+        uniform sampler2D tColor, tScene, tDepth; uniform mat4 uInvProj, uCamWorld; uniform float uNear, uFar, uSunVis, uFogDen, uUnder, uTime, uGod, uExposure, uDamage, uSleep, uAO, uMist, uMistH, uGodK, uCamDepth, uHeat, uDark, uShader, uSeaY;
         uniform vec2 uSunScreen, uRes; uniform vec3 uSunDir, uSunCol, uHor, uZen, uAmb; varying vec2 vUv;
         float lin(float d){ float z = d*2.0-1.0; return 2.0*uNear*uFar/(uFar+uNear - z*(uFar-uNear)); }
         vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
@@ -565,7 +596,7 @@
           }
           // foschia bassa nelle valli (mattino, pioggia, foreste pluviali): nebbia che dipende dalla quota
           if (uMist > 0.001 && uUnder < 0.5) {
-            vec3 cp = uCamWorld[3].xyz; float L = isSolid > 0.5 ? min(dist, 700.0) : 700.0;
+            vec3 cp = uCamWorld[3].xyz; float L = isSolid > 0.5 ? min(dist, 700.0) : (ray.y < -0.002 ? min(max(cp.y - uSeaY, 0.3) / -ray.y, 700.0) : 700.0);
             float H = 9.0, a = exp(-(cp.y - uMistH) / H);
             float ry = ray.y; float integ = abs(ry) < 0.002 ? L * a : H / ry * (a - exp(-(cp.y + ry * L - uMistH) / H));
             float mist = 1.0 - exp(-max(integ, 0.0) * uMist * 0.0032);
@@ -577,6 +608,11 @@
               float fd = dist * uFogDen; float fog = 1.0 - exp(-fd * fd);
               fog *= mix(1.0, 0.55, clamp(ray.y*2.0, 0.0, 1.0));
               vec3 fc = mix(uHor, uZen, clamp(ray.y*1.5+0.05, 0.0, 1.0)*0.35) + uSunCol*0.12*pow(max(dot(ray, uSunDir),0.0), 6.0);
+              if (uShader > 0.5) {
+                // prospettiva aerea: la distanza si sbiadisce in una foschia azzurra, dorata verso il sole
+                float fd2 = dist * uFogDen * 1.45; fog = max(fog, (1.0 - exp(-fd2 * 1.25)) * 0.82) * mix(1.0, 0.6, clamp(ray.y*2.0, 0.0, 1.0));
+                fc = mix(uHor * 1.04, uZen, clamp(ray.y*1.5+0.05, 0.0, 1.0)*0.25) + uSunCol*0.32*pow(max(dot(ray, uSunDir),0.0), 4.0);
+              }
               col = mix(col, fc, fog);
             }
           } else {
@@ -601,7 +637,21 @@
             }
             acc /= 30.0;
             float fall = pow(max(1.0 - length(dir*vec2(uRes.x/uRes.y,1.0))*0.9, 0.0), 1.6);
-            col += uSunCol * acc * fall * uSunVis * uGodK;
+            col += uSunCol * acc * fall * uSunVis * uGodK * (uShader > 0.5 ? vec3(2.6, 2.25, 1.7) : vec3(1.0));
+          }
+          if (uShader > 0.5 && uUnder < 0.5) {
+            // bagliore (bloom) dei punti più luminosi: cielo, sole, fuochi, riflessi sull'acqua
+            vec3 bl = vec3(0.0); float rad = 0.028;
+            for (int i = 0; i < 16; i++) {
+              float fi = float(i), ang = fi * 2.39996 + h12(vUv*uRes) * 0.5, rr = sqrt((fi + 0.5) / 16.0) * rad;
+              vec2 o = vec2(cos(ang), sin(ang)) * rr * vec2(uRes.y / uRes.x, 1.0);
+              vec4 s = texture2D(tColor, vUv + o); if (s.a > 0.5) s = texture2D(tScene, vUv + o);
+              float sl = dot(s.rgb, vec3(0.3, 0.55, 0.15)); bl += s.rgb * smoothstep(1.15, 2.2, sl); // solo sole, cielo vicino al sole, fuochi, riflessi: non neve né sabbia
+            }
+            col += bl / 16.0 * 1.1;
+            // alone del sole
+            float sd = max(dot(ray, uSunDir), 0.0);
+            col += uSunCol * (pow(sd, 18.0) * 0.16 + pow(sd, 400.0) * 0.9) * smoothstep(-0.05, 0.1, uSunDir.y) * (1.0 - isSolid); // solo dove si vede il cielo
           }
           // fasci di luce subacquei (analitici, senza campionamenti)
           if (uUnder > 0.5 && uGod > 0.5) {
@@ -624,6 +674,15 @@
           float l = dot(col, vec3(0.299,0.587,0.114));
           col = mix(vec3(l), col, 1.08);
           vec2 q = vUv - 0.5; col *= 1.0 - dot(q,q)*0.55;
+          if (uShader > 0.5) {
+            // colori alla «Complementary»: più vivi, luci calde, ombre fresche, contrasto morbido
+            l = dot(col, vec3(0.299,0.587,0.114));
+            col = mix(vec3(l), col, 1.32);
+            col += vec3(0.05, 0.025, -0.03) * smoothstep(0.35, 0.9, l) - vec3(0.016, 0.0, -0.026) * (1.0 - smoothstep(0.0, 0.35, l));
+            col = mix(col, col * col * (3.0 - 2.0 * col), 0.32);
+            col *= 1.0 - dot(q,q)*0.45;
+            col = max(col, 0.0);
+          }
           if (uDark > 0.01) {
             vec3 c0 = col;
             // notte dark fantasy: ombre blu-petrolio, verdi smeraldo, fuochi caldi che risaltano

@@ -31,7 +31,7 @@
       bark: G.MAT.bark,
       cloth: P('cloth', { map: T.clothT.map, normalMap: T.clothT.normal, vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }, { wind: { amp: 0.025, freq: 2.6, mode: 'anchor' } }),
       fruit: P('fruit', { vertexColors: true, roughness: 0.6 }),
-      iron: P('iron', { color: 0x2c2e31, roughness: 0.5, metalness: 0.75, vertexColors: true }),
+      iron: P('iron', (G.ACG ? G.ACG.mat : (k, o) => o)('iron', { color: 0x2c2e31, roughness: G.ACG && G.ACG.on ? 1 : 0.5, metalness: 0.75, vertexColors: true }, [2, 2])),
       dark: new THREE.MeshBasicMaterial({ color: 0x0b0806 }),
       glow: new THREE.MeshStandardMaterial({ color: 0x2a1e12, emissive: 0xffa040, emissiveIntensity: 0, roughness: 0.6 }),
       glass: new THREE.MeshStandardMaterial({ color: 0xbfe6ff, emissive: 0xfff0b0, emissiveIntensity: 0, transparent: true, opacity: 0.45, roughness: 0.1, metalness: 0.2 }),

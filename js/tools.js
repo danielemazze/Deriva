@@ -20,11 +20,11 @@
       flint: new THREE.MeshStandardMaterial({ map: rep(TX.flintT.map, 0.6, 0.6), normalMap: rep(TX.flintT.normal, 0.6, 0.6), normalScale: new THREE.Vector2(1.4, 1.4), roughness: 0.38, metalness: 0.02, color: 0xd6cfc4 }),
       stone: new THREE.MeshStandardMaterial({ map: rep(TX.rockT.map, 0.8, 0.8), normalMap: rep(TX.rockT.normal, 0.8, 0.8), normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.8, color: 0xf0ebe2 }),
       rope: new THREE.MeshStandardMaterial({ map: rep(TX.ropeT.map, 6, 1), normalMap: rep(TX.ropeT.normal, 6, 1), normalScale: new THREE.Vector2(1.5, 1.5), roughness: 0.95 }),
-      leather: new THREE.MeshStandardMaterial({ color: 0x5a3720, roughness: 0.55, normalMap: rep(TX.woolT.normal, 3, 3), normalScale: new THREE.Vector2(0.3, 0.3) }),
-      cloth: new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 1, normalMap: rep(TX.clothT.normal, 3, 3), normalScale: new THREE.Vector2(1.5, 1.5) }),
-      cork: new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.9, normalMap: rep(TX.sandT.normal, 2, 4) }),
-      paper: new THREE.MeshStandardMaterial({ color: 0xe9dcbc, roughness: 0.9 }),
-      cover: new THREE.MeshStandardMaterial({ color: 0x5e2617, roughness: 0.5, normalMap: rep(TX.woolT.normal, 2, 2), normalScale: new THREE.Vector2(0.25, 0.25) }),
+      leather: new THREE.MeshStandardMaterial(G.ACG && G.ACG.on && G.ACG.tex.leather ? G.ACG.mat('leather', { color: 0xb08868, roughness: 1 }, [2, 2]) : { color: 0x5a3720, roughness: 0.55, normalMap: rep(TX.woolT.normal, 3, 3), normalScale: new THREE.Vector2(0.3, 0.3) }),
+      cloth: new THREE.MeshStandardMaterial(G.ACG && G.ACG.on && G.ACG.tex.fabric ? G.ACG.mat('fabric', { color: 0x8a6a4c, roughness: 1 }, [3, 3]) : { color: 0x3a2a1c, roughness: 1, normalMap: rep(TX.clothT.normal, 3, 3), normalScale: new THREE.Vector2(1.5, 1.5) }),
+      cork: new THREE.MeshStandardMaterial(G.ACG && G.ACG.on && G.ACG.tex.cork ? G.ACG.mat('cork', { roughness: 1 }, [1, 2]) : { color: 0xb08a5a, roughness: 0.9, normalMap: rep(TX.sandT.normal, 2, 4) }),
+      paper: new THREE.MeshStandardMaterial(G.ACG && G.ACG.on && G.ACG.tex.paper ? G.ACG.mat('paper', { color: 0xfff4e0, roughness: 1 }) : { color: 0xe9dcbc, roughness: 0.9 }),
+      cover: new THREE.MeshStandardMaterial(G.ACG && G.ACG.on && G.ACG.tex.leather ? G.ACG.mat('leather', { color: 0xa04a30, roughness: 1 }) : { color: 0x5e2617, roughness: 0.5, normalMap: rep(TX.woolT.normal, 2, 2), normalScale: new THREE.Vector2(0.25, 0.25) }),
       brass: new THREE.MeshStandardMaterial({ color: 0xc9a25e, roughness: 0.35, metalness: 0.85 }),
       line: new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4 }),
     };
@@ -80,7 +80,7 @@
     }
     if (/^(ascia|piccone|pala)_ferro$/.test(id) || id === 'spada_ferro') {
       const g0 = T.build(id === 'spada_ferro' ? 'sciabola' : id.replace('_ferro', '')); if (!g0) return null;
-      const iron = M.iron || (M.iron = new THREE.MeshStandardMaterial({ color: 0xa9aeb3, roughness: 0.35, metalness: 0.85 }));
+      const iron = M.iron || (M.iron = new THREE.MeshStandardMaterial(G.ACG && G.ACG.on && G.ACG.tex.iron ? G.ACG.mat('iron', { color: 0xc4c8cc, roughness: 0.55, metalness: 0.85 }) : { color: 0xa9aeb3, roughness: 0.35, metalness: 0.85 }));
       g0.traverse((o) => { if (o.isMesh && (o.material === M.stone || o.material === M.flint || (M.steel && o.material === M.steel))) o.material = iron; });
       if (id === 'spada_ferro') g0.scale.set(1.08, 1.1, 1.08);
       return g0;

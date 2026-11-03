@@ -9,6 +9,8 @@
   G.time = 0.31; G.clock = 0; G.anims = []; G.started = false;
 
   G.settings = Object.assign(G.defaultSettings(), G.store.get('deriva_settings') || {});
+  // prova fotografica automatica (Deriva.exe --fototest): qualità scelta dalla riga di comando
+  if (window.deriva && window.deriva.fotoTest) { const ft = window.deriva.fotoTest; G.settings = Object.assign(G.settings, G.PRESETS[ft.preset] || {}, { preset: ft.preset, basePreset: ft.preset, shaders: !!ft.shaders, gpuChecked: true, volume: 0, hints: false, newsSeen: G.NEWS && G.NEWS.v }); }
 
   /* ---------------- RENDERER ---------------- */
   const canvas = $('c');
@@ -152,8 +154,10 @@
   G.applyPreset = function (k) {
     const keep = { fov: G.settings.fov, sens: G.settings.sens, volume: G.settings.volume, vols: G.settings.vols };
     if (G.adaptReset) G.adaptReset();
+    const lv0 = G.ACG ? G.ACG.level(G.settings) : 0;
     G.settings = Object.assign({}, G.settings, G.PRESETS[k], keep, { preset: k, basePreset: k });
     for (const key of ['shadows', 'pixel', 'view', 'godrays', 'fx']) G.applySettings(key, true);
+    if (G.ACG && G.ACG.level(G.settings) !== lv0 && G.UI) G.UI.toast(k === 'patata' ? 'Texture leggere: si caricano al prossimo avvio del gioco' : 'Le texture ' + (G.ACG.level(G.settings) === 2 ? '2K' : '1K') + ' si caricano al prossimo avvio del gioco');
     G.store.set('deriva_settings', G.settings);
   };
   G.applySettings = function (k, quiet) {
@@ -293,7 +297,7 @@
       if (G.Climate) G.Climate.reset(); G.time = 0.31; G.Player.inv = new Array(36).fill(null); G.Player.equip = [null, null, null, null]; G.Player.temp = 50; }
     G.Build.load(save ? save.builds : []);
     G.Boats.load(save ? save.boats : []);
-    G.Player.resetProgress(); G.Skills.load(null); G.Player.stamina = undefined;
+    G.Player.resetProgress(); G.Skills.load(null); G.Player.stamina = undefined; if (G.Mount) G.Mount.load(G.Player, null); G.Player.picked = {};
     if (save) G.Player.load(save.player);
     else {
       const sp = G.findSpawn();
@@ -334,7 +338,7 @@
     G.state.removed = new Set(snap.removed || []);
     G.state.killed = new Set(snap.killed || []);
     G.state.chests = snap.chests || {};
-    G.Player.resetProgress(); G.Skills.load(null); G.Player.stamina = undefined;
+    G.Player.resetProgress(); G.Skills.load(null); G.Player.stamina = undefined; if (G.Mount) G.Mount.load(G.Player, null); G.Player.picked = {};
     G.time = snap.time || 0.3; G.Boats.wind.dir = snap.wind || 0.6;
     if (G.Climate) G.Climate.load(snap.weather);
     if (G.Dig) G.Dig.load(snap.digs);
@@ -371,6 +375,7 @@
     await G.TEX.buildAll(S.texSize, (p, k) => { $('loadBar').style.transform = `scaleX(${p * 0.75})`; });
     $('loadText').textContent = 'Carico le texture fotografiche…';
     G.PHOTO = await G.TEX.loadPhotos('assets/');
+    if (G.ACG && G.ACG.level(S)) { $('loadText').textContent = 'Carico le texture ambientCG…'; try { await G.ACG.load(S, (p) => { $('loadBar').style.transform = `scaleX(${0.75 + p * 0.15})`; }); } catch (e) { console.warn('texture ambientCG', e); } }
     try { G.SCAN = await G.TEX.loadScans('assets/models/'); } catch (e) { G.SCAN = null; console.warn('modelli scansionati non disponibili', e); }
     try { if (G.AnimLib) await G.AnimLib.load('assets/models/animali/'); } catch (e) { console.warn('animali animati non disponibili', e); }
     try { if (G.Humans) await G.Humans.load('assets/models/persone/'); } catch (e) { console.warn('persone non disponibili', e); }
@@ -476,7 +481,7 @@
       if (P.keys.ArrowUp) P.pitch = Math.min(1.5, P.pitch + dt * 1.5); if (P.keys.ArrowDown) P.pitch = Math.max(-1.5, P.pitch - dt * 1.5);
       P.update(dt, t);
       G.Combat.update(dt, P);
-      if (G.Stealth) G.Stealth.update(dt, P); if (G.Skills) G.Skills.update(dt); if (G.Admin) G.Admin.update(dt);
+      if (G.Stealth) G.Stealth.update(dt, P); if (G.Skills) G.Skills.update(dt); if (G.Admin) G.Admin.update(dt); if (G.Mount) G.Mount.update(dt, P); if (G.Lockpick) G.Lockpick.update(dt, P); if (G.Music) G.Music.update(dt, P);
       G.Entities.update(dt, P, t);
       G.Structures.update(dt, P);
       G.MapUI.track(dt);
@@ -496,6 +501,7 @@
       if (G.Net) G.Net.update(dt, t);
       if (G.Voice) G.Voice.update(dt);
     } else {
+      if (G.Audio && G.Audio.title) G.Audio.title(dt);
       // camera del titolo: orbita lenta attorno all'isola
       if (G.Player.vm) G.Player.vm.visible = false;
       const a = t * 0.025 + 2.2;
@@ -523,6 +529,7 @@
     G.fogDen = fogDen;
     const spyK = G.Combat ? G.Combat.zoom || 0 : 0; // attraverso la lente la foschia quasi sparisce
 
+    if (G.Atmo) G.Atmo.update(dt, P, S);
     if (G.noRender) return; // test: solo logica
     camera.updateMatrixWorld(); _mt = performance.now();
     gateLights();
@@ -570,6 +577,9 @@
       pu.uMist.value = mist * (1 - spyK * 0.7); pu.uMistH.value = mh; pu.uDark.value = S.dark;
       const pre = G.settings.preset === 'custom' ? G.settings.basePreset : G.settings.preset;
       pu.uGodK.value = pre === 'ultra' ? 0.62 : pre === 'alta' ? 0.5 : 0.3;
+      pu.uShader.value = G.settings.shaders && !S.dark ? 1 : 0; pu.uSeaY.value = G.SEA;
+      // con gli shader la foschia leggera c'è sempre (più forte al mattino e alla sera)
+      if (pu.uShader.value) { const low = 1 - G.smooth(0.12, 0.35, S.sun.y); pu.uMist.value = Math.max(pu.uMist.value, 0.18 + low * 0.35); pu.uMistH.value = Math.max(pu.uMistH.value, G.SEA + 2 + low * 4); }
       pu.uCamDepth.value = P.under ? Math.max(0, (G.waterLevelAt ? G.waterLevelAt(camera.position.x, camera.position.z, t, camera.position.y) : G.SEA) - camera.position.y) : 0;
       pu.uHeat.value = wc ? Math.max(0, wc.heat - 0.2) : 0;
     }

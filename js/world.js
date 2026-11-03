@@ -22,19 +22,24 @@
       key: 'terrain',
     });
     const treeWind = { amp: 0.0035, freq: 1.05, mode: 'tip' };
-    if (PH.bark) { PH.bark.repeat.set(1, 0.35); PH.barkN.repeat.set(1, 0.35); }
+    if (PH.bark) { const v = G.ACG && G.ACG.on ? 1.2 : 0.35; PH.bark.repeat.set(1, v); PH.barkN.repeat.set(1, v); }
     MAT.bark = G.patch(std({ map: ph('bark', TEX.barkT.map), normalMap: ph('barkN', TEX.barkT.normal), normalScale: new THREE.Vector2(1.6, 1.6), vertexColors: true, roughness: 0.95 }), { wind: treeWind, key: 'bark' });
+    // cortecce diverse per pino e betulla (texture ambientCG)
+    const barkOf = (k) => { const a = G.ACG && G.ACG.on && G.ACG.tex[k]; if (!a) return MAT.bark; for (const t of [a.map, a.normal, a.rough]) if (t) t.repeat.set(1, 1.2); return G.patch(std({ map: a.map, normalMap: a.normal, roughnessMap: a.rough, normalScale: new THREE.Vector2(1.4, 1.4), vertexColors: true, roughness: 1 }), { wind: treeWind, key: k }); };
+    MAT.barkPine = barkOf('barkPine'); MAT.barkBirch = barkOf('barkBirch');
+    MAT.barkFor = (leafTex) => (leafTex === 'frond' ? MAT.palmBark : leafTex === 'pine' ? MAT.barkPine : leafTex === 'leavesBirch' ? MAT.barkBirch : MAT.bark);
     MAT.palmBark = G.patch(std({ map: TEX.palmBarkT.map, normalMap: TEX.palmBarkT.normal, vertexColors: true, roughness: 0.92 }), { wind: treeWind, key: 'pbark' });
     MAT.leaves = {};
     for (const k of ['leavesOak', 'leavesBirch', 'pine', 'frond']) {
       const photo = k === 'leavesOak' ? PH.leaves1 : k === 'leavesBirch' ? PH.leaves0 : null;
       const map = photo || TEX[k + 'T'];
-      const m = G.patch(std({ map, normalMap: k === 'leavesOak' ? PH.leaves1N : k === 'leavesBirch' ? PH.leaves0N : null, alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.82 }), { wind: Object.assign({ flutter: k === 'frond' ? 0.004 : 0.008 }, treeWind), backShade: true, key: 'leaf' + k });
+      const m = G.patch(std({ map, normalMap: k === 'leavesOak' ? PH.leaves1N : k === 'leavesBirch' ? PH.leaves0N : k === 'pine' && G.ACG && G.ACG.cards.pine ? G.ACG.cards.pine.normal : null, alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.82 }), { wind: Object.assign({ flutter: k === 'frond' ? 0.004 : 0.008 }, treeWind), backShade: true, key: 'leaf' + k });
       m.userData.depth = leafDepth(map);
       MAT.leaves[k] = m;
     }
-    MAT.bushLeaves = G.patch(std({ map: ph('leaves1', TEX.leavesOakT), alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 }), { wind: { amp: 0.05, freq: 1.4, mode: 'tip', flutter: 0.01 }, backShade: true, key: 'bush' });
-    MAT.bushLeaves.userData.depth = leafDepth(ph('leaves1', TEX.leavesOakT));
+    const bushC = G.ACG && G.ACG.on && G.ACG.cards.bush;
+    MAT.bushLeaves = G.patch(std({ map: bushC ? bushC.map : ph('leaves1', TEX.leavesOakT), normalMap: bushC ? bushC.normal : null, alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 }), { wind: { amp: 0.05, freq: 1.4, mode: 'tip', flutter: 0.01 }, backShade: true, key: 'bush' });
+    MAT.bushLeaves.userData.depth = leafDepth(bushC ? bushC.map : ph('leaves1', TEX.leavesOakT));
     MAT.berries = G.patch(std({ vertexColors: true, roughness: 0.4 }), { wind: { amp: 0.05, freq: 1.4, mode: 'tip' }, key: 'berry' });
     MAT.grass = G.patch(std({ map: TEX.grassCardT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 }), { wind: { amp: 0.32, freq: 1.7, mode: 'tip' }, fadeDist: true, key: 'grass' });
     MAT.flowers = G.patch(std({ map: TEX.flowerCardT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 }), { wind: { amp: 0.3, freq: 1.5, mode: 'tip' }, fadeDist: true, key: 'flower' });
@@ -68,8 +73,16 @@
     MAT.cloth = G.patch(std({ map: TEX.clothT.map, normalMap: TEX.clothT.normal, side: THREE.DoubleSide, vertexColors: true, roughness: 0.95 }), { key: 'cloth' });
     MAT.planksB = G.patch(std({ map: TEX.planksT.map, normalMap: TEX.planksT.normal, vertexColors: true, roughness: 0.82, side: THREE.DoubleSide }), { key: 'planksB', alphaTag: 0.85 });
     MAT.logsB = G.patch(std({ map: TEX.barkT.map, normalMap: TEX.barkT.normal, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), { key: 'logsB', alphaTag: 0.85 });
+    // alberi e pennoni delle navi: legno piallato (con le texture ambientCG), non corteccia
+    { const a = G.ACG && G.ACG.on && G.ACG.tex.woodGrain;
+      if (a) { const r = (t) => { const c = t.clone(); c.center.set(0.5, 0.5); c.rotation = Math.PI / 2; c.repeat.set(2.5, 1); c.needsUpdate = true; return c; }; const o = { map: r(a.map), normalMap: r(a.normal), roughnessMap: a.rough ? r(a.rough) : null, vertexColors: true, roughness: 1, color: 0x8e6e52 };
+        MAT.spar = G.patch(std(o), { key: 'spar' }); MAT.sparB = G.patch(std(Object.assign({}, o, { side: THREE.DoubleSide })), { key: 'sparB', alphaTag: 0.85 }); }
+      else { MAT.spar = MAT.logs; MAT.sparB = MAT.logsB; } }
     MAT.rope = G.patch(std({ color: 0xc8a46a, roughness: 0.9 }), { key: 'rope' });
-    MAT.cannon = std({ color: 0x0e0e10, roughness: 0.5, metalness: 0.3, envMapIntensity: 0.2 }); // ferro scuro (canna e affusto)
+    // vele delle navi: si gonfiano e sventolano col vento (le bandiere anche)
+    MAT.clothB = G.patch(std({ map: TEX.clothT.map, normalMap: TEX.clothT.normal, side: THREE.DoubleSide, vertexColors: true, roughness: 0.95 }), { key: 'clothB', wind: { amp: 0.09, freq: 2.2, mode: 'sail' } });
+    MAT.lanternB = std({ color: 0x2a1e12, emissive: 0xffa040, emissiveIntensity: 1.4, roughness: 0.6 });
+    MAT.cannon = std(G.ACG && G.ACG.on && G.ACG.tex.iron ? G.ACG.mat('iron', { color: 0x2a2b2e, roughness: 1, metalness: 0.55, envMapIntensity: 0.35 }, [2, 2]) : { color: 0x0e0e10, roughness: 0.5, metalness: 0.3, envMapIntensity: 0.2 }); // ferro scuro (canna e affusto)
     TEX.woolT.map.repeat.set(3, 2); TEX.woolT.normal.repeat.set(3, 2);
     MAT.wool = G.patch(std({ map: TEX.woolT.map, normalMap: TEX.woolT.normal, color: 0xe8e2d6, roughness: 1 }), { key: 'wool' });
     MAT.cow = G.patch(std({ map: TEX.cowHideT.map, color: 0xd8d4cc, roughness: 0.85 }), { key: 'cow' });
@@ -155,7 +168,7 @@
     W.treeInfo = {};
     const tree = (key, model) => {
       const leafMat = MAT.leaves[model.leafTex];
-      addKind(key, [{ geo: model.trunk, lod: model.trunkLod, mat: model.leafTex === 'frond' ? MAT.palmBark : MAT.bark, shadow: true }, { geo: model.leaves, lod: model.leavesLod, mat: leafMat, shadow: true }], { split: G.lowQ() });
+      addKind(key, [{ geo: model.trunk, lod: model.trunkLod, mat: MAT.barkFor(model.leafTex), shadow: true }, { geo: model.leaves, lod: model.leavesLod, mat: leafMat, shadow: true }], { split: G.lowQ() });
       W.treeInfo[key] = model;
     };
     for (let v = 0; v < W.VAR.oak; v++) tree('oak' + v, M.oak(100 + v));

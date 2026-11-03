@@ -75,13 +75,26 @@ G.piecewise = function (pts, x) {
 
 /* ---------- Impostazioni grafiche ---------- */
 G.PRESETS = {
+  patata: { label: 'Patata', pixel: 0.65, shadows: 0, godrays: false, view: 2, grass: 0.1, texSize: 512, waterSeg: 100, fx: false, ao: false },
   minima: { label: 'Minima', pixel: 0.7, shadows: 0, godrays: false, view: 2, grass: 0.12, texSize: 512, waterSeg: 110, fx: false, ao: false },
   bassa: { label: 'Bassa', pixel: 0.75, shadows: 0, godrays: false, view: 3, grass: 0.3, texSize: 512, waterSeg: 150, fx: false, ao: false },
   media: { label: 'Media', pixel: 1.0, shadows: 1024, godrays: true, view: 4, grass: 0.65, texSize: 512, waterSeg: 220, fx: true, ao: true },
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.19.1';
+G.VERSION = '1.20';
+// novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
+G.NEWS = { v: '1.20', t: 'Cavalli e stive', d: '3 novembre 2026', items: [
+  ['♞', 'Cavalli, zebre e lama si cavalcano: sella, galoppo, salto'],
+  ['🔒', 'Bauli dei villaggi chiusi col lucchetto: scassinali senza farti vedere'],
+  ['⚓', 'Il vascello: la nave più grande, con il ponte di sotto'],
+  ['☰', 'Sartie per salire sugli alberi fino alla coffa, vele che sventolano'],
+  ['♫', 'Chitarra e flauto d’osso da suonare'],
+  ['⇄', 'Partite pubbliche: trovale nella lista del Multigiocatore'],
+  ['▦', 'Texture fotografiche ovunque · nuova qualità «Patata»'],
+  ['✦', 'Shaders: luce, bagliore e foschia (Impostazioni → Grafica)'],
+  ['♪', 'Il tema di Deriva nella pagina principale'],
+] };
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';
 // pagina aperta dal PC che ospita (http://ip:porta): il campo "entra" si riempie da solo
