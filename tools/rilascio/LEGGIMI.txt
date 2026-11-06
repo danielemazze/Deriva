@@ -1,0 +1,505 @@
+DERIVA - sopravvivenza tra le isole (versione per Windows)
+==========================================================
+
+AVVIO
+1. Estrai TUTTO lo zip in una cartella (per esempio Documenti\Deriva).
+   Non avviarlo da dentro lo zip.
+2. Fai doppio clic su Deriva.exe.
+   La prima volta Windows potrebbe mostrare "Windows ha protetto il PC":
+   clicca "Ulteriori informazioni" e poi "Esegui comunque"
+   (succede con tutti i programmi non firmati digitalmente).
+
+MONDI
+- Menu > Mondi: elenco dei tuoi mondi. Gioca, Esporta, Elimina.
+- Nuovo mondo: scegli nome, seme (facoltativo), modalità e vento.
+- Per continuare un mondo su un altro PC: Esporta crea un file .deriva
+  (per esempio nei Documenti); copialo sull'altro computer e usa
+  Menu > Mondi > Importa un mondo.
+- I mondi stanno anche in %APPDATA%\deriva\mondi (un file per mondo).
+
+MODALITÀ CREATIVA
+- Hai tutti gli oggetti: nell'inventario (E) c'è il Catalogo.
+  Clic = una pila in mano, Maiusc+clic = dritto nell'inventario.
+- Niente fame, sete o danni; costruire non consuma niente.
+- Le barche tracciate col libro sono subito complete.
+- Doppio Spazio per volare (Spazio sali, Maiusc scendi, Ctrl veloce).
+- Si può cambiare in qualsiasi momento: Esc > Impostazioni > Questo mondo.
+
+VENTO
+- Esc > Impostazioni > Questo mondo > Vento: da 0 (bonaccia, mare piatto)
+  a 10 (tempesta, onde alte e schiuma). Con vento 0 le vele non portano.
+
+BIOMI
+Pianura, foresta, foresta pluviale, giungla, deserto (cactus, dune) e
+montagne con la neve. Il nome del bioma è accanto all'orologio.
+Nota: i biomi cambiano la forma del mondo, quindi un mondo creato con la
+versione precedente avrà isole diverse da come le ricordavi.
+
+NOVITÀ DELLA 1.21.2 «Tetti a 45 gradi»
+- Tetto a 45 gradi e frontone nuovo, un muro tagliato in diagonale.
+- Mastio del castello senza la lastra finta che tagliava l'ingresso.
+
+NOVITÀ DELLA 1.21.1 «Gente nuova»
+- Personaggi animati nuovi: cavaliere e paladino di guardia nei castelli;
+  Morak, Arissa, Erika e la piratessa come nemici; Arissa ed Erika anche
+  tra le donne dei villaggi (sul telefono restano quelli di prima).
+- Costruire è più comodo: i pezzi seguono la griglia della costruzione
+  vicina e vanno nel posto libero più vicino a dove guardi.
+- Tetto senza incroci, scala nuova alta quanto un muro, e il frontone
+  per chiudere il triangolo sotto il tetto.
+- I suoni registrati tornano a funzionare.
+- Menu: «Controlla aggiornamento» (scarica solo i file nuovi) e
+  «Prossimamente» (cosa arriverà, e un modulo per le proposte).
+
+NOVITÀ DELLA 1.21 «Navi da abitare»
+- Galeone e vascello rifatti: a poppa il cassero e a prua il castello sono
+  ponti rialzati con ringhiera e due scale; sotto c'è una cabina con la
+  porta, il tavolo e una lanterna. A poppa finestre e balconata.
+- Nel vascello si scende nella stiva a piedi, dalla scala del boccaporto.
+- Cannone da terra: posalo col tasto destro, poi tasto destro per usarlo
+  (mouse o A D ruota, W S alza, clic sinistro spara). Le palle aprono
+  crateri diversi in roccia, sabbia e terra e rompono le costruzioni.
+- Libro del costruttore da sfogliare (frecce, ← → o A D): indice, barca
+  libera, una doppia pagina per barca, ricettario.
+- F5: prima persona, terza persona, terza persona di fronte.
+- Sott'acqua turchese e limpido, con bollicine e fasci di luce.
+- Frutta e pane fotografati in 3D (ambientCG): pane, limone, pera, mango,
+  anguria, avocado, kiwi. Si comprano dai mercanti e si trovano ai banchi.
+- Nuovi simboli disegnati al posto delle emoji, in tutto il gioco.
+- Foreste più fitte, terreno lontano più chiaro, buche dello scavo più
+  regolari, animali che seguono il pendio, livello di abilità al centro
+  dello schermo, freccia della mappa nella direzione del personaggio.
+- Scafi, bauli e barili più rotondi; castello senza le strisce grigie.
+- La musica del menu parte subito e nel menu non si sentono gli animali.
+- T apre la chat senza aprire il menu.
+- Chi ospita e chi entra devono avere la stessa versione (1.21).
+
+NOVITÀ DELLA 1.20 «Cavalli e stive»
+- Cavalcature: cavallo, zebra e lama. Sella in mano (pelle + corda al banco),
+  tasto destro sull'animale. W passo, Ctrl galoppo, Spazio salta, Maiusc scende.
+- Lucchetti sui bauli dei villaggi: accovacciato e non visto, E per
+  scassinare (mouse = grimaldello, D o tasto destro = gira). Grimaldelli:
+  lingotto di ferro + bastone, o dai mercanti. Segue la Furtività.
+- Navi: vele che sventolano, sartie per salire fino alla coffa (W contro la
+  murata). Nuovo vascello col boccaporto e il ponte di sotto.
+- Chitarra (clic sinistro pizzica, destro accordo) e flauto d'osso
+  (clic sinistro soffia, guarda su o giù per la nota).
+- Partite pubbliche o private; lista delle partite aperte nel Multigiocatore.
+- Texture fotografiche ambientCG (CC0): 2K su Alta/Ultra, 1K sulle altre.
+  Nuova qualità «Patata» con le texture di prima per i PC più deboli.
+  Cambiando qualità le texture nuove si caricano al riavvio.
+- Shaders (Impostazioni > Grafica): luce volumetrica, bagliore, foschia,
+  colori caldi, pulviscolo, pollini e lucciole.
+- Corretto il mare lattiginoso in qualità Alta.
+
+NOVITÀ DELLA 1.19.1
+- Da ora i piccoli aggiornamenti hanno un terzo numero (1.19.1, 1.19.2...).
+- Menu Giocatori (tasto P), per chi ospita e per gli operatori: stato,
+  poteri (invincibile, creativa per un solo giocatore, volo, fame e sete
+  bloccate, invisibile ai nemici), teletrasporti, inventario, abilità.
+  Anche da comando: /giocatore Nome fame 50 · invincibile si · tp
+- Scrivendo un comando compaiono i suggerimenti: Tab completa, frecce
+  per scegliere.
+- Teletrasporti: ripetendo lo stesso luogo si va al successivo più vicino.
+- Chi ospita e chi entra devono avere la stessa versione (1.19.1).
+
+NOVITÀ DELLA 1.19
+- Cannoni del galeone: avvicinati e premi il tasto destro per metterti in
+  postazione. A D (o il mouse) girano, W S alzano/abbassano, clic sinistro
+  spara, tasto destro per lasciarlo.
+- Comandi nuovi: Ctrl = correre (consuma la stamina, barra gialla),
+  Maiusc = accovacciarsi.
+- Furto: accovacciato, l'occhio sopra il mirino dice se ti vedono.
+  Nascosto: E per rubare dai banchi dei mercanti o dalle tasche degli
+  abitanti (alle spalle). Se ti vedono, il villaggio ti attacca.
+- Abilità (L): Spada, Parata, Arma da fuoco, Arceria, Furtività, Corsa,
+  Contadino, Allevatore. Crescono facendo, fino al livello 50.
+- Nuova frutta: mele e arance.
+
+NOVITÀ DELLA 1.18
+- Animali: ora camminano e corrono col muso in avanti (tutti, anche
+  pecore, maiali, cani e lama).
+- Bandiere, tende e stoffe restano ancorate: col vento increspano sul
+  posto. La frutta dei mercanti resta ferma.
+- Modalità creativa: la può mettere solo chi ospita la partita.
+- Musica 6 dB più forte.
+
+NOVITÀ DELLA 1.17
+- Pirati con voci vere: grida, dolore, grido d'attacco; l'equipaggio grida
+  dalla nave, i naufraghi gridano in acqua.
+- Kraken con voci vere (ruggiti, versi, gemiti da ferito, morte) e il
+  tonfo dell'acqua quando i tentacoli si abbattono.
+- Kraken più forte; si sentono i tentacoli che si muovono.
+- Suoni veri per mangiare, bere, tendere e scoccare l'arco; gli abitanti
+  ti salutano; battito del cuore quando sei grave, fiato corto dopo una
+  lunga corsa o un'apnea.
+- Suoni nello spazio: restano nel punto in cui nascono anche se ti giri
+  (meglio con le cuffie).
+- Ogni suono varia leggermente di intonazione (±10 cent) ogni volta.
+
+NOVITÀ DELLA 1.16
+- Suoni registrati: versi veri di mucca, pecora, agnello, maiale, gallina e
+  orso; lamenti di mucca e maiale quando li colpisci.
+- Il lupo ulula solo da lontano (di notte); da vicino ringhia.
+- Musica: il tema del castello parte quando ti avvicini a un castello.
+  Nuovo volume "Musica" in Impostazioni > Audio.
+- Nella cartella c'è il PDF "Deriva - Diario delle versioni" con tutte le
+  novità dalla prima versione.
+
+NOVITÀ DELLA 1.15
+- MINERALI come gemme: dove una vena affiora su una parete spuntano grappoli
+  di cristalli in rilievo. Carbone: scaglie nere lucide. Ferro: punte e grumi
+  di ematite rosso-bruna metallica. Oro: cristalli e pepite dorate che
+  luccicano anche al buio. Si estraggono col piccone (spariscono man mano
+  che scavi la vena).
+
+NOVITÀ DELLA 1.14
+- CAVERNE NASCOSTE: sotto tutta la terraferma, a pochi metri di profondità
+  (la volta da 4 a 17 m sotto i piedi), ci sono tantissime caverne chiuse
+  collegate da gallerie, con pozze, stalattiti, stalagmiti, funghi,
+  pipistrelli e vene di carbone, ferro e oro. Scava verso il basso o di
+  lato col piccone: quando ti avvicini a un vuoto "il piccone rimbomba",
+  quando ci sbuchi dentro te lo dice il gioco. Porta una torcia.
+- Stalattiti e stalagmiti più naturali (anelli, bozzi, punte più chiare).
+
+NOVITÀ DELLA 1.13
+- GROTTE: sui fianchi di colline e montagne ci sono imbocchi di grotte
+  naturali (◓ sulla mappa, /vai grotta). Dentro: gallerie che scendono
+  serpeggiando, cunicoli stretti, caverne ampie con pozze d'acqua,
+  stalattiti, stalagmiti e colonne, muschio vicino all'ingresso e
+  all'acqua, funghi (in profondità anche luminosi), radici, pipistrelli
+  appesi alla volta che si alzano in volo se ti avvicini con la torcia,
+  gocce che cadono. Nelle terre gelate le stalattiti sono di ghiaccio.
+  È buio: porta una torcia. Sottoterra l'aria è fresca e umida (e ripara
+  dal gelo d'inverno). In fondo spesso c'è un forziere.
+- VENE: sulle pareti di grotte e miniere affiorano vene di carbone, ferro
+  e oro: scavale col piccone.
+- MINIERE più grandi: gallerie laterali sulle vene e una rampa che scende a
+  un livello inferiore con un'altra camera e un forziere.
+- BARCHE DEI PORTICCIOLI: le barche ormeggiate ai pontili dei villaggi sono
+  vere: sali, guida, portale via.
+- DERIVA: una barca senza ancora (e senza nessuno al timone) si sposta
+  piano dove la porta il vento, più in fretta col vento forte. Tasto X a
+  bordo (o il pulsante Ancora sul telefono): getta / salpa l'ancora.
+  Le barche dei salvataggi precedenti restano ancorate dove le avevi lasciate.
+- Creativa: mettendo pezzi nella barca in costruzione il catalogo non torna
+  più in cima.
+- Animali: girati di 180°, ora camminano col muso in avanti.
+
+NOVITÀ DELLA 1.12
+- PERSONE VERE: abitanti, mercanti, pirati e gli altri giocatori hanno
+  corpi con vestiti veri (contadini, ranger), volti, capelli e barbe
+  diversi, e camminano, corrono, nuotano e parlano con animazioni.
+- Gli animali ora camminano in avanti (prima andavano all'indietro).
+- PIRATI: il galeone pirata è una nave vera: ci sbatti contro e ci puoi
+  salire a bordo. Quando affonda i pirati restano a galla e scappano a nuoto.
+- CANNONI del galeone: non più bianchi. A piedi sul ponte, vicino a un
+  cannone, clic sinistro spara quel cannone (serve una munizione); al
+  timone il clic sinistro spara tutta la bordata.
+- Galeone: le vele basse sono più alte, non ci passi più con la testa.
+- Riparare la barca costa più legno (più è grande, più assi e chiodi).
+- TERRA: scavando ottieni terra; con la terra in mano, tasto destro su un
+  buco scavato per richiuderlo.
+- BARILI: nuovo contenitore da 18 posti (6 assi + 1 lingotto di ferro).
+- Torcia nella mano sinistra: si appoggia lo stesso col tasto destro.
+- Ingressi delle case: i gradini bassi si salgono camminando, senza saltare.
+- Cripta del castello: l'ingresso non è più coperto dal prato.
+- K (Strumenti): tutti i comandi, divisi in Mondo, Viaggi, Creature,
+  Giocatore, Partita (teletrasporto alle coordinate, vai da un amico, dai
+  oggetti, Kraken e pirati, operatori, tieni l'inventario).
+- Tab non apre più l'inventario (si usa E).
+- MINIMAPPA in alto a destra (si può spegnere in Impostazioni > Interfaccia).
+- F3: schermata tecnica come Minecraft (coordinate, giorno e ora, vento,
+  meteo, direzione...). F2: istantanea salvata in Immagini\Deriva.
+- Mappa condivisa: in multigiocatore le zone scoperte da chiunque compaiono
+  sulla mappa di tutti.
+- Il mare ondeggia più lentamente, come prima.
+- MORTE: perdi tutto l'inventario, che resta per terra dove sei morto
+  (hai 5 minuti per riprenderlo). Chi ospita può attivare "Tieni
+  l'inventario" (Esc > Impostazioni > Mondo, oppure K > Partita).
+
+NOVITÀ DELLA 1.11
+- KRAKEN: raro, in mare aperto e profondo (più facile di notte o in
+  tempesta). Sbatte i tentacoli sulla barca per sfasciarla. Colpiscilo con
+  frecce, pistole, spada sui tentacoli o i cannoni del galeone. Il bottino
+  galleggia: dobloni, perle, tentacoli (da cuocere), mappe, rarità.
+- PIRATI: navi con le vele nere ti inseguono e sparano bordate. Affondale
+  per il bottino (dobloni, munizioni, a volte pistola o progetto galeone).
+- SCAFO: le barche si danneggiano (barra in alto). Riparale a bordo con le
+  assi in mano + tasto destro (2 assi e 1 chiodo). Se affonda, il carico
+  della stiva galleggia e si può ripescare.
+- CANNONI: al timone del galeone, clic sinistro = bordata dal lato verso
+  cui guardi (serve una munizione).
+- OGGETTI A TERRA: Q lascia l'oggetto in mano (Ctrl+Q tutta la pila); si
+  raccolgono passandoci sopra, anche in barca. Così si passano agli amici.
+  Il parla-per-tenere della voce ora è sul tasto Z.
+- Animali nuovi e animati: mucca, pecora, maiale, cavallo, lama, zebra, cane.
+- Utensili di legno (piccone, ascia, spada). Nella roccia, scavando, si
+  trovano ferro e oro grezzi da fondere nella fornace.
+- Temperatura: a schermo vedi se ti stai scaldando o raffreddando e perché.
+  Il falò scalda davvero; il freddo arriva più piano.
+- Fame e sete scendono più lentamente.
+- Le scale a pioli si salgono tenendo premuto Spazio (C per scendere).
+- Le salite troppo ripide non si scalano più: si scivola.
+- Onde che seguono il vento, più alte col vento forte; vento più rumoroso.
+- Meno ghiaccio in mare, biomi circa il doppio più grandi.
+- In barca il tasto destro non ti fa più scendere: si scende uscendo a piedi.
+- Nella visuale esterna della barca si vede il tuo personaggio.
+- Cannocchiale: più zoomi, più il mouse è lento e preciso.
+- Faro: ora si sale fino in cima.
+- Suoni rifatti: colpi su legno/pietra/metallo, passi, acqua, cannoni...
+
+NOVITÀ DELLA 1.10
+- La notte è "dark fantasy": al tramonto il cielo diventa blu-viola, con
+  nebulose, tante stelle, nuvole argentate e una grande luna (rossa di
+  base; argento in Impostazioni > Grafica > Luna di notte). Di giorno il
+  mondo resta com'era.
+- Castelli: rarissimi (circa uno ogni 14 regioni), giganteschi, a doppia
+  cinta di mura con torri, porte fortificate, mastio gotico con la gran
+  torre, saloni, cappella, pozzo e scale per salire sulle mura. Dentro ci
+  sono forzieri col bottino migliore. Compaiono sulla mappa (♚).
+  Con gli strumenti: /vai castello.
+- Menu nuovo, diviso in categorie; impostazioni a schede (Grafica, Audio,
+  Chat vocale, Controlli, Interfaccia, Questo mondo).
+- Creativa: inventario rapido. Con l'inventario aperto premi 1-8 (o i
+  pulsanti in alto): Barche, Legno, Pietra, Attrezzi, Armi, Luce, Cibo,
+  Natura. Barra e inventario si riempiono con gli oggetti di quel tema.
+- Il libro non occupa più l'inventario: si apre con B (telefono: Libro).
+- Compatibile in multigiocatore con la 1.8 e la 1.9.
+
+NOVITÀ DELLA 1.9
+- Cannocchiale: si costruisce al banco da lavoro con 2 lingotti di ferro,
+  1 ossidiana e 1 pelle (resta anche nei relitti e dai mercanti).
+  Tasto destro tenuto premuto per guardare, rotella per l'ingrandimento
+  (×2, ×4, ×6, ×8), al centro la distanza di quello che guardi.
+  Sul telefono: pulsanti Guarda e Zoom.
+
+NOVITÀ DELLA 1.8
+- Tasti: E apre l'inventario. Per interagire (timone, bauli, porte,
+  persone, salire in barca) si usa il TASTO DESTRO. Sul telefono: Usa.
+- Barca libera: con il fasciame in mano mira il mare e premi il tasto
+  destro: nasce una barca che galleggia subito. Aggiungi i pezzi dove
+  vuoi (fasciame, ponte, zavorra, timone, albero, vela, remi, baule,
+  panca, lanterna); clic sinistro su un pezzo per toglierlo. Ogni pezzo
+  pesa: la barca pende verso dove pesa di più, il vento sulla vela la fa
+  sbandare, se è troppo carica imbarca acqua e affonda, se è alta e
+  stretta si ribalta (dall'acqua, tasto destro sullo scafo per
+  raddrizzarla). In alto a destra: peso, portata, inclinazione e stabilità.
+- Case di pietra: muri (anche con porta e finestra), pavimento, tetto di
+  ardesia, scala, pilastro, camino (scalda e fa luce) e fornace.
+- Minerali: vene di carbone, ferro e oro sulle montagne e nelle gallerie.
+  Si estraggono solo col piccone. La fornace fonde ferro e oro in
+  lingotti (serve carbone o legna): attrezzi e spada di ferro, chiodi;
+  l'oro si vende ai mercanti.
+- Le pietre grosse si rompono solo col piccone.
+- La torcia si piazza subito (tasto destro), anche sui muri e sulle
+  pareti delle gallerie.
+- Scavando dentro una montagna non si trova più il mare.
+- Ricettario con ricerca e categorie (nell'inventario).
+- Chat vocale: in Impostazioni > Chat vocale. Di base il microfono è
+  sempre aperto (trasmette quando parli); in alternativa "Tieni premuto Q"
+  o spento. Le voci arrivano da dove sta il giocatore.
+- Il fumo dei vulcani non si vede più da troppo lontano; la fiamma delle
+  torce davanti all'acqua non fa più l'alone strano.
+Per giocare insieme TUTTI devono avere la 1.8 (o usare il sito).
+
+NOVITÀ DELLA 1.7: IL CODICE PARTITA FUNZIONA
+Il server pubblico usato prima per i codici (PeerJS) aveva smesso di
+inoltrare le richieste di chi entra: per questo il codice non funzionava.
+Ora il codice usa altri server pubblici gratuiti (due, se uno è giù si usa
+l'altro) e, se il collegamento diretto tra i due PC non riesce, i dati del
+gioco passano da lì: funziona anche con reti che bloccano i collegamenti
+diretti (operatori mobili, alcuni router), con un ritardo un po' più alto.
+Per giocare col codice TUTTI devono avere la 1.7 (o usare il sito).
+
+NOVITÀ DELLA 1.6.1: AUDIO
+In Impostazioni > Audio, oltre al volume generale, ci sono sei volumi
+separati (da 0 a 150%):
+- Ambiente: mare, vento, uccelli diversi per bioma (cuculo e picchio nel
+  bosco, pappagalli e scimmie nella giungla, corvi sulla neve), gabbiani
+  sulla costa, cicale col caldo, fruscio delle foglie.
+- Stanze e grotte: il suono degli interni e delle gallerie, l'eco in grotta,
+  le gocce, il crepitio del falò e della torcia, la pioggia sul tetto.
+  Al chiuso e sottoterra i suoni di fuori arrivano attutiti.
+- Animali: ogni animale ha il suo verso e un verso di dolore quando lo
+  colpisci; si sentono da destra o da sinistra e più piano da lontano.
+  Di notte ululano i lupi, cantano grilli, rane vicino ai laghi e gufi.
+- Meteo, Effetti (i passi cambiano su erba, sabbia, legno, pietra, neve,
+  ghiaccio e ghiaia), Interfaccia.
+
+NOVITÀ DELLA 1.6: SI GIOCA ANCHE DAL TELEFONO
+Deriva ora c'è anche nel browser: https://danielemazze.github.io/Deriva/
+È lo stesso gioco di Deriva.exe, con i comandi touch sul telefono.
+- Da telefono (o da un altro computer) si gioca da soli, oppure si entra
+  nella partita di chi ospita con Deriva.exe scrivendo il codice partita.
+- Sulla stessa Wi-Fi si può anche aprire sul telefono l'indirizzo che
+  Deriva.exe mostra nella finestra Multigiocatore (http://...:7777).
+- Ospitare una partita si può solo da Deriva.exe.
+- Comandi sul telefono: metà sinistra dello schermo per camminare,
+  trascina sulla destra per guardarti intorno, tocca per colpire
+  (tieni premuto per continuare), pulsanti Salta, Usa (E), Oggetto
+  (tasto destro: piazza, mangia, para), Zaino, Mappa, Libro, Scambia (F).
+- Tieni il telefono in orizzontale. Al primo tocco il gioco va a schermo
+  intero, dove il browser lo permette. Dal menu del browser puoi
+  "Aggiungere a schermata Home" per aprirlo come un'app.
+- I mondi del browser restano salvati nel browser di quel telefono.
+
+NOVITÀ DELLA 1.5
+- Mano sinistra: F scambia l'oggetto in mano con quello a sinistra (anche
+  dallo slot "Sinistra" nell'inventario). Il tasto destro usa la sinistra:
+  torcia, cibo, cannocchiale, scudo (tieni premuto per parare).
+- Vestiti e temperatura: con il caldo hai più sete (cappello di paglia), con
+  il freddo servono berretto e maglione di lana, mantello e stivali di
+  pelle, oppure un falò vicino. La barra del termometro compare quando hai
+  freddo o caldo.
+- Meteo: sereno, nuvoloso, pioggia, temporale con fulmini, caldo torrido,
+  siccità, neve nei biomi freddi. Fasi lunari (8 giorni): con la luna piena
+  le notti sono chiare, con la luna nuova buie.
+- Vento: cambia direzione col tempo e da zona a zona; il meteo lo rinforza
+  o lo calma. Con vento forte in mare aperto si aprono i gorghi: la barca
+  resta bloccata finché il vento non cambia o cala.
+- Nuovi biomi: neve con mare ghiacciato (si cammina sulla banchisa, le barche
+  passano solo nei canali) e vulcani con lava, fumo e ossidiana.
+- Laghetti di montagna con cascate.
+- Scavo: con piccone e pala sul terreno scavi tunnel, cantine e case dentro
+  la montagna. Sottoterra è buio: porta una torcia.
+- Trappole: posale dove passano gli animali, li catturano vivi. Con il loro
+  cibo in mano (fibra, bacche, funghi, cocco) gli animali ti seguono; nutrine
+  due della stessa specie e avranno un cucciolo che cresce.
+- Strutture abbandonate con casse: rovine, miniere (con una vera galleria
+  scavata e un forziere in fondo), accampamenti.
+- Villaggi molto più frequenti. Rovine e miniere sono segnate sulla mappa.
+- Si sale a bordo anche arrampicandosi (Spazio contro lo scafo) o saltando
+  sul ponte. Il cerchio dorato con il timone indica dove guidare.
+- I tetti non si attraversano più. Colpi visibili: lampo rosso, numero del
+  danno e segno sul mirino.
+- Creativa ⇄ sopravvivenza in partita: menu Esc o F4.
+- Comandi: T (o /) apre la console, /aiuto elenca tutto: /ora 18, /meteo
+  temporale, /vento 7 NE, /luna piena, /bioma deserto, /villaggio, /villaggi,
+  /vai miniera, /spawn lupo 3, /spawn abitante, /tp x z, /modalita creativa,
+  /nemici no, /dai assi 64, /cura, /gorgo. K apre lo stesso in un pannello a
+  pulsanti. In multigiocatore li usa solo chi ospita.
+- Grafica adattiva (Impostazioni): sceglie gli FPS da mantenere (30, 45, 60)
+  e abbassa o rialza la grafica da sola, avvisandoti ogni volta.
+- Qualità Alta e Ultra: riflessi delle isole sul mare, foschia nelle valli,
+  raggi di sole più intensi, boschi più fitti, fondale più profondo.
+
+ESPLORARE
+- Navigando trovi villaggi (diversi per bioma: cittadine coloniali con
+  campanile, case sugli alberi, palafitte, borghi agricoli, baite, borghi
+  di pietra), fari, relitti sul fondale, covi dei pirati.
+- Alcuni villaggi sono abitati, altri abbandonati (spesso con i pirati).
+- Ogni villaggio ha una locanda: il letto salva il punto di rinascita.
+- Casse e forzieri contengono bottino: dobloni, armi, mappe del tesoro,
+  progetti di nuove barche e oggetti rari.
+- Parla con gli abitanti (E): il capovillaggio dà missioni da una a tre
+  stelle (ricompense più ricche per quelle difficili), il mercante compra
+  e vende in dobloni, l'oste dà da mangiare e da dormire, gli altri
+  raccontano voci che segnano nuovi luoghi sulla mappa.
+- Mappa del tesoro: tasto destro per leggerla, poi vai alla X e scava con
+  la pala (clic sinistro).
+- Arrampicata: W + Spazio contro i muri, W sulle scale a pioli. Dal
+  campanile puoi saltare nel carro di fieno senza farti male.
+- M = mappa che si disegna mentre esplori. J = diario (missioni,
+  scoperte, collezione dei 6 oggetti rari, imprese).
+
+NEMICI E ARMI
+- Pirati ai covi e in alcuni villaggi abbandonati; lupi, orsi, giaguari,
+  serpenti, coccodrilli e squali nei rispettivi ambienti.
+- Si possono disattivare: nuovo mondo > Nemici > Mondo tranquillo,
+  oppure Esc > Impostazioni > Questo mondo. In creativa non ti attaccano.
+- Arco: tieni premuto il clic sinistro per tendere, rilascia per
+  scoccare (frecce = pietra + bastone + piume). Pistola: servono
+  munizioni. Lancia e sciabola: corpo a corpo.
+
+NUOVE BARCHE
+Canoa, catamarano e galeone si sbloccano con i progetti (casse,
+relitti, mercanti, missioni). Tasto destro sul progetto per impararlo.
+
+MULTIGIOCATORE (fino a 4 giocatori)
+Tutti devono avere la stessa versione di Deriva (questa: 1.10, compatibile con 1.8 e 1.9; le versioni precedenti non lo sono).
+
+Chi ospita:
+  - Menu > Multigiocatore > scegli il nome > "Ospita la partita".
+  - Nel menu di pausa (Esc) compare il CODICE PARTITA, per esempio
+    ABC-234 (c'è anche il pulsante Copia). Mandalo agli amici.
+Chi si unisce:
+  - Menu > Multigiocatore > scegli il nome > scrivi il codice > "Unisciti".
+
+Il codice funziona anche da case diverse, via internet, senza aprire
+porte sul router: i due PC si collegano direttamente (WebRTC, come le
+videochiamate). Serve solo la connessione a internet. In rari casi
+(reti aziendali o scolastiche molto chiuse) il collegamento può non
+riuscire: riprovate, o usate un'altra rete.
+
+In alternativa, sulla stessa rete Wi-Fi si può usare l'indirizzo IP
+mostrato sotto il codice (es. 192.168.1.20:7777). Se così dice
+"nessuna risposta", chi ospita prema "Sblocca nel firewall di Windows"
+nel menu Multigiocatore e risponda Sì alla richiesta di Windows.
+
+Il fuoco amico si sceglie quando si ospita la partita.
+
+Il mondo resta di chi ospita; l'inventario degli amici viene ricordato
+quando rientrano con lo stesso nome.
+
+COSTRUIRE UNA BARCA
+B apre il libro: scegli il progetto e traccia la sagoma sul mare.
+Poi guarda la barca e premi E (o il tasto destro): si apre l'elenco delle
+parti con i materiali che servono. Premi "Monta" o "Monta tutto il possibile".
+
+A BORDO
+- Con E sali a bordo e puoi camminare sul ponte (anche gli amici).
+- Per guidare vai nella zona guida (remo della zattera, banco dei remi,
+  timone) e premi E. E di nuovo per lasciarla; E altrove per scendere.
+- Spazio contro la murata: ti tuffi in mare.
+- Barca a remi: A = remo sinistro, D = remo destro. Premili insieme e a
+  tempo per andare dritto; un remo solo fa girare la barca dall'altra
+  parte. S tenuto premuto mentre remi = indietro.
+
+PRESTAZIONI
+- Al primo avvio il gioco riconosce la scheda video: su quelle integrate
+  (Intel, Radeon dei portatili) parte da solo con la qualità Bassa o Minima.
+  In Impostazioni vedi quale scheda video sta usando.
+- Qualità: Minima, Bassa, Media, Alta, Ultra. Se scatta, scendi di una.
+- "Risoluzione dinamica" (attiva di serie): quando gli FPS calano la
+  risoluzione 3D si abbassa da sola e risale quando c'è margine.
+- "Mostra FPS" e "Mostra ping" si attivano nelle impostazioni.
+- VSync disattivato = FPS illimitati (vale dal riavvio successivo).
+- Sui portatili collega l'alimentatore: a batteria Windows rallenta la
+  scheda video. Se il PC ha due schede video (es. Intel + NVIDIA), in
+  Impostazioni di Windows > Sistema > Schermo > Grafica aggiungi
+  Deriva.exe e scegli "Prestazioni elevate".
+- F11 = schermo intero. F12 = strumenti per sviluppatori (per segnalare errori).
+
+COMANDI
+W A S D        muoversi / guidare la barca (remi: A sinistro, D destro)
+Ctrl           correre
+Maiusc         accovacciarsi (E per rubare o scassinare se nessuno ti vede) · a cavallo: scendere
+L              abilità
+P              menu Giocatori (chi ospita e operatori)
+Spazio         saltare, risalire in acqua (doppio Spazio = volo in creativa)
+C              immergersi
+Clic sinistro  colpire, abbattere, estrarre, scavare, sparare (arco: tieni premuto) (anche gli altri giocatori, se il fuoco amico è attivo)
+Tasto destro   usare, mangiare, posare, montare parti della barca
+Tasto destro   interagire, salire/scendere, prendere e lasciare il timone
+E · I · Tab    inventario e creazione 3x3 (il banco da lavoro apre il 5x5)
+B              libro del costruttore (progetti delle barche)
+F              scambia l'oggetto con la mano sinistra
+G              stiva della barca
+T oppure /     console dei comandi (/aiuto)
+K              strumenti (ora, meteo, vento, luna, biomi, villaggi)
+F4             creativa / sopravvivenza
+M              mappa
+J              diario
+R              ruotare la costruzione
+V              visuale esterna in barca
+H              mostra/nasconde i comandi a schermo
+1-9, rotella   scegliere l'oggetto
+Esc            pausa
+
+I salvataggi stanno in %APPDATA%\deriva.
+Motore: Electron 33 (MIT). Libreria 3D: three.js r149 (MIT).
+Texture fotografiche: ambientCG (ambientcg.com, CC0) e, per la qualità Patata, Babylon.js Assets
+(github.com/BabylonJS/Assets), licenza CC BY 4.0.
+Modelli 3D scansionati di rocce, scogliere, rami, muschio e albero faretra: Poly Haven
+(polyhaven.com, CC0), tramite Babylon.js Assets. Dettagli in game\assets\CREDITI.txt.

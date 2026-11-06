@@ -1,0 +1,42 @@
+# Crea da sola la release per Windows (Deriva-Windows.zip) ogni volta che esce una versione nuova (cambia version.json)
+name: Rilascio Windows
+on:
+  push:
+    branches: [main]
+    paths: ['version.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: rilascio
+jobs:
+  rilascio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versione
+        id: v
+        run: |
+          V=$(jq -r .v version.json); echo "v=$V" >> $GITHUB_OUTPUT
+          echo "name=$(jq -r .name version.json)" >> $GITHUB_OUTPUT
+          echo "el=$(jq -r '.devDependencies.electron' tools/rilascio/package.json)" >> $GITHUB_OUTPUT
+          if gh release view "v$V" >/dev/null 2>&1; then echo "esiste=1" >> $GITHUB_OUTPUT; fi
+        env: { GH_TOKEN: '${{ github.token }}' }
+      - name: Prepara Deriva per Windows
+        if: steps.v.outputs.esiste != '1'
+        run: |
+          set -e
+          T=$RUNNER_TEMP/out; mkdir -p $T
+          curl -sSL -o $RUNNER_TEMP/el.zip "https://github.com/electron/electron/releases/download/v${{ steps.v.outputs.el }}/electron-v${{ steps.v.outputs.el }}-win32-x64.zip"
+          unzip -q $RUNNER_TEMP/el.zip -d $T/Deriva
+          mv $T/Deriva/electron.exe $T/Deriva/Deriva.exe
+          rm -f $T/Deriva/resources/default_app.asar
+          A=$T/Deriva/resources/app; mkdir -p $A/game $A/electron
+          rsync -a --exclude .git --exclude .github --exclude tools --exclude README.md --exclude .nojekyll ./ $A/game/
+          cp tools/rilascio/package.json $A/; cp tools/rilascio/electron/*.js $A/electron/
+          cp tools/rilascio/LEGGIMI.txt "tools/rilascio/Deriva - Diario delle versioni.pdf" $T/Deriva/
+          (cd $T && zip -qr -9 Deriva-Windows.zip Deriva)
+          jq -r '"Novità:\n" + ([.items[] | "- " + .] | join("\n")) + "\n\nChi ha già Deriva può aggiornare dal menu del gioco con «Controlla aggiornamento»."' version.json > $T/note.md
+      - name: Pubblica la release
+        if: steps.v.outputs.esiste != '1'
+        run: gh release create "v${{ steps.v.outputs.v }}" "$RUNNER_TEMP/out/Deriva-Windows.zip" --title "Deriva ${{ steps.v.outputs.v }} «${{ steps.v.outputs.name }}»" --notes-file "$RUNNER_TEMP/out/note.md" --latest
+        env: { GH_TOKEN: '${{ github.token }}' }

@@ -86,7 +86,7 @@ G.VERSION = '1.21.2';
 // novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
 G.NEWS = { v: '1.21.2', t: 'Tetti a 45 gradi', d: '6 novembre 2026', items: [
   ['casa', 'Tetto a 45 gradi e frontone nuovo: un muro tagliato in diagonale'],
-  ['castello', 'Mastio senza la lastra finta che tagliava l\u2019ingresso'],
+  ['castello', 'Mastio senza la lastra finta che tagliava l’ingresso'],
   ['persone', 'Nuovi personaggi animati: cavalieri, banditi, abitanti e piratesse'],
   ['casa', 'I pezzi si agganciano a quelli vicini, scala alta quanto un muro'],
   ['nota', 'I suoni registrati tornano a funzionare'],
