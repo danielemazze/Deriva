@@ -55,19 +55,19 @@
     GEO.muro = wallParts(); GEO.muro_porta = wallParts('door'); GEO.muro_finestra = wallParts('win');
     GEO.porta = M.merge([boxUV(0.95, 2.2, 0.07, 0.475, 1.1, 0), darker(boxUV(0.1, 2.0, 0.1, 0.12, 1.1, 0.04), 0.7), darker(boxUV(0.75, 0.1, 0.1, 0.5, 1.6, 0.04), 0.7), darker(boxUV(0.75, 0.1, 0.1, 0.5, 0.6, 0.04), 0.7), M.colorize(new THREE.SphereGeometry(0.04, 6, 4).translate(0.82, 1.05, 0.08), 0.8, 0.65, 0.3)]);
     // tetto: falda inclinata 3x3 che sale di 1.6 m verso -z
-    const slope = Math.atan2(1.6, 3), L = Math.hypot(3, 1.6);
+    // falda a 45 gradi: sale di 3 m su 3 m, come il frontone
+    const slope = Math.atan2(3, 3), L = Math.hypot(3, 3);
     // la falda finisce esatta sul colmo (due tetti schiena contro schiena non si incrociano) e sporge solo in gronda
-    const r1 = boxUV(2.98, 0.12, L + 0.3, 0, 0, 0.15); r1.rotateX(slope); r1.translate(0, 0.8, 0);
+    const r1 = boxUV(2.98, 0.12, L + 0.3, 0, 0, 0.15); r1.rotateX(slope); r1.translate(0, 1.5, 0);
     const beams = [];
-    for (const bx of [-1.38, -0.46, 0.46, 1.38]) { const b = darker(boxUV(0.12, 0.16, L + 0.24, bx, -0.14, 0.12), 0.65); b.rotateX(slope); b.translate(0, 0.8, 0); beams.push(b); }
+    for (const bx of [-1.38, -0.46, 0.46, 1.38]) { const b = darker(boxUV(0.12, 0.16, L + 0.24, bx, -0.14, 0.12), 0.65); b.rotateX(slope); b.translate(0, 1.5, 0); beams.push(b); }
     GEO.tetto = M.merge([r1, ...beams]);
-    // frontone: triangolo rettangolo che chiude il fianco sotto una falda (alto 1.6 dal lato del colmo)
-    { const sh = new THREE.Shape(); sh.moveTo(-1.5, 0); sh.lineTo(1.5, 0); sh.lineTo(-1.5, 1.6); sh.closePath();
+    // frontone: un muro tagliato in diagonale a 45 gradi (alto 3 m dal lato del colmo, come il tetto)
+    { const sh = new THREE.Shape(); sh.moveTo(-1.3, 0.16); sh.lineTo(1.25, 0.16); sh.lineTo(-1.3, 2.71); sh.closePath();
       const tri = new THREE.ExtrudeGeometry(sh, { depth: 0.14, bevelEnabled: false }); tri.translate(0, 0, -0.07);
-      { const p = tri.attributes.position, uv = tri.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 2.5 + 0.5, p.getY(i) / 2.5); }
-      const parts = [M.colorize(tri, 1, 1, 1), darker(boxUV(3, 0.16, 0.26, 0, 0.08, 0), 0.75), darker(boxUV(0.22, 1.6, 0.26, -1.39, 0.8, 0), 0.75)];
-      const ed = darker(boxUV(Math.hypot(3, 1.6), 0.14, 0.24, 0, 0, 0), 0.7); ed.rotateZ(-Math.atan2(1.6, 3)); ed.translate(0, 0.8, 0); parts.push(ed);
-      for (const x of [-0.5, 0.5]) { const h = 1.6 * (1.5 - x) / 3; parts.push(darker(boxUV(0.1, h, 0.2, x, h / 2, 0), 0.68)); }
+      { const p = tri.attributes.position, uv = tri.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 3, p.getY(i) / 3); }
+      const parts = [M.colorize(tri, 1, 1, 1), darker(boxUV(3, 0.16, 0.26, 0, 0.08, 0), 0.75), darker(boxUV(0.22, 3, 0.26, -1.39, 1.5, 0), 0.75)];
+      const ed = darker(boxUV(Math.hypot(3, 3) - 0.1, 0.2, 0.26, 0, 0, 0), 0.75); ed.rotateZ(-Math.PI / 4); ed.translate(0.02, 1.48, 0); parts.push(ed);
       GEO.frontone = M.merge(parts); }
     // trappola: gabbia di bastoni con porta a ghigliottina
     { const parts = [boxUV(1.3, 0.08, 1.3, 0, 0.04, 0)];
@@ -296,7 +296,7 @@
       case 'fornace': bx.push(rotBox(p, -0.72, 0, -0.72, 0.72, 1.55, 0.72, { walk: true })); break;
       case 'pavimento': bx.push(rotBox(p, -1.5, -0.25, -1.5, 1.5, 0, 1.5, { walk: true })); break;
       case 'muro': bx.push(rotBox(p, -1.5, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
-      case 'frontone': bx.push(rotBox(p, -1.5, 0, -0.12, 0, 1.6, 0.12, { walk: true }), rotBox(p, 0, 0, -0.12, 1.5, 0.8, 0.12, { walk: true })); break;
+      case 'frontone': bx.push(rotBox(p, -1.5, 0, -0.12, -0.5, 3, 0.12, { walk: true }), rotBox(p, -0.5, 0, -0.12, 0.5, 2, 0.12, { walk: true }), rotBox(p, 0.5, 0, -0.12, 1.5, 1, 0.12, { walk: true })); break;
       case 'muro_finestra': bx.push(rotBox(p, -1.5, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
       case 'muro_porta': bx.push(rotBox(p, -1.5, 0, -0.12, -0.45, WALL_H, 0.12, { walk: true }), rotBox(p, 0.45, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true }), rotBox(p, -1.5, 2.2, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
       case 'porta': if (!p.open) bx.push(rotBox(p, -0.45, 0, -0.06, 0.45, 2.2, 0.06)); break;
@@ -310,7 +310,7 @@
       case 'falo': bx.push(rotBox(p, -0.5, 0, -0.5, 0.5, 0.3, 0.5, { soft: true })); break;
       case 'torcia': break;
       case 'trappola': bx.push(rotBox(p, -0.65, 0, -0.65, 0.65, 1.0, 0.65, { soft: true })); break;
-      case 'tetto': bx.push(B.slopeBox(p, 'z', -1.5, 1.5, 1.65, -1.5, p.y - 0.05, p.y + 1.72, { shell: 0.32, piece: p })); break;
+      case 'tetto': bx.push(B.slopeBox(p, 'z', -1.5, 1.5, 1.65, -1.5, p.y - 0.05, p.y + 3.12, { shell: 0.32, piece: p })); break;
     }
     return bx;
   }
@@ -322,7 +322,7 @@
     if (p.t === 'camino') return rotBox(p, -1.05, 0, -0.3, 1.05, 3.05, 0.67);
     if (p.t === 'falo') return rotBox(p, -0.55, 0, -0.55, 0.55, 0.9, 0.55);
     if (p.t === 'trappola') return rotBox(p, -0.66, 0, -0.66, 0.66, 1.1, 0.66);
-    if (kind(p.t) === 'tetto') return rotBox(p, -1.6, -0.1, -1.6, 1.6, 1.8, 1.6);
+    if (kind(p.t) === 'tetto') return rotBox(p, -1.6, -0.1, -1.6, 1.6, 3.2, 1.6);
     return colliders(p)[0] || rotBox(p, -0.5, 0, -0.5, 0.5, 1, 0.5);
   }
 

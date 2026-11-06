@@ -82,16 +82,15 @@ G.PRESETS = {
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.21.1';
+G.VERSION = '1.21.2';
 // novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
-G.NEWS = { v: '1.21.1', t: 'Gente nuova', d: '6 novembre 2026', items: [
+G.NEWS = { v: '1.21.2', t: 'Tetti a 45 gradi', d: '6 novembre 2026', items: [
+  ['casa', 'Tetto a 45 gradi e frontone nuovo: un muro tagliato in diagonale'],
+  ['castello', 'Mastio senza la lastra finta che tagliava l\u2019ingresso'],
   ['persone', 'Nuovi personaggi animati: cavalieri, banditi, abitanti e piratesse'],
-  ['castello', 'Guardie nel cortile dei castelli'],
-  ['casa', 'Costruire è più comodo: i pezzi si agganciano a quelli vicini'],
-  ['casa', 'Tetto senza incroci, scala nuova e frontone per chiudere i lati'],
+  ['casa', 'I pezzi si agganciano a quelli vicini, scala alta quanto un muro'],
   ['nota', 'I suoni registrati tornano a funzionare'],
-  ['giro', 'Controlla aggiornamento: scarica solo i file nuovi'],
-  ['bussola', 'Prossimamente: cosa arriverà, e le vostre proposte'],
+  ['giro', 'Controlla aggiornamento · Prossimamente e proposte'],
 ] };
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';

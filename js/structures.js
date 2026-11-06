@@ -928,7 +928,14 @@
     P('stone', BOX(2 * DW, KH - 6, KT, 0, 6 + (KH - 6) / 2, fz), ST); col(-DW, 6, fz - KT / 2, DW, KH, fz + KT / 2);
     for (let k = 0; k <= 10; k++) { const a = (k / 10) * Math.PI, g = BOX(0.6, 0.8, 0.4, 0, 0, 0); g.rotateZ(a - Math.PI / 2); g.translate(Math.cos(a) * (DW + 0.3), 4.6 + Math.sin(a) * 1.8, kz1 + 0.15); P('stone', g, ST3); }
     // marcapiani, finestre gotiche, contrafforti angolari
-    for (const ry of [3, 12, 21, 30]) P('stone', BOX(KW + 0.5, 0.35, KW + 0.5, 0, ry, KZ), ST3);
+    // marcapiani: solo una fascia sporgente sulle facce esterne (prima era una lastra piena che tagliava l'interno senza collisione)
+    for (const ry of [3, 12, 21, 30]) {
+      const B2 = KW / 2 + 0.25, th = 0.5;
+      P('stone', BOX(KW + 0.5, 0.35, th, 0, ry, KZ - B2 + th / 2), ST3); // retro
+      for (const sx of [-1, 1]) P('stone', BOX(th, 0.35, KW + 0.5, sx * (B2 - th / 2), ry, KZ), ST3); // fianchi
+      if (ry > 8) P('stone', BOX(KW + 0.5, 0.35, th, 0, ry, KZ + B2 - th / 2), ST3); // facciata (non davanti alla porta)
+      else for (const sx of [-1, 1]) { const w = B2 - DW - 0.3; P('stone', BOX(w, 0.35, th, sx * (DW + 0.3 + w / 2), ry, KZ + B2 - th / 2), ST3); }
+    }
     for (let f = 0; f < 3; f++) for (let k = 0; k < 4; k++) {
       const t = kx0 + 4 + k * ((KW - 8) / 3), wy = 5 + f * 9, lit = (k + f) % 3 !== 1;
       gwin(t, wy, kz0 - 0.01, 0, -1, 1.4, 4.2, lit); gwin(kx0 - 0.01, wy, KZ + t, -1, 0, 1.4, 4.2, lit); gwin(kx1 + 0.01, wy, KZ + t, 1, 0, 1.4, 4.2, !lit);
