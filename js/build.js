@@ -56,20 +56,37 @@
     GEO.porta = M.merge([boxUV(0.95, 2.2, 0.07, 0.475, 1.1, 0), darker(boxUV(0.1, 2.0, 0.1, 0.12, 1.1, 0.04), 0.7), darker(boxUV(0.75, 0.1, 0.1, 0.5, 1.6, 0.04), 0.7), darker(boxUV(0.75, 0.1, 0.1, 0.5, 0.6, 0.04), 0.7), M.colorize(new THREE.SphereGeometry(0.04, 6, 4).translate(0.82, 1.05, 0.08), 0.8, 0.65, 0.3)]);
     // tetto: falda inclinata 3x3 che sale di 1.6 m verso -z
     const slope = Math.atan2(1.6, 3), L = Math.hypot(3, 1.6);
-    const r1 = boxUV(3.3, 0.12, L + 0.3, 0, 0, 0); r1.rotateX(slope); r1.translate(0, 0.8, 0);
+    // la falda finisce esatta sul colmo (due tetti schiena contro schiena non si incrociano) e sporge solo in gronda
+    const r1 = boxUV(2.98, 0.12, L + 0.3, 0, 0, 0.15); r1.rotateX(slope); r1.translate(0, 0.8, 0);
     const beams = [];
-    for (let i = 0; i < 4; i++) { const b = darker(boxUV(0.12, 0.16, L + 0.3, -1.5 + i, -0.1, 0), 0.65); b.rotateX(slope); b.translate(0, 0.8, 0); beams.push(b); }
+    for (const bx of [-1.38, -0.46, 0.46, 1.38]) { const b = darker(boxUV(0.12, 0.16, L + 0.24, bx, -0.14, 0.12), 0.65); b.rotateX(slope); b.translate(0, 0.8, 0); beams.push(b); }
     GEO.tetto = M.merge([r1, ...beams]);
+    // frontone: triangolo rettangolo che chiude il fianco sotto una falda (alto 1.6 dal lato del colmo)
+    { const sh = new THREE.Shape(); sh.moveTo(-1.5, 0); sh.lineTo(1.5, 0); sh.lineTo(-1.5, 1.6); sh.closePath();
+      const tri = new THREE.ExtrudeGeometry(sh, { depth: 0.14, bevelEnabled: false }); tri.translate(0, 0, -0.07);
+      { const p = tri.attributes.position, uv = tri.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 2.5 + 0.5, p.getY(i) / 2.5); }
+      const parts = [M.colorize(tri, 1, 1, 1), darker(boxUV(3, 0.16, 0.26, 0, 0.08, 0), 0.75), darker(boxUV(0.22, 1.6, 0.26, -1.39, 0.8, 0), 0.75)];
+      const ed = darker(boxUV(Math.hypot(3, 1.6), 0.14, 0.24, 0, 0, 0), 0.7); ed.rotateZ(-Math.atan2(1.6, 3)); ed.translate(0, 0.8, 0); parts.push(ed);
+      for (const x of [-0.5, 0.5]) { const h = 1.6 * (1.5 - x) / 3; parts.push(darker(boxUV(0.1, h, 0.2, x, h / 2, 0), 0.68)); }
+      GEO.frontone = M.merge(parts); }
     // trappola: gabbia di bastoni con porta a ghigliottina
     { const parts = [boxUV(1.3, 0.08, 1.3, 0, 0.04, 0)];
       for (let i = 0; i < 6; i++) for (const sd of [-1, 1]) { parts.push(darker(boxUV(0.05, 0.9, 0.05, -0.6 + i * 0.24, 0.47, sd * 0.62), 0.75)); parts.push(darker(boxUV(0.05, 0.9, 0.05, sd * 0.62, 0.47, -0.6 + i * 0.24), 0.75)); }
       parts.push(boxUV(1.3, 0.06, 1.3, 0, 0.93, 0), darker(boxUV(0.08, 0.5, 0.08, 0, 1.2, 0.55), 0.6), darker(boxUV(0.9, 0.06, 0.06, 0, 1.45, 0.55), 0.6));
       GEO.trappola = M.merge(parts); }
     GEO.recinto = M.merge([darker(boxUV(0.14, 1.3, 0.14, -1.45, 0.65, 0), 0.8), darker(boxUV(0.14, 1.3, 0.14, 1.45, 0.65, 0), 0.8), darker(boxUV(0.14, 1.3, 0.14, 0, 0.65, 0), 0.8), boxUV(3, 0.12, 0.06, 0, 0.45, 0.06), boxUV(3, 0.12, 0.06, 0, 0.95, 0.06)]);
-    const steps = []; for (let i = 0; i < 10; i++) steps.push(boxUV(1.4, 0.12, 0.36, 0, (i + 1) * 0.3 - 0.06, 1.5 - i * 0.3 - 0.15));
-    steps.push(darker(boxUV(0.12, 0.2, 3.6, -0.68, 1.5, 0), 0.7)); steps.push(darker(boxUV(0.12, 0.2, 3.6, 0.68, 1.5, 0), 0.7));
-    const sr = steps.slice(-2); sr.forEach((g) => { g.translate(0, -1.5, 0); g.rotateX(-Math.PI / 4); g.translate(0, 1.5, 0); });
-    GEO.scala = M.merge(steps);
+    { // 12 gradini da 25 cm: sale di 3 m (un muro) in una cella
+      const steps = [], n = 12, rise = WALL_H / n, run = CELL / n, W = 1.3;
+      for (let i = 0; i < n; i++) { const y = (i + 1) * rise, z = CELL / 2 - (i + 0.5) * run;
+        steps.push(boxUV(W, 0.05, run + 0.04, 0, y - 0.025, z)); steps.push(darker(boxUV(W - 0.04, rise - 0.05, 0.04, 0, y - rise / 2 - 0.025, z + run / 2 - 0.02), 0.82)); }
+      const ang = Math.atan2(WALL_H, CELL), len = Math.hypot(WALL_H, CELL);
+      for (const sd of [-1, 1]) {
+        const c = darker(boxUV(0.08, 0.32, len, sd * (W / 2 + 0.04), 0, 0), 0.7); c.rotateX(ang); c.translate(0, WALL_H / 2 - 0.12, 0); steps.push(c);
+        for (const [z, y] of [[CELL / 2 - 0.05, 0], [-CELL / 2 + 0.05, WALL_H]]) steps.push(darker(boxUV(0.1, 1.0, 0.1, sd * (W / 2 + 0.04), y + 0.5, z), 0.62));
+        const h = darker(boxUV(0.06, 0.06, len, sd * (W / 2 + 0.04), 0, 0), 0.62); h.rotateX(ang); h.translate(0, WALL_H / 2 + 0.92, 0); steps.push(h);
+        for (let k = 1; k < 4; k++) { const z = CELL / 2 - k * CELL / 4, y = WALL_H * k / 4; steps.push(darker(boxUV(0.04, 0.9, 0.04, sd * (W / 2 + 0.04), y + 0.47, z), 0.68)); }
+      }
+      GEO.scala = M.merge(steps); }
     GEO.banco = M.merge([boxUV(1.6, 0.12, 0.85, 0, 0.92, 0), ...[[-0.7, -0.33], [0.7, -0.33], [-0.7, 0.33], [0.7, 0.33]].map(([x, z]) => darker(boxUV(0.1, 0.9, 0.1, x, 0.45, z), 0.75)), darker(boxUV(1.45, 0.06, 0.7, 0, 0.3, 0), 0.8),
       M.colorize(new THREE.BoxGeometry(0.3, 0.05, 0.12).translate(-0.3, 1.0, 0.1), 0.55, 0.55, 0.55), M.colorize(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 5).rotateZ(1.2).translate(0.3, 1.0, -0.1), 0.45, 0.3, 0.15)]);
     // forziere del tesoro: legno scuro con bande di ferro e coperchio bombato
@@ -185,7 +202,7 @@
 
   /* ---------- creazione pezzi ---------- */
   const FREE = new Set(['banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola', 'pilastro', 'camino', 'fornace', 'cannone']);
-  B.isPlaceable = (id) => ['pavimento', 'muro', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace', 'cannone'].includes(id);
+  B.isPlaceable = (id) => ['pavimento', 'muro', 'frontone', 'muro_porta', 'muro_finestra', 'porta', 'tetto', 'recinto', 'scala', 'banco', 'falo', 'baule', 'barile', 'letto', 'torcia', 'trappola'].includes(id) || G.PIECE_KIND[id] !== undefined || ['pilastro', 'camino', 'fornace', 'cannone'].includes(id);
 
   function makeMesh(p) {
     const MAT = G.MAT;
@@ -279,6 +296,7 @@
       case 'fornace': bx.push(rotBox(p, -0.72, 0, -0.72, 0.72, 1.55, 0.72, { walk: true })); break;
       case 'pavimento': bx.push(rotBox(p, -1.5, -0.25, -1.5, 1.5, 0, 1.5, { walk: true })); break;
       case 'muro': bx.push(rotBox(p, -1.5, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
+      case 'frontone': bx.push(rotBox(p, -1.5, 0, -0.12, 0, 1.6, 0.12, { walk: true }), rotBox(p, 0, 0, -0.12, 1.5, 0.8, 0.12, { walk: true })); break;
       case 'muro_finestra': bx.push(rotBox(p, -1.5, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
       case 'muro_porta': bx.push(rotBox(p, -1.5, 0, -0.12, -0.45, WALL_H, 0.12, { walk: true }), rotBox(p, 0.45, 0, -0.12, 1.5, WALL_H, 0.12, { walk: true }), rotBox(p, -1.5, 2.2, -0.12, 1.5, WALL_H, 0.12, { walk: true })); break;
       case 'porta': if (!p.open) bx.push(rotBox(p, -0.45, 0, -0.06, 0.45, 2.2, 0.06)); break;
@@ -292,7 +310,7 @@
       case 'falo': bx.push(rotBox(p, -0.5, 0, -0.5, 0.5, 0.3, 0.5, { soft: true })); break;
       case 'torcia': break;
       case 'trappola': bx.push(rotBox(p, -0.65, 0, -0.65, 0.65, 1.0, 0.65, { soft: true })); break;
-      case 'tetto': bx.push(B.slopeBox(p, 'z', -1.65, 1.65, 1.65, -1.65, p.y - 0.05, p.y + 1.72, { shell: 0.32, piece: p })); break;
+      case 'tetto': bx.push(B.slopeBox(p, 'z', -1.5, 1.5, 1.65, -1.5, p.y - 0.05, p.y + 1.72, { shell: 0.32, piece: p })); break;
     }
     return bx;
   }
@@ -479,13 +497,37 @@
     }
     return best;
   }
+  // griglia locale: se vicino c'è già una costruzione, i pezzi nuovi seguono la sua griglia (anche quella di castelli e villaggi)
+  const STRUCT = (k) => k === 'pavimento' || k === 'scala' || k === 'tetto' || k.startsWith('muro') || k === 'recinto' || k === 'pilastro';
+  function nearStruct(x, y, z, r) {
+    let best = null, bd = r;
+    for (const p of B.pieces) { if (!STRUCT(kind(p.t)) || Math.abs(p.y - y) > 4) continue; const dd = Math.hypot(p.x - x, p.z - z) + Math.abs(p.y - y) * 0.5; if (dd < bd) { bd = dd; best = p; } }
+    return best;
+  }
+  function gridOf(p) {
+    if (!p) return [CELL / 2, CELL / 2];
+    const k = kind(p.t), q = Math.round(p.rot / (Math.PI / 2)) & 1;
+    const md = (v) => ((v % CELL) + CELL) % CELL;
+    if (k.startsWith('muro') || k === 'recinto') return q ? [md(p.x - CELL / 2), md(p.z)] : [md(p.x), md(p.z - CELL / 2)];
+    return [md(p.x), md(p.z)];
+  }
+  let G0 = [CELL / 2, CELL / 2];
+  const snapX = (v) => G0[0] + Math.round((v - G0[0]) / CELL) * CELL, snapZ = (v) => G0[1] + Math.round((v - G0[1]) / CELL) * CELL;
+  const occupied = (type, x, y, z, rot) => B.pieces.some((p) => kind(p.t) === type && Math.abs(p.x - x) < 0.2 && Math.abs(p.z - z) < 0.2 && Math.abs(p.y - y) < 0.3 && (FREE.has(type) || Math.abs(Math.cos(p.rot - rot)) > 0.9));
   B.computePlacement = function (type0, o, d) {
     const MAXD = 7.5, type = kind(type0);
     let t = terrainHit(o, d, MAXD);
     const bh = B.raycast(o, d, MAXD);
     if (bh && (t < 0 || bh.t < t)) t = bh.t;
+    // guardando nel vuoto accanto a una costruzione: si usa il piano del pezzo più vicino
+    if (t < 0 && !FREE.has(type)) {
+      const near = nearStruct(o.x + d.x * 4, o.y + d.y * 4, o.z + d.z * 4, 7);
+      if (near && Math.abs(d.y) > 0.02) { const py = kind(near.t) === 'pavimento' ? near.y : near.y + (type === 'pavimento' && d.y < 0 ? 0 : 0); const tp = (py - o.y) / d.y; if (tp > 0 && tp < MAXD + 3) t = tp; }
+    }
     if (t < 0) return null;
     const hx = o.x + d.x * t, hy = o.y + d.y * t, hz = o.z + d.z * t;
+    G0 = FREE.has(type) ? [CELL / 2, CELL / 2] : gridOf(nearStruct(hx, hy, hz, 9));
+    const snap = (v, axis) => (axis === 'z' ? snapZ(v) : snapX(v));
     const res = { t: type0, x: hx, y: hy, z: hz, rot: 0, ok: true, reason: '' };
     const yaw = G.Player.yaw;
     if (FREE.has(type)) {
@@ -493,7 +535,13 @@
       const top = B.groundAt(hx, hz, hy + 0.1, 0);
       res.y = Math.max(gAt(hx, hz, hy + 0.3), top);
     } else if (type === 'pavimento' || type === 'scala') {
-      res.x = snap(hx); res.z = snap(hz);
+      res.x = snap(hx); res.z = snap(hz, 'z');
+      if (type === 'pavimento') { const sy0 = supportY(res.x, res.z, hy);
+        if (sy0 !== null && occupied('pavimento', res.x, sy0, res.z, 0)) {
+          // cella piena: la vicina libera più vicina al punto guardato
+          let bd = Infinity, bx = res.x, bz = res.z;
+          for (const [ox, oz] of [[CELL, 0], [-CELL, 0], [0, CELL], [0, -CELL]]) { const x = res.x + ox, z = res.z + oz; if (occupied('pavimento', x, sy0, z, 0)) continue; const dd = Math.hypot(x - hx, z - hz); if (dd < bd) { bd = dd; bx = x; bz = z; } }
+          res.x = bx; res.z = bz; } }
       const sy = supportY(res.x, res.z, hy);
       if (sy !== null) res.y = sy;
       else { let m = -Infinity; for (const [ox, oz] of [[0, 0], [-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]]) m = Math.max(m, gAt(res.x + ox, res.z + oz, hy + 0.3)); res.y = m + (type === 'pavimento' ? 0.25 : 0); }
@@ -510,16 +558,29 @@
       }
       return res;
     } else if (type === 'tetto') {
-      res.x = snap(hx); res.z = snap(hz);
+      res.x = snap(hx); res.z = snap(hz, 'z');
       let y = null;
       for (const p of B.pieces) if (kind(p.t).startsWith('muro') && Math.abs(p.x - res.x) <= 1.6 && Math.abs(p.z - res.z) <= 1.6) y = Math.max(y === null ? -Infinity : y, p.y + WALL_H);
       if (y === null) { const sy = supportY(res.x, res.z, hy); y = sy !== null ? sy + WALL_H : G.World.groundAt(res.x, res.z) + WALL_H; }
       res.y = y; res.rot = (Math.round(yaw / (Math.PI / 2)) + B.rotStep) * (Math.PI / 2);
     } else {
       // muri e recinti: si allineano al bordo di cella più vicino
-      const cx = snap(hx), cz = snap(hz), fx = hx - cx, fz = hz - cz;
-      if (Math.abs(fx) > Math.abs(fz)) { res.x = cx + Math.sign(fx) * 1.5; res.z = cz; res.rot = Math.PI / 2; }
-      else { res.x = cx; res.z = cz + Math.sign(fz) * 1.5; res.rot = 0; }
+      // il bordo libero più vicino al punto guardato (tra i quattro della cella e quelli delle celle accanto)
+      const cx = snap(hx), cz = snap(hz, 'z');
+      let bd = Infinity, pick = null;
+      for (const [ox, oz] of [[0, 0], [CELL, 0], [-CELL, 0], [0, CELL], [0, -CELL]]) for (const [ex, ez, r] of [[1.5, 0, Math.PI / 2], [-1.5, 0, Math.PI / 2], [0, 1.5, 0], [0, -1.5, 0]]) {
+        const x = cx + ox + ex, z = cz + oz + ez, dd = Math.hypot(x - hx, z - hz) + (ox || oz ? 0.6 : 0); if (dd >= bd) continue;
+        const yy = supportY(x, z, hy); if (occupied(type, x, yy !== null ? yy : hy, z, r) && (ox || oz || true)) { if (!(ox || oz) && dd < 0.9) {} continue; }
+        bd = dd; pick = [x, z, r];
+      }
+      if (!pick) { const fx = hx - cx, fz = hz - cz; pick = Math.abs(fx) > Math.abs(fz) ? [cx + Math.sign(fx) * 1.5, cz, Math.PI / 2] : [cx, cz + Math.sign(fz) * 1.5, 0]; }
+      res.x = pick[0]; res.z = pick[1]; res.rot = pick[2];
+      if (type === 'frontone') {
+        // il lato alto va verso il colmo del tetto accanto (o si gira con R)
+        let ok = false; const lx = -Math.cos(res.rot), lz = Math.sin(res.rot);
+        for (const p of B.pieces) if (kind(p.t) === 'tetto' && Math.hypot(p.x - res.x, p.z - res.z) < 1.7) { const rx = -Math.sin(p.rot), rz = -Math.cos(p.rot); if (Math.abs(rx * lx + rz * lz) > 0.5) { if (rx * lx + rz * lz < 0) res.rot += Math.PI; ok = true; break; } }
+        if (!ok) res.rot += (B.rotStep & 1) * Math.PI;
+      }
       const sy = supportY(res.x, res.z, hy);
       if (sy !== null) res.y = sy;
       else { const c = Math.cos(res.rot), s = Math.sin(res.rot); res.y = Math.max(G.World.groundAt(res.x + c * 1.4, res.z - s * 1.4), G.World.groundAt(res.x - c * 1.4, res.z + s * 1.4), G.World.groundAt(res.x, res.z)) + 0.05; if (type === 'recinto') res.y -= 0.1; }

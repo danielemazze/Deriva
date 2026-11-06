@@ -551,6 +551,18 @@ body.spyglass #touch { z-index: 7; }
 .ico.fill path, .ico.fill circle { fill: currentColor; }
 .eqhint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; opacity: .32; pointer-events: none; }
 
+/* prossimamente e proposte */
+.mscreen.road { position: fixed; top: 5vh; left: 50%; transform: translateX(-50%); width: min(680px, 92vw); max-width: none; max-height: 90vh; overflow: auto; background: rgba(8,18,24,.94); border: 1px solid rgba(255,255,255,.1); padding: 22px 24px; border-radius: 14px; z-index: 5; gap: 10px; }
+.mscreen.road .roadl { max-height: none; }
+.roadl { list-style: none; margin: 10px 0 18px; padding: 0; display: grid; gap: 8px; max-height: 38vh; overflow: auto; }
+.roadl li { display: grid; grid-template-columns: 132px 1fr; column-gap: 12px; padding: 9px 12px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+.roadl li b { grid-column: 2; font-weight: 600; }
+.roadl li small { grid-column: 2; opacity: .75; }
+.roadl .rst { grid-row: 1 / span 2; align-self: center; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 99px; text-align: center; background: rgba(120,200,255,.14); color: #9fd8ff; }
+.roadl .st-lavoro .rst { background: rgba(255,190,90,.16); color: #ffcf7a; }
+.roadl .st-poi .rst { background: rgba(255,255,255,.08); color: #c9c9c9; }
+.mscreen.road textarea { width: 100%; resize: vertical; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25); color: inherit; }
+.fbt { margin: 8px 0 10px; }
 /* libro da sfogliare */
 .book { perspective: 2200px; height: min(680px, 90vh); }
 .book > .page { height: 100%; max-height: none; display: flex; flex-direction: column; }
@@ -796,6 +808,7 @@ html.touch #f3{top:calc(112px + env(safe-area-inset-top,0px));font-size:11px}
 <script src="js/tools.js"></script>
 <script src="js/people.js"></script>
 <script src="js/humans.js"></script>
+<script src="js/mixamo.js"></script>
 <script src="js/structures.js"></script>
 <script src="js/quests.js"></script>
 <script src="js/combat.js"></script>

@@ -430,11 +430,12 @@
   };
   A.loadSamples = async function (base) {
     try {
-      const list = await (await fetch(base + 'suoni.json')).json(); smRaw = [];
+      const list = await (await fetch(base + 'suoni.json')).json(), raw = [];
       if (hasS('menu') && list.musica) list.musica = list.musica.filter((n) => !/^menu_/.test(n));
-      for (const [dir, names] of Object.entries(list)) for (const n of names) smRaw.push({ n, url: base + dir + '/' + n + '.mp3', dir });
-      await Promise.all(smRaw.map(async (r) => { try { r.buf = await (await fetch(r.url)).arrayBuffer(); } catch (e) { } }));
-      if (A.ctx) decodeAll();
+      for (const [dir, names] of Object.entries(list)) for (const n of names) raw.push({ n, url: base + dir + '/' + n + '.mp3', dir });
+      await Promise.all(raw.map(async (r) => { try { r.buf = await (await fetch(r.url)).arrayBuffer(); } catch (e) { } }));
+      // pronti solo quando sono tutti scaricati (prima, se l'audio partiva subito, si perdevano)
+      smRaw = raw; if (A.ctx) decodeAll();
     } catch (e) { console.warn('suoni registrati non disponibili', e); }
   };
   async function decodeAll() {

@@ -1216,6 +1216,21 @@
       a.pieces.push(p);
     }
     if (a.poi.type === 'village' && a.poi.inhabited) S.spawnNPCs(a);
+    else if (a.poi.type === 'castello' && G.MX && G.MX.ready) S.spawnGuards(a);
+  };
+  // guardie del castello: cavalieri e paladini fermi nel cortile
+  const GUARD_N = ['Ser Aldo', 'Ser Brando', 'Ser Corrado', 'Ser Guido', 'Ser Rolando', 'Ser Ugo'];
+  S.spawnGuards = function (a) {
+    const v = a.poi, r = G.mulberry32(v.seed ^ 0x9d), rot = v.rotR || 0; a.npcs = [];
+    for (let i = 0; i < 4; i++) {
+      const ang = rot + i * Math.PI / 2 + Math.PI / 4, d = 4 + r() * 2.5, x = v.x + Math.sin(ang) * d, z = v.z + Math.cos(ang) * d;
+      const gy = G.World.groundAt(x, z), y = Math.max(gy, G.Build.groundAt(x, z, gy + 1.5, 0.05));
+      const look = (v.seed + i * 131) | 0, p = G.People.build(look, { guard: true });
+      const def = { id: `n:${v.id}:g${i}`, role: 'abitante', name: GUARD_N[(r() * GUARD_N.length) | 0] + ' la guardia', x, z, y, rot: ang, look };
+      const tag = nameTag(def.name); tag.position.y = p.height + 0.35; tag.visible = false; p.root.add(tag); G.scene.add(p.root);
+      const e = { def, p, tag, home: a, village: v, way: null, len: 0, x, z, y, yaw: ang, talking: 0 };
+      a.npcs.push(e); S.npcs.push(e);
+    }
   };
   S.leaveNear = function (a) {
     a.near = false;

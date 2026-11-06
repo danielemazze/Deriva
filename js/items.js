@@ -73,6 +73,7 @@
     muro_finestra: { n: 'Muro con finestra', d: 'Parete con finestra.', cat: 'place' },
     porta: { n: 'Porta', d: 'Mirala su un muro con porta. Si apre con E.', cat: 'place' },
     tetto: { n: 'Tetto', d: 'Falda inclinata da posare sopra i muri.', cat: 'place' },
+    frontone: { n: 'Frontone', d: 'Triangolo di assi che chiude il fianco sotto il tetto. Si posa sopra un muro e si gira da solo verso il colmo.', cat: 'place' },
     recinto: { n: 'Recinto', d: 'Staccionata per gli animali.', cat: 'place' },
     scala: { n: 'Scala', d: 'Rampa per salire al piano di sopra.', cat: 'place' },
     albero_barca: { n: 'Albero della barca', d: 'Montante per le vele.', cat: 'part' },
@@ -210,6 +211,7 @@
     R('porta', 1, ['AA', 'AB', 'AA']),
     R('tetto', 2, ['..A', '.AA', 'AAA']),
     R('tetto', 2, ['..O', '.OA', 'OAA']),
+    R('frontone', 2, ['A..', 'AA.']),
     R('recinto', 3, ['BAB', 'BAB']),
     R('scala', 1, ['A.A', 'AAA', 'A.A']),
     // parti navali: solo banco 5x5
@@ -491,6 +493,8 @@
       c.strokeStyle = 'rgba(40,20,8,0.6)'; c.lineWidth = 2; c.strokeRect(22, 12, 20, 18); c.strokeRect(22, 34, 20, 18); c.beginPath(); c.arc(40, 32, 2.5, 0, 7); c.fillStyle = '#c9a25e'; c.fill(); },
     tetto(c) { c.beginPath(); c.moveTo(4, 46); c.lineTo(32, 14); c.lineTo(60, 46); c.closePath(); c.fillStyle = lg(c, 0, 14, 0, 46, ['#8a5a2e', '#5a3a1e']); c.fill(); outline(c);
       c.strokeStyle = 'rgba(20,10,4,0.5)'; c.lineWidth = 1.5; for (let i = 1; i < 4; i++) { const y = 14 + i * 8; const dx = (y - 14) * 28 / 32; c.beginPath(); c.moveTo(32 - dx, y); c.lineTo(32 + dx, y); c.stroke(); } },
+    frontone(c) { c.beginPath(); c.moveTo(6, 50); c.lineTo(6, 16); c.lineTo(58, 50); c.closePath(); c.fillStyle = lg(c, 0, 16, 0, 50, ['#a8743e', '#6e4622']); c.fill(); outline(c);
+      c.strokeStyle = 'rgba(20,10,4,0.45)'; c.lineWidth = 1.5; for (const x of [19, 32, 45]) { c.beginPath(); c.moveTo(x, 50); c.lineTo(x, 16 + (x - 6) * 34 / 52); c.stroke(); } },
     recinto(c) { for (const x of [12, 30, 48]) { c.beginPath(); c.moveTo(x, 54); c.lineTo(x, 16); c.lineTo(x + 3, 12); c.lineTo(x + 6, 16); c.lineTo(x + 6, 54); c.closePath(); c.fillStyle = '#b07a46'; c.fill(); outline(c, 1.5); }
       for (const y of [24, 40]) { rr(c, 8, y, 50, 6, 1); c.fillStyle = '#9b6a36'; c.fill(); outline(c, 1.5); } },
     scala(c) { for (let i = 0; i < 4; i++) { rr(c, 10 + i * 10, 46 - i * 10, 44 - i * 10, 8, 1); c.fillStyle = lg(c, 0, 0, 64, 0, ['#d6a46a', '#a8743e']); c.fill(); outline(c, 1.5); } },

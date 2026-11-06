@@ -9,3 +9,5 @@ Modelli 3D scansionati (cartella models): rocce "rock_moss_set_01/02", scogliere
 albero faretra "quiver_tree_02", ceppo "tree_trunk" — Poly Haven (polyhaven.com),
 licenza CC0 1.0. Ottenuti dalla composizione "coastalCliff.glb" di Babylon.js Assets
 (github.com/BabylonJS/Assets, CC BY 4.0), poi semplificati con meshoptimizer (MIT).
+
+Personaggi e animazioni: Mixamo (Adobe), scaricati dall'autore del gioco e usati secondo le condizioni di Mixamo.

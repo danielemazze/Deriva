@@ -82,18 +82,16 @@ G.PRESETS = {
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.21';
+G.VERSION = '1.21.1';
 // novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
-G.NEWS = { v: '1.21', t: 'Navi da abitare', d: '3 novembre 2026', items: [
-  ['ancora', 'Galeone e vascello rifatti: cassero e castello con scale e cabine'],
-  ['sartie', 'Nella stiva del vascello si scende a piedi, dal boccaporto'],
-  ['esplosione', 'Cannone da piazzare a terra · le palle spaccano roccia e terreno'],
-  ['libro', 'Libro del costruttore da sfogliare, pagina per pagina'],
-  ['occhio', 'Terza persona con F5, anche di fronte'],
-  ['goccia', 'Sott\u2019acqua turchese, limpido e pieno di bollicine'],
-  ['frutto', 'Frutta e pane fotografati in 3D dai mercanti'],
-  ['scintilla', 'Nuovi simboli disegnati al posto delle emoji'],
-  ['fiore', 'Foreste più fitte, scavi più precisi, animali sui pendii'],
+G.NEWS = { v: '1.21.1', t: 'Gente nuova', d: '6 novembre 2026', items: [
+  ['persone', 'Nuovi personaggi animati: cavalieri, banditi, abitanti e piratesse'],
+  ['castello', 'Guardie nel cortile dei castelli'],
+  ['casa', 'Costruire è più comodo: i pezzi si agganciano a quelli vicini'],
+  ['casa', 'Tetto senza incroci, scala nuova e frontone per chiudere i lati'],
+  ['nota', 'I suoni registrati tornano a funzionare'],
+  ['giro', 'Controlla aggiornamento: scarica solo i file nuovi'],
+  ['bussola', 'Prossimamente: cosa arriverà, e le vostre proposte'],
 ] };
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';
@@ -102,6 +100,19 @@ G.servedByHost = (() => { try { return !window.deriva && location.protocol === '
 /* telefono o tablet: comandi touch, grafica leggera */
 G.isTouch = (() => { try { const q = location.search; if (/[?&]touch=1/.test(q)) return true; if (/[?&]touch=0/.test(q)) return false; return !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && (navigator.maxTouchPoints || 0) > 0); } catch (e) { return false; } })();
 // tipo di base dei pezzi di pietra (stesse regole di aggancio e collisione di quelli di legno); serve anche al server
+// cosa arriverà nei prossimi aggiornamenti (il gioco prova prima a scaricare roadmap.json dal sito, così si aggiorna da solo)
+G.ROADMAP = [
+  { s: 'lavoro', t: 'Tutto si può smontare', d: 'castelli, villaggi e covi pezzo per pezzo: muri, pavimenti e tetti da portarsi via e ripiazzare' },
+  { s: 'presto', t: 'Nuovi mari', d: 'una laguna turchese e luminosa vicino alle isole, poi oceano profondo, caldo e freddo' },
+  { s: 'presto', t: 'Neve rifatta', d: 'le montagne innevate delle isole fredde, con forme e ombre vere' },
+  { s: 'presto', t: 'Suoni veri', d: 'passi, onde, pioggia, fuoco, chitarra e flauto registrati dal vero' },
+  { s: 'poi', t: 'Nuovi oggetti 3D realistici', d: 'barili, casse, rocce, mobili e attrezzi fotografati dal vero' },
+  { s: 'poi', t: 'Pozzo, bancarella e castello rifatti', d: 'forme più sensate e dettagliate' },
+  { s: 'poi', t: 'Persone più vive', d: 'abitanti che salutano, si siedono, dormono, tirano con l’arco e nuotano; nuovi abitanti uomini' },
+  { s: 'poi', t: 'Vascello rifinito', d: 'il cassero di poppa più curato visto da fuori' },
+];
+// modulo per proposte e segnalazioni (Google Moduli): vuoto finché non è collegato
+G.FEEDBACK = { form: '', fields: { tipo: '', testo: '', nome: '', versione: '', piattaforma: '' } };
 G.PIECE_KIND = { pavimento_pietra: 'pavimento', muro_pietra: 'muro', muro_porta_pietra: 'muro_porta', muro_finestra_pietra: 'muro_finestra', tetto_pietra: 'tetto', scala_pietra: 'scala' };
 G.pieceKind = (t) => G.PIECE_KIND[t] || t;
 // come si interagisce (timone, bauli, porte, persone): tasto destro, sul telefono il pulsante Usa

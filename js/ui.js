@@ -704,6 +704,47 @@
     if (n === UI.bookPage) return;
     UI.renderBook(n);
   };
+  // «Controlla aggiornamento»: sul PC scarica solo i file cambiati dal sito; nel browser basta ricaricare
+  const updMsg = (h) => { const e = document.getElementById('updmsg'); if (e) e.innerHTML = h; };
+  const vn = (v) => String(v || '0').split('.').map((n) => +n || 0).reduce((a, n, i) => a + n * Math.pow(1000, 2 - i), 0);
+  UI.checkUpdate = async function () {
+    updMsg('Controllo in corso…');
+    try {
+      if (window.deriva && window.deriva.updCheck) {
+        const r = await window.deriva.updCheck();
+        if (!r.ok) { updMsg('Non riesco a raggiungere il sito: controlla la connessione.'); return; }
+        if (!r.newer) { updMsg(`Hai già l’ultima versione (${esc(r.cur)}).`); return; }
+        updMsg(`È uscita la <b>${esc(r.v)}</b>${r.name ? ' «' + esc(r.name) + '»' : ''}. <button class="mini-btn primary" data-m="updgo">Aggiorna adesso</button>` + (r.exe ? '<br><small>Questa versione cambia anche Deriva.exe: per alcune novità serve la cartella nuova.</small>' : ''));
+      } else {
+        const v = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json();
+        if (vn(v.v) <= vn(G.VERSION)) { updMsg(`Hai già l’ultima versione (${esc(G.VERSION)}).`); return; }
+        updMsg(`È uscita la <b>${esc(v.v)}</b>: la carico…`); setTimeout(() => location.reload(), 800);
+      }
+    } catch (e) { updMsg('Non riesco a controllare gli aggiornamenti adesso.'); }
+  };
+  UI.applyUpdate = async function () {
+    const D = window.deriva; if (!D || !D.updApply) return;
+    updMsg('Scarico l’aggiornamento… <b id="updpc">0%</b>');
+    D.onUpdProgress && D.onUpdProgress((p) => { const e = document.getElementById('updpc'); if (e) e.textContent = Math.round(p.done / p.total * 100) + '%'; });
+    const r = await D.updApply();
+    if (!r.ok) { updMsg('Aggiornamento non riuscito: ' + esc(r.err || '') + '. Riprova più tardi.'); return; }
+    updMsg(`Aggiornato alla ${esc(r.v)}. Riavvio il gioco…`); G.save && G.started && G.save();
+    setTimeout(() => D.updRestart(), 900);
+  };
+  // proposte e segnalazioni dei giocatori: vanno al modulo Google del gioco (le risposte finiscono nel foglio di Daniele)
+  UI.sendFeedback = async function () {
+    const F = G.FEEDBACK, t = ($('fb-txt') || {}).value || '', msg = $('fb-msg');
+    if (!F || !F.form) return;
+    if (t.trim().length < 5) { msg.textContent = 'Scrivi qualcosa in più.'; return; }
+    const last = +(G.store.get('deriva_fb_t') || 0); if (Date.now() - last < 60000) { msg.textContent = 'Aspetta un minuto prima di mandarne un altro.'; return; }
+    const tipo = { idea: 'Proposta', bug: 'Problema', commento: 'Commento' }[UI.fbType || 'idea'];
+    const body = new URLSearchParams(); const f = F.fields;
+    body.set(f.tipo, tipo); body.set(f.testo, t.trim()); body.set(f.nome, (($('fb-name') || {}).value || '').trim());
+    body.set(f.versione, G.VERSION || ''); body.set(f.piattaforma, window.deriva ? 'PC (Deriva.exe)' : G.isTouch ? 'Telefono' : 'Browser');
+    msg.textContent = 'Invio…';
+    try { await fetch(F.form, { method: 'POST', mode: 'no-cors', body }); G.store.set('deriva_fb_t', String(Date.now())); $('fb-txt').value = ''; msg.textContent = 'Grazie! Il messaggio è arrivato.'; }
+    catch (e) { msg.textContent = 'Non riesco a inviarlo adesso: controlla la connessione.'; }
+  };
   UI.renderBook = function (to) {
     const S = (UI._spreads = bookSpreads()), from = UI.bookPage;
     if (to === undefined) to = G.clamp(from, 0, S.length - 1);
@@ -742,6 +783,8 @@
     map: SV('<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'), plus: SV('<path d="M12 5v14M5 12h14"/>'),
     ppl: SV('<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 14c3 0 6 1.5 6 4.5"/>'),
     gear: SV('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'),
+    road: SV('<path d="M5 21l4-18M19 21l-4-18"/><path d="M12 5v2M12 11v2M12 17v2"/>'),
+    upd: SV('<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/><path d="M12 8v5l3 2"/>'),
     kb: SV('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h1M11 10h1M15 10h1M7 14h10"/>'), exit: SV('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>'),
     eye: SV('<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'), snd: SV('<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9a4 4 0 010 6"/>'),
     mic: SV('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>'), mouse: SV('<rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v3"/>'),
@@ -824,7 +867,7 @@
     const side = $('menuSide'); const S = G.settings;
     const worlds = G.Worlds.list(), has = worlds.length > 0, last = worlds[0];
     const started = G.started, mp = G.Net && G.Net.on;
-    const modal = UI.menu === 'settings' || UI.menu === 'controls';
+    const modal = UI.menu === 'settings' || UI.menu === 'controls' || UI.menu === 'prossimamente';
     $('menu').classList.toggle('modal', modal);
     let h = modal ? '' : `<div class="mhead"><h1 class="logo">${UI.menu === 'main' && started ? 'In pausa' : 'Deriva'}</h1><div class="logo-sub">${UI.menu === 'main' && started && G.worldName ? esc(G.worldName) + ' · ' + (G.creative() ? 'Creativa' : 'Sopravvivenza') : 'sopravvivenza tra le isole'}</div></div>${started ? '' : `<div class="coords" id="coords">${G.coordsText ? G.coordsText() : ''}</div>`}`;
     const row = (m, ic, t, sub, cls) => `<button class="mrow ${cls || ''}" data-m="${m}"><span class="mic">${MICO[ic]}</span><span>${t}${sub ? `<small>${sub}</small>` : ''}</span></button>`;
@@ -846,9 +889,9 @@
         h += '<div class="mcap">Gioca</div>';
         if (has) h += row('worlds', 'map', 'Mondi', `${worlds.length} ${worlds.length === 1 ? 'mondo salvato' : 'mondi salvati'} · importa, esporta`) + row('newWorld', 'plus', 'Nuovo mondo', 'un arcipelago mai visto');
         h += row('mp', 'ppl', 'Multigiocatore', 'codice partita · fino a 4 giocatori');
-        h += `</div><div class="mfoot">${chip('settings', 'gear', 'Impostazioni')}${chip('controls', 'kb', 'Comandi')}${APP() ? chip('quit', 'exit', 'Esci') : ''}</div>`;
+        h += `</div><div class="mfoot">${chip('settings', 'gear', 'Impostazioni')}${chip('controls', 'kb', 'Comandi')}${chip('prossimamente', 'road', 'Prossimamente')}${chip('upd', 'upd', 'Controlla aggiornamento')}${APP() ? chip('quit', 'exit', 'Esci') : ''}</div>`;
       }
-      h += `<p class="note mver">versione ${G.VERSION || ''} · il mondo si salva da solo</p>`;
+      h += `<p class="note mver" id="updmsg">versione ${G.VERSION || ''} · il mondo si salva da solo</p>`;
     } else if (UI.menu === 'worlds') {
       const fmt = (t) => t ? new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
       const rows = worlds.map((w) => `<div class="wrow"><div class="wmain"><b>${esc(w.name || 'Mondo')}</b><span class="wbadge ${w.mode === 'creativa' ? 'cr' : ''}">${G.Worlds.MODE_N[w.mode] || 'Sopravvivenza'}</span><small>seme ${esc(String(w.seed))} · giocato il ${fmt(w.played)}${w.size ? ' · ' + Math.max(1, Math.round(w.size / 1024)) + ' KB' : ''}</small></div>
@@ -872,6 +915,18 @@
         <div class="mbtns"><button class="mbtn primary" data-m="create">Crea e salpa</button><button class="mbtn" data-m="${has ? 'worlds' : 'main'}">Indietro</button></div></div>`;
     } else if (UI.menu === 'confirmNew') {
       h += `<div class="mscreen"><h2>Nuovo mondo?</h2><p class="note">Il mondo salvato verrà sostituito da un nuovo arcipelago. Case, barche e inventario andranno persi.</p><div class="mbtns"><button class="mbtn primary" data-m="newok">Sì, salpa verso un nuovo mondo</button><button class="mbtn" data-m="main">Annulla</button></div></div>`;
+    } else if (UI.menu === 'prossimamente') {
+      const R = UI.roadmap || G.ROADMAP, ST = { lavoro: 'in lavorazione', presto: 'prossimamente', poi: 'in programma' };
+      const F = G.FEEDBACK && G.FEEDBACK.form;
+      h += `<div class="mscreen road"><h2>Prossimamente</h2><p class="note">Cosa arriverà nei prossimi aggiornamenti di Deriva.</p>
+        <ul class="roadl">${R.map((x) => `<li class="st-${x.s}"><span class="rst">${ST[x.s] || ''}</span><b>${esc(x.t)}</b>${x.d ? `<small>${esc(x.d)}</small>` : ''}</li>`).join('')}</ul>
+        <h3>Hai un’idea o hai trovato un problema?</h3>
+        <div class="seg small fbt">${[['idea', 'Proposta'], ['bug', 'Problema'], ['commento', 'Commento']].map(([k, n], i) => `<button data-m="fbtype" data-v="${k}" class="${(UI.fbType || 'idea') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+        <div class="field"><label for="fb-txt">Scrivi qui</label><textarea id="fb-txt" maxlength="1500" rows="4" placeholder="Es. vorrei poter pescare dalla barca…"></textarea></div>
+        <div class="field"><label for="fb-name">Nome <small>(facoltativo)</small></label><input id="fb-name" maxlength="30" value="${esc(S.name || '')}" autocomplete="off"></div>
+        <p class="mperr" id="fb-msg" role="status">${F ? '' : 'L’invio sarà attivo a breve.'}</p>
+        <div class="mbtns row"><button class="mbtn primary" data-m="fbsend" ${F ? '' : 'disabled'}>Invia</button><button class="mbtn" data-m="main">Indietro</button></div></div>`;
+      if (!UI.roadmap && !UI._roadT) { UI._roadT = 1; fetch((window.deriva ? 'https://danielemazze.github.io/Deriva/' : '') + 'roadmap.json?t=' + Date.now()).then((r) => r.json()).then((j) => { if (Array.isArray(j) && j.length) { UI.roadmap = j; if (UI.menu === 'prossimamente') UI.showMenu('prossimamente'); } }).catch(() => {}); }
     } else if (UI.menu === 'mp') {
       const name = esc(S.name || '');
       h += `<div class="mscreen"><h2>Multigiocatore</h2>
@@ -1093,6 +1148,10 @@
     else if (m === 'savequit') { G.save(); G.toTitle(); }
     else if (m === 'leave') { if (G.Net.isHost) G.save(); UI.hostInfo = null; G.Net.leave(); if (G.started) G.toTitle(); }
     else if (m === 'quit') { G.save(); window.deriva && window.deriva.quit(); }
+    else if (m === 'upd') UI.checkUpdate();
+    else if (m === 'fbtype') { UI.fbType = b.dataset.v; b.parentNode.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }
+    else if (m === 'fbsend') UI.sendFeedback();
+    else if (m === 'updgo') UI.applyUpdate();
     else if (m === 'togglemode') { UI.toggleMode(); UI.showMenu('main'); }
     else if (m === 'tools') { UI.hideMenu(); UI.openCustom('strumenti'); }
     else if (m === 'host') doHost();
