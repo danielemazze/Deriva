@@ -1,12 +1,57 @@
 [
- {"s": "lavoro", "t": "Tutto si può smontare", "d": "castelli, villaggi e covi pezzo per pezzo: muri, pavimenti e tetti da portarsi via e ripiazzare dove vuoi"},
- {"s": "presto", "t": "Nuovi mari", "d": "vicino alle isole una laguna turchese e luminosa, limpida come vetro e piena di bolle; poi l’oceano profondo, quello caldo e quello freddo"},
- {"s": "presto", "t": "Neve rifatta", "d": "le montagne innevate delle isole fredde con forme, rilievo e ombre vere, e niente più chiazze bianche sull’acqua"},
- {"s": "presto", "t": "Suoni veri", "d": "passi, onde, vento, pioggia, tuoni, fuoco, porte e bauli registrati dal vero; chitarra e flauto con note vere"},
- {"s": "presto", "t": "Proposte e segnalazioni", "d": "dal gioco e dal sito potrai mandare idee e segnalare problemi direttamente a chi sviluppa Deriva"},
- {"s": "poi", "t": "Nuovi oggetti 3D realistici", "d": "barili, casse, rocce, mobili, attrezzi e oggetti da villaggio e da nave, ricostruiti da foto vere"},
- {"s": "poi", "t": "Pozzo, bancarella e castello rifatti", "d": "forme più sensate e dettagliate per il pozzo, la bancarella del mercante e alcune parti del castello"},
- {"s": "poi", "t": "Persone più vive", "d": "abitanti che salutano, parlano, si siedono, dormono, tirano con l’arco e nuotano; nuovi abitanti uomini"},
- {"s": "poi", "t": "Vascello rifinito", "d": "il cassero di poppa più curato visto da fuori"},
- {"s": "poi", "t": "Mani in prima persona", "d": "mani e braccia dettagliate che stringono attrezzi e torce"}
+ {
+  "s": "lavoro",
+  "t": "Tutto si può smontare",
+  "d": "castelli, villaggi e covi pezzo per pezzo: muri, pavimenti e tetti da portarsi via e ripiazzare dove vuoi"
+ },
+ {
+  "s": "presto",
+  "t": "Nuovi mari",
+  "d": "vicino alle isole una laguna turchese e luminosa, limpida come vetro e piena di bolle; poi l’oceano profondo, quello caldo e quello freddo"
+ },
+ {
+  "s": "presto",
+  "t": "Neve rifatta",
+  "d": "le montagne innevate delle isole fredde con forme, rilievo e ombre vere, e niente più chiazze bianche sull’acqua"
+ },
+ {
+  "s": "presto",
+  "t": "Suoni veri",
+  "d": "passi, onde, vento, pioggia, tuoni, fuoco, porte e bauli registrati dal vero; chitarra e flauto con note vere"
+ },
+ {
+  "s": "presto",
+  "t": "Proposte e segnalazioni",
+  "d": "dal gioco e dal sito potrai mandare idee e segnalare problemi direttamente a chi sviluppa Deriva"
+ },
+ {
+  "s": "poi",
+  "t": "Nuovi oggetti 3D realistici",
+  "d": "barili, casse, rocce, mobili, attrezzi e oggetti da villaggio e da nave, ricostruiti da foto vere"
+ },
+ {
+  "s": "poi",
+  "t": "Pozzo, bancarella e castello rifatti",
+  "d": "forme più sensate e dettagliate per il pozzo, la bancarella del mercante e alcune parti del castello"
+ },
+ {
+  "s": "poi",
+  "t": "Persone più vive",
+  "d": "abitanti che salutano, parlano, si siedono, dormono, tirano con l’arco e nuotano; nuovi abitanti uomini"
+ },
+ {
+  "s": "poi",
+  "t": "Vascello rifinito",
+  "d": "il cassero di poppa più curato visto da fuori"
+ },
+ {
+  "s": "poi",
+  "t": "Mani in prima persona",
+  "d": "mani e braccia dettagliate che stringono attrezzi e torce"
+ },
+ {
+  "s": "poi",
+  "t": "Deriva su Steam",
+  "d": "il gioco arriverà anche su Steam: accesso con il tuo account Steam, amici, inviti e partite insieme"
+ }
 ]
