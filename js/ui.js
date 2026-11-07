@@ -870,7 +870,8 @@
     const started = G.started, mp = G.Net && G.Net.on;
     const modal = UI.menu === 'settings' || UI.menu === 'controls' || UI.menu === 'prossimamente';
     $('menu').classList.toggle('modal', modal);
-    let h = modal ? '' : `<div class="mhead"><h1 class="logo">${UI.menu === 'main' && started ? 'In pausa' : 'Deriva'}</h1><div class="logo-sub">${UI.menu === 'main' && started && G.worldName ? esc(G.worldName) + ' · ' + (G.creative() ? 'Creativa' : 'Sopravvivenza') : 'sopravvivenza tra le isole'}</div></div>${started ? '' : `<div class="coords" id="coords">${G.coordsText ? G.coordsText() : ''}</div>`}`;
+    const bigLogo = UI.menu === 'main' && !started; const ml = $('menulogo'); if (ml) ml.hidden = !bigLogo;
+    let h = modal ? '' : `<div class="mhead${bigLogo ? ' haslogo' : ''}">${bigLogo ? '<img class="logoimg" src="assets/ui/logo.png" alt="DERIVA">' : ''}<h1 class="logo">${UI.menu === 'main' && started ? 'In pausa' : 'Deriva'}</h1><div class="logo-sub">${UI.menu === 'main' && started && G.worldName ? esc(G.worldName) + ' · ' + (G.creative() ? 'Creativa' : 'Sopravvivenza') : 'sopravvivenza tra le isole'}</div></div>${started ? '' : `<div class="coords" id="coords">${G.coordsText ? G.coordsText() : ''}</div>`}`;
     const row = (m, ic, t, sub, cls) => `<button class="mrow ${cls || ''}" data-m="${m}"><span class="mic">${MICO[ic]}</span><span>${t}${sub ? `<small>${sub}</small>` : ''}</span></button>`;
     const chip = (m, ic, t) => `<button class="mchip" data-m="${m}">${MICO[ic]}${t}</button>`;
     if (UI.menu === 'main') {
