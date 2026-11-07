@@ -492,6 +492,8 @@
       G.Build.update(dt, P, t);
       if (G.Drops) G.Drops.update(dt, P);
       if (G.Sea) G.Sea.update(dt);
+      if (G.Crew) G.Crew.update(dt);
+      if (G.Demo) G.Demo.uniforms();
       if (G.Caves) { G.Caves.updateHidden(dt, P); G.Caves.update(dt, P); }
       if (G.Features) G.Features.update(dt, P, t);
       if (G.Dig) G.Dig.update();
@@ -550,6 +552,7 @@
     const wu = water.material.uniforms;
     wu.tScene.value = rtA.texture; wu.tDepth.value = rtA.depthTexture; wu.uRes.value.set(G.rtSize[0], G.rtSize[1]);
     wu.uNear.value = camera.near; wu.uFar.value = camera.far; wu.uCam.value.copy(camera.position);
+    { const cx = G.camera.position.x, cz = G.camera.position.z, cold = G.coldAt ? G.coldAt(cx, cz) : 0; const wl = 1 - cold; wu.uLag.value += ((G.settings.lagoon === false ? 0 : wl) - wu.uLag.value) * 0.02; }
     wu.uSunDir.value.copy(S.sun); wu.uSunCol.value.copy(S.sunCol); wu.uZen.value.copy(S.zen); wu.uHor.value.copy(S.hor); wu.uAmb.value.copy(S.amb);
     wu.uFogDen.value = fogDen * 0.85 * (1 - spyK * 0.45); wu.uUnder.value = P.under ? 1 : 0;
     wu.uWaveAmp.value = G.waveAmp; wu.uWaveRot.value.set(G.waveRot[0], G.waveRot[1]); wu.uWindLv.value = (G.Climate ? G.Climate.windLevel() : G.WIND.level) / 10;

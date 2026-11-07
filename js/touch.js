@@ -41,6 +41,7 @@
     ['t-spy', 'Guarda', 'spy', () => G.Combat && G.Combat.hasSpy],
     ['t-zoom', 'Zoom', 'spyzoom', () => G.Combat && G.Combat._spyOn],
     ['t-anchor', 'Ancora', 'anchor', () => !!(P().boat && !G.UI.open)],
+    ['t-crew', 'Ordini', 'crew', () => !!(G.Crew && G.Crew.list.length && !G.UI.open)],
     ['t-talk', 'Parla', 'talk', () => !!(G.Net && G.Net.on && G.Voice && G.Voice.settings().mode === 'ptt')],
   ];
 
@@ -142,6 +143,7 @@
         if (code === 'spy') { G.Combat.touchSpy = !G.Combat.touchSpy; b.classList.toggle('on', G.Combat.touchSpy); return; }
         if (code === 'spyzoom') { G.Combat.spyZoom(0); return; }
         if (code === 'anchor') { G.Boats.toggleAnchor(P().boat); return; }
+        if (code === 'crew') { G.Crew.toggleMenu(); return; }
         tap(code);
       }, { passive: false });
       if (code === 'talk') { const up = (e) => { e.preventDefault(); G.Voice.setPTT(false); b.classList.remove('on'); }; b.addEventListener('touchend', up); b.addEventListener('touchcancel', up); }

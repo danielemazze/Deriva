@@ -154,6 +154,8 @@
   };
   N.remoteRemove = function (id) {
     G.state.removed.add(id);
+    if (id.startsWith('cut:')) { if (G.Demo) { G.Demo.sync(); G.Demo.refresh(); G.Demo.uniforms(true); } return; }
+    if (id.startsWith('gp:')) { const p = G.Build.byId(id.slice(3)); if (p) G.Build.remove(p); return; }
     const [cx, cz] = id.split(',');
     const ch = G.World.chunks.get(cx + ',' + cz);
     if (!ch) return;

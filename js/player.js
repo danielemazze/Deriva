@@ -566,6 +566,7 @@
     const swordXP = () => { if (W.dmg) G.Skills.add('spada', 2); };
     // tentacoli del Kraken o fiancata pirata a portata di spada
     if (G.Sea && G.Sea.enc.length) { P.lookDir(_dir); const sh = G.Sea.raycast(P.cam.position, _dir, 4); if (sh && (!tg || sh.t < (tg.t || 9))) { G.Sea.hitEnc(sh.enc, melee * 4, P.cam.position.clone().addScaledVector(_dir, sh.t)); swordXP(); return; } }
+    if (G.Demo && (!tg || tg.t > 1.2) && (tool === 'piccone' || tool === 'ascia' || G.creative())) { P.lookDir(_dir); const reach = tg ? tg.t : 4; if (G.Demo.hit(P, tool, pow, P.cam.position, _dir, reach)) return; }
     if (!tg) return;
     if (tg.kind === 'res') hitResource(tg.res, tool, pow);
     else if (tg.kind === 'remote') { G.Net.hit(tg.remote, Math.round(melee * 4)); swordXP(); }
@@ -574,7 +575,7 @@
     else if (tg.kind === 'boat' && tg.boat.free && !tg.boat.sunk) { G.FreeBoat.hit(P, tg.boat); }
     else if (tg.kind === 'piece') {
       const p = tg.piece;
-      if (p.gen) { G.UI.toast(p.t === 'letto' ? 'Questo letto è della locanda' : 'Non puoi smontarlo'); return; } p.hp = (p.hp === undefined ? (G.Build.isStone && G.Build.isStone(p.t) ? 6 : 3) : p.hp) - (tool === 'ascia' ? 1.5 : tool === 'piccone' ? 1.5 * pow : 1);
+      if (p.gen && G.Lockpick && G.Lockpick.locked(p)) { G.UI.toast('Questo forziere è chiuso a chiave'); return; } p.hp = (p.hp === undefined ? (G.Build.isStone && G.Build.isStone(p.t) ? 6 : 3) : p.hp) - (tool === 'ascia' ? 1.5 : tool === 'piccone' ? 1.5 * pow : 1);
       G.FX.burst(P.cam.position.x + _dir.x * tg.t, P.cam.position.y + _dir.y * tg.t, P.cam.position.z + _dir.z * tg.t, [0.75, 0.55, 0.3], 6, 2);
       { const mx = G.Build.isStone && G.Build.isStone(p.t) ? 6 : 3; if (p.hp > 0) Crack.hit(p, P.cam.position.clone().addScaledVector(_dir, tg.t), 1 - p.hp / mx, 0.9); else Crack.clear(); P._shakeP = p; P._shakeT = 0.2; }
       if (G.Audio) G.Audio.hit('wood');
@@ -583,6 +584,7 @@
         if (p.cook) { if (p.cook.in) P.give(p.cook.in.id, p.cook.in.n, true); if (p.cook.out) P.give(p.cook.out.id, p.cook.out.n, true); if (p.cook.fuel) P.give(p.cook.fuel.id, p.cook.fuel.n, true); }
         if (G.pieceKind(p.t) === 'muro_porta') { const door = G.Build.pieces.find((d) => d.t === 'porta' && Math.hypot(d.x - p.x, d.z - p.z) < 0.1 && Math.abs(d.y - p.y) < 0.1); if (door) { G.Build.remove(door); P.give('porta', 1, true); } }
         if (G.Net && G.Net.on) G.Net.send({ t: 'bdel', id: p.id });
+        if (p.gen) { G.state.removed.add('gp:' + p.id); if (G.Net && G.Net.on) G.Net.send({ t: 'rm', id: 'gp:' + p.id }); }
         G.Build.remove(p); P._popPos = { x: p.x, y: p.y + 0.3, z: p.z }; P.give(p.t, 1); P._popPos = null; G.saveSoon();
       }
     }
@@ -863,8 +865,8 @@
   }
 
   P.serialize = () => ({ pos: [P.pos.x, P.pos.y, P.pos.z], yaw: P.yaw, pitch: P.pitch, health: P.health, hunger: P.hunger, thirst: P.thirst, inv: P.inv, sel: P.sel, spawn: P.spawn,
-    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina, picked: P.picked || {}, mount: G.Mount ? G.Mount.serialize(P) : null, pw: { god: !!P.god, pc: !!P.pcreative, fly: !!P.allowFly, nn: !!P.noNeeds, gh: !!P.ghost } });
-  P.resetProgress = function () { P.god = P.pcreative = P.allowFly = P.noNeeds = P.ghost = false; P.quests = []; P.questsDone = {}; P.discovered = {}; P.revealed = {}; P.explored = new Set(); P.kills = {}; P.rareFound = {}; P.stats = {}; P.known = {}; };
+    quests: P.quests || [], questsDone: P.questsDone || {}, discovered: P.discovered || {}, revealed: P.revealed || {}, explored: [...(P.explored || [])], kills: P.kills || {}, rareFound: P.rareFound || {}, stats: P.stats || {}, known: P.known || {}, equip: P.equip, temp: P.temp, skills: G.Skills.serialize(), stamina: P.stamina, picked: P.picked || {}, recruited: P.recruited || {}, crew: G.Crew ? G.Crew.serialize() : null, mount: G.Mount ? G.Mount.serialize(P) : null, pw: { god: !!P.god, pc: !!P.pcreative, fly: !!P.allowFly, nn: !!P.noNeeds, gh: !!P.ghost } });
+  P.resetProgress = function () { P.recruited = {}; if (G.Crew) G.Crew.clear(); P.god = P.pcreative = P.allowFly = P.noNeeds = P.ghost = false; P.quests = []; P.questsDone = {}; P.discovered = {}; P.revealed = {}; P.explored = new Set(); P.kills = {}; P.rareFound = {}; P.stats = {}; P.known = {}; };
   P.load = function (d) {
     if (!d) return;
     P.pos.set(d.pos[0], d.pos[1], d.pos[2]); P.yaw = d.yaw; P.pitch = d.pitch;
@@ -875,7 +877,8 @@
     if (typeof d.temp === 'number') P.temp = d.temp;
     G.Skills.load(d.skills); if (typeof d.stamina === 'number') P.stamina = d.stamina;
     if (G.Mount) G.Mount.load(P, d.mount);
-    P.picked = d.picked || {};
+    P.picked = d.picked || {}; P.recruited = d.recruited || {};
+    if (G.Crew) G.Crew.load(d.crew);
     { const w = d.pw || {}; P.god = !!w.god; P.pcreative = !!w.pc; P.allowFly = !!w.fly; P.noNeeds = !!w.nn; P.ghost = !!w.gh; }
     // il libro non sta più nell'inventario: si apre con B
     P.inv = P.inv.map((st) => (st && st.id === 'libro' ? null : st)); P.equip = P.equip.map((st) => (st && st.id === 'libro' ? null : st));

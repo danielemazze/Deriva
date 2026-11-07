@@ -12,7 +12,8 @@
   function mats() {
     if (iceMat) return;
     const T = G.TEX;
-    iceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.32, metalness: 0.0, normalMap: T.rockT ? T.rockT.normal : null, normalScale: new THREE.Vector2(0.25, 0.25) });
+    const sn = G.ACG && G.ACG.on && G.ACG.tex.snow;
+    iceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.42, metalness: 0.0, map: sn ? sn.map : null, normalMap: sn ? sn.normal : T.rockT ? T.rockT.normal : null, normalScale: new THREE.Vector2(0.25, 0.25) });
     if (iceMat.normalMap) { iceMat.normalMap = iceMat.normalMap.clone(); iceMat.normalMap.needsUpdate = true; iceMat.normalMap.wrapS = iceMat.normalMap.wrapT = THREE.RepeatWrapping; }
     G.patch(iceMat, { key: 'ice' });
     lavaMat = new THREE.ShaderMaterial({
@@ -68,24 +69,32 @@
     const C = G.CHUNK, x0 = ch.cx * C, z0 = ch.cz * C;
     if (G.coldAt(x0 + C / 2, z0 + C / 2) < 0.35 && G.coldAt(x0, z0) < 0.35 && G.coldAt(x0 + C, z0 + C) < 0.35) return;
     mats();
-    const N = 16, S = C / N, Y = G.SEA + G.ICE_Y;
-    const ice = (i, j) => { const x = x0 + (i + 0.5) * S, z = z0 + (j + 0.5) * S; return G.heightAt(x, z) < G.SEA - 0.2 && G.iceAt(x, z); };
-    const cells = []; for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) cells.push(ice(i, j));
-    if (!cells.some(Boolean)) return;
+    // lastre dai bordi morbidi (marching squares sul campo del ghiaccio), con lo spessore verso l'acqua libera
+    const N = 32, S = C / N, Y = G.SEA + G.ICE_Y;
+    const val = (x, z) => { const h = G.heightAt(x, z); return Math.min(G.iceVal(x, z), (G.SEA - 0.2 - h) * 0.4); };
+    const F = new Float32Array((N + 1) * (N + 1)); let any = false;
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) { const v = val(x0 + i * S, z0 + j * S); F[j * (N + 1) + i] = v; if (v > 0) any = true; }
+    if (!any) return;
     const pos = [], col = [], nor = [], uv = [];
-    const jit = (x, z) => [(G.hash2(Math.round(x * 3), Math.round(z * 3), 81) - 0.5) * S * 0.55, (G.hash2(Math.round(x * 3), Math.round(z * 3), 82) - 0.5) * S * 0.55];
-    const vtx = (x, z, y, sh) => { const [jx, jz] = jit(x, z); pos.push(x + jx, y, z + jz); nor.push(0, 1, 0); uv.push((x + jx) * 0.08, (z + jz) * 0.08); col.push(0.86 * sh, 0.93 * sh, 0.99 * sh); };
+    const shade = (x, z) => 0.8 + G.hash2(Math.round(x * 0.5), Math.round(z * 0.5), 83) * 0.08;
+    const top = (x, z) => { pos.push(x, Y, z); nor.push(0, 1, 0); uv.push(x * 0.12, z * 0.12); const s = shade(x, z); col.push(s * 0.95, s, s * 1.04); };
+    const wall = (ax, az, bx, bz) => {
+      const P = [[ax, Y, az], [bx, Y, bz], [ax, Y - 0.6, az], [bx, Y, bz], [bx, Y - 0.6, bz], [ax, Y - 0.6, az]];
+      const nx = bz - az, nz = -(bx - ax), l = Math.hypot(nx, nz) || 1;
+      for (const p of P) { pos.push(p[0], p[1], p[2]); nor.push(nx / l, 0, nz / l); uv.push((p[0] + p[2]) * 0.12, p[1] * 0.3); const s = p[1] < Y - 0.1 ? 0.42 : 0.62; col.push(s * 0.85, s * 0.95, s * 1.05); }
+    };
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      if (!cells[j * N + i]) continue;
-      const xa = x0 + i * S, xb = xa + S, za = z0 + j * S, zb = za + S;
-      const sh = 0.9 + G.hash2(ch.cx * 50 + i, ch.cz * 50 + j, 83) * 0.12;
-      vtx(xa, za, Y, sh); vtx(xa, zb, Y, sh); vtx(xb, za, Y, sh);
-      vtx(xb, za, Y, sh); vtx(xa, zb, Y, sh); vtx(xb, zb, Y, sh);
-      // bordo della lastra: si vede lo spessore verso l'acqua libera
-      const side = (ax, az, bx, bz) => { vtx(ax, az, Y, 0.75); vtx(bx, bz, Y, 0.75); vtx(ax, az, Y - 0.7, 0.55); vtx(bx, bz, Y, 0.75); vtx(bx, bz, Y - 0.7, 0.55); vtx(ax, az, Y - 0.7, 0.55); };
-      const open = (ii, jj) => ii >= 0 && jj >= 0 && ii < N && jj < N ? !cells[jj * N + ii] : !ice(ii, jj);
-      if (open(i, j - 1)) side(xb, za, xa, za); if (open(i, j + 1)) side(xa, zb, xb, zb);
-      if (open(i - 1, j)) side(xa, za, xa, zb); if (open(i + 1, j)) side(xb, zb, xb, za);
+      const c = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]], v = c.map(([a, b]) => F[b * (N + 1) + a]);
+      if (v.every((q) => q <= 0)) continue;
+      const poly = []; // [x, z, èBordo]
+      for (let k = 0; k < 4; k++) {
+        const k2 = (k + 1) % 4, [ia, ja] = c[k], [ib, jb] = c[k2];
+        if (v[k] > 0) poly.push([x0 + ia * S, z0 + ja * S, false]);
+        if ((v[k] > 0) !== (v[k2] > 0)) { const t = v[k] / (v[k] - v[k2]); poly.push([x0 + (ia + (ib - ia) * t) * S, z0 + (ja + (jb - ja) * t) * S, true]); }
+      }
+      for (let k = 1; k + 1 < poly.length; k++) { top(poly[0][0], poly[0][1]); top(poly[k + 1][0], poly[k + 1][1]); top(poly[k][0], poly[k][1]); }
+      if (poly.length < 4 || v.every((q) => q > 0)) continue;
+      for (let k = 0; k < poly.length; k++) { const p = poly[k], q = poly[(k + 1) % poly.length]; if (p[2] && q[2]) wall(q[0], q[1], p[0], p[1]); }
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));

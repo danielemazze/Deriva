@@ -172,6 +172,7 @@
     if (role === 'capo') tabs.push(['missioni', 'Missioni']);
     if (role === 'mercante' || role === 'locandiere') tabs.push(['compra', 'Compra'], ['vendi', 'Vendi']);
     tabs.push(['parla', role === 'abitante' ? 'Chiacchiera' : 'Voci']);
+    if (G.Crew && G.Crew.canRecruit(n)) tabs.push(['recluta', 'Recluta']);
     if (role === 'locandiere') tabs.push(['riposa', 'Riposa']);
     let body = '';
     const dob = P().count('doblone');
@@ -191,6 +192,12 @@
     } else if (Q.tab === 'vendi') {
       const have = [...new Set(P().inv.filter((s) => s && SELL[s.id]).map((s) => s.id))];
       body = have.length ? `<div class="shop">${have.map((id) => `<div class="srow"><img src="${G.icon(id)}" alt=""><div><b>${esc(ITEM(id).n)}</b><small>ne hai ${P().count(id)}</small></div><button class="mini-btn" data-q="sell" data-id="${id}">Vendi 1 · ${SELL[id]}</button><button class="mini-btn" data-q="sellall" data-id="${id}">Tutti</button></div>`).join('')}</div>` : '<p class="note">Non hai niente che mi interessi. Pelli, perle e denti di squalo li pago bene.</p>';
+    } else if (Q.tab === 'recluta') {
+      const o = G.Crew.offer(n), J = G.Crew.JOBS[o.job], ok = (dob >= o.price || G.creative()) && G.Crew.list.length < G.Crew.MAX;
+      body = `<div class="recruit"><p><b>${esc(J.n)}</b> <span class="stars">${'★'.repeat(o.lv)}${'☆'.repeat(3 - o.lv)}</span></p><p class="note">${esc(J.d)}</p>
+        <p>Ingaggio: <b>${o.price}</b> <img class="coin" src="${G.icon('doblone')}" alt="dobloni"> · paga: <b>${o.wage}</b> al giorno</p>
+        <p class="note">La paga si prende da sola dalla tua borsa ogni mattina. Dopo tre giorni senza paga se ne va. Sale sulla tua nave quando ci sali tu; con <b>O</b> gli dai gli ordini.</p>
+        <button class="mbtn primary" data-q="recruit" ${ok ? '' : 'disabled'}>Unisciti alla mia ciurma</button>${G.Crew.list.length >= G.Crew.MAX ? '<p class="note">La tua ciurma è al completo.</p>' : ''}</div>`;
     } else if (Q.tab === 'riposa') {
       const h = (G.time * 24) % 24, night = h > 19.5 || h < 5;
       body = `<p>${night ? 'Il letto è pronto. Dormi fino al mattino: il tuo punto di rinascita sarà qui.' : 'Si dorme solo di notte, ma posso segnare questo letto come tuo punto di rinascita.'}</p><button class="mbtn primary" data-q="rest">${night ? 'Dormi fino al mattino' : 'Salva il punto di rinascita'}</button>`;
@@ -222,6 +229,8 @@
       G.UI.close();
       if (bed) P().sleep(bed); else { P().spawn = { x: n.x, y: n.y + 0.3, z: n.z }; G.UI.toast('Punto di rinascita salvato', 'good'); }
       return true;
+    } else if (act === 'recruit') {
+      if (G.Crew.recruit(n)) { G.UI.close(); return true; }
     } else if (act === 'again') { Q.lineTalk = Q.rumor(n); }
     G.UI.renderPanel();
     return true;

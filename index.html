@@ -551,6 +551,15 @@ body.spyglass #touch { z-index: 7; }
 .ico.fill path, .ico.fill circle { fill: currentColor; }
 .eqhint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; opacity: .32; pointer-events: none; }
 
+/* ciurma */
+.crewhud { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); padding: 5px 14px; border-radius: 99px; background: rgba(8,18,24,.6); color: #e9d5a3; font-size: 13px; pointer-events: none; white-space: nowrap; }
+.crewmenu { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); width: 300px; padding: 12px; border-radius: 14px; background: rgba(8,18,24,.9); border: 1px solid rgba(233,213,163,.25); display: grid; gap: 4px; z-index: 30; }
+.crewmenu .cmh { display: grid; margin-bottom: 4px; } .crewmenu .cmh b { color: #e9d5a3; font-size: 16px; } .crewmenu .cmh small { opacity: .7; }
+.crewmenu button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 7px 10px; border-radius: 8px; border: 1px solid transparent; background: rgba(255,255,255,.05); color: #eef3f2; font: inherit; cursor: pointer; }
+.crewmenu button:hover, .crewmenu button.on { border-color: rgba(233,213,163,.5); background: rgba(233,213,163,.12); }
+.crewmenu kbd { min-width: 20px; text-align: center; padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,.12); font: 12px/1.4 Signika, sans-serif; }
+.crewmenu .cml { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; } .crewmenu .cml span { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,.07); }
+.recruit p { margin: 6px 0; }
 /* prossimamente e proposte */
 .mscreen.road { position: fixed; top: 5vh; left: 50%; transform: translateX(-50%); width: min(680px, 92vw); max-width: none; max-height: 90vh; overflow: auto; background: rgba(8,18,24,.94); border: 1px solid rgba(255,255,255,.1); padding: 22px 24px; border-radius: 14px; z-index: 5; gap: 10px; }
 .mscreen.road .roadl { max-height: none; }
@@ -764,6 +773,8 @@ html.touch #f3{top:calc(112px + env(safe-area-inset-top,0px));font-size:11px}
     <div class="cross" id="cross"></div>
     <div class="target" id="target"></div>
     <div class="toasts" id="toasts"></div>
+    <div id="crewhud" class="crewhud" hidden></div>
+    <div id="crewmenu" class="crewmenu" hidden></div>
     <div class="boathud" id="boathud" hidden><div class="spd" id="bspd">0.0<small>nodi</small></div><canvas id="windc" width="148" height="148" aria-label="Vento"></canvas></div>
     <div class="placebar" id="placebar" hidden></div>
     <div class="perf" id="perf" hidden></div>
@@ -802,6 +813,8 @@ html.touch #f3{top:calc(112px + env(safe-area-inset-top,0px));font-size:11px}
 <script src="js/build.js"></script>
 <script src="js/drops.js"></script>
 <script src="js/sea.js"></script>
+<script src="js/crew.js"></script>
+<script src="js/demolish.js"></script>
 <script src="js/caves.js"></script>
 <script src="js/boats.js"></script>
 <script src="js/freeboat.js"></script>

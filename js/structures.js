@@ -16,7 +16,7 @@
   S.mats = function () {
     if (MT) return MT;
     const T = G.TEX, std = (o) => new THREE.MeshStandardMaterial(o);
-    const P = (key, o, extra) => G.patch(std(o), Object.assign({ key: 's_' + key }, extra || {}));
+    const P = (key, o, extra) => G.patch(std(o), Object.assign({ key: 's_' + key, cut: true }, extra || {}));
     const rep = (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     for (const k of ['stuccoT', 'tilesT', 'thatchT', 'shinglesT', 'stonewallT', 'slateT', 'planksT']) { rep(T[k].map); rep(T[k].normal); }
     MT = {
@@ -69,7 +69,8 @@
       const m = S.mats();
       for (const k in this.g) {
         const list = this.g[k].map(({ geo, uv }) => { if (uv !== false) worldUV(geo, uv || (k === 'tiles' || k === 'slate' || k === 'shingle' ? 2.2 : k === 'thatch' ? 2.6 : k === 'stucco' ? 4.5 : 2.5)); return geo; });
-        const mesh = new THREE.Mesh(M().merge(list), m[k]);
+        if (!m[k]) { console.warn('materiale mancante', k); continue; }
+        const mesh = new THREE.Mesh(M().merge(list), m[k]); mesh.name = k;
         mesh.castShadow = k !== 'beam' && k !== 'glass'; mesh.receiveShadow = true;
         if (k === 'beam' || k === 'glass') mesh.renderOrder = 5;
         if (m[k] && m[k].userData && m[k].userData.depth) mesh.customDepthMaterial = m[k].userData.depth;
@@ -385,22 +386,46 @@
       put(bk, 'stone', CYL(0.8, 0.6, 0.25, 0, 1.9, 0, 14), mtx, [0.95, 0.92, 0.85]);
       cols.push({ x0: p.x - 2.1, x1: p.x + 2.1, y0: p.y - 0.2, y1: p.y + 0.5, z0: p.z - 2.1, z1: p.z + 2.1, walk: true });
     } else if (p.k === 'pozzo') {
-      const ring = new THREE.CylinderGeometry(1.0, 1.0, 0.9, 16, 1, true); ring.translate(0, 0.45, 0); put(bk, 'stone', ring, mtx, [0.9, 0.88, 0.84]);
-      put(bk, 'dark', CYL(0.9, 0.9, 0.02, 0, 0.3, 0, 14), mtx, [1, 1, 1], false);
-      for (const sx of [-1, 1]) put(bk, 'wood', BOX(0.14, 2.0, 0.14, sx * 0.9, 1.0, 0), mtx, [0.5, 0.38, 0.26]);
-      const r = new THREE.ConeGeometry(1.3, 0.8, 4); r.rotateY(Math.PI / 4); r.translate(0, 2.4, 0); put(bk, v.style === 'pietra' ? 'slate' : 'thatch', r, mtx);
-      cols.push({ x0: p.x - 1, x1: p.x + 1, y0: p.y, y1: p.y + 0.9, z0: p.z - 1, z1: p.z + 1, walk: true });
+      // pozzo in pietra: parapetto spesso con la cornice, due montanti, rullo con la manovella, corda e secchio, tettuccio a due falde
+      const ring = new THREE.CylinderGeometry(1.0, 1.04, 0.95, 28, 1, true); ring.translate(0, 0.47, 0); put(bk, 'stone', ring, mtx, [0.9, 0.88, 0.84]);
+      const inner = new THREE.CylinderGeometry(0.78, 0.78, 0.95, 28, 1, true); inner.scale(-1, 1, 1); inner.translate(0, 0.47, 0); put(bk, 'stone', inner, mtx, [0.62, 0.6, 0.57]);
+      const cap = new THREE.RingGeometry(0.74, 1.1, 28, 1); cap.rotateX(-Math.PI / 2); cap.translate(0, 0.96, 0); put(bk, 'stone', cap, mtx, [0.82, 0.8, 0.76]);
+      const capE = new THREE.CylinderGeometry(1.1, 1.1, 0.1, 28, 1, true); capE.translate(0, 0.91, 0); put(bk, 'stone', capE, mtx, [0.78, 0.76, 0.72]);
+      put(bk, 'water', CYL(0.78, 0.78, 0.02, 0, -0.35, 0, 24), mtx, [1, 1, 1], false);
+      for (const sx of [-1, 1]) { put(bk, 'wood', BOX(0.16, 2.1, 0.16, sx * 0.92, 1.95, 0), mtx, [0.5, 0.38, 0.26]); put(bk, 'wood', BOX(0.3, 0.12, 0.3, sx * 0.92, 0.96, 0), mtx, [0.42, 0.32, 0.22]); }
+      const axle = new THREE.CylinderGeometry(0.11, 0.11, 1.7, 14); axle.rotateZ(Math.PI / 2); axle.translate(0, 2.05, 0); put(bk, 'wood', axle, mtx, [0.56, 0.42, 0.28]);
+      put(bk, 'iron', BOX(0.06, 0.4, 0.06, 1.06, 1.9, 0), mtx, [0.3, 0.3, 0.32]); put(bk, 'iron', BOX(0.24, 0.05, 0.05, 1.16, 1.72, 0), mtx, [0.3, 0.3, 0.32]);
+      for (let k = 0; k < 6; k++) { const t = new THREE.TorusGeometry(0.13, 0.025, 6, 14); t.rotateY(Math.PI / 2); t.translate(-0.25 + k * 0.1, 2.05, 0); put(bk, 'wood', t, mtx, [0.75, 0.66, 0.48]); }
+      put(bk, 'wood', CYL(0.015, 0.015, 1.15, 0.05, 1.45, 0, 6), mtx, [0.75, 0.66, 0.48]);
+      { const bu = new THREE.CylinderGeometry(0.17, 0.13, 0.28, 14, 1, true); bu.translate(0.05, 0.75, 0); put(bk, 'wood', bu, mtx, [0.55, 0.4, 0.26]); put(bk, 'wood', CYL(0.13, 0.13, 0.02, 0.05, 0.62, 0, 14), mtx, [0.45, 0.33, 0.22]);
+        const h = new THREE.TorusGeometry(0.16, 0.012, 5, 14, Math.PI); h.translate(0.05, 0.9, 0); put(bk, 'iron', h, mtx, [0.3, 0.3, 0.32]); }
+      const rm = v.style === 'pietra' ? 'slate' : 'thatch';
+      for (const sd of [-1, 1]) { const r = BOX(2.5, 0.08, 1.05, 0, 0, 0); r.rotateX(sd * 0.62); r.translate(0, 2.98, sd * 0.42); put(bk, rm === 'thatch' ? 'shingle' : rm, r, mtx); }
+      put(bk, 'wood', BOX(2.4, 0.12, 0.12, 0, 3.22, 0), mtx, [0.45, 0.34, 0.24]);
+      cols.push({ x0: p.x - 1.05, x1: p.x + 1.05, y0: p.y, y1: p.y + 0.96, z0: p.z - 1.05, z1: p.z + 1.05, walk: true });
     } else if (p.k === 'totem') {
       for (let i = 0; i < 4; i++) put(bk, 'wood', CYL(0.32 - i * 0.03, 0.3 - i * 0.03, 0.8, 0, i * 0.8, 0, 8), mtx, [[0.75, 0.35, 0.2], [0.85, 0.7, 0.35], [0.3, 0.45, 0.6], [0.8, 0.8, 0.75]][i]);
       put(bk, 'wood', BOX(1.8, 0.2, 0.25, 0, 2.6, 0), mtx, [0.75, 0.35, 0.2]);
       cols.push({ x0: p.x - 0.35, x1: p.x + 0.35, y0: p.y, y1: p.y + 3.2, z0: p.z - 0.35, z1: p.z + 0.35 });
     } else if (p.k === 'bancarella') {
       S.stalls.set((v.id || v.x + ',' + v.z) + ':' + Math.round(p.x) + ':' + Math.round(p.z), { x: p.x, y: p.y, z: p.z, rot: p.rot || 0, v });
-      for (const [px, pz] of [[-1.1, -0.6], [1.1, -0.6], [-1.1, 0.6], [1.1, 0.6]]) put(bk, 'wood', BOX(0.1, 2.3, 0.1, px, 1.15, pz), mtx, [0.5, 0.38, 0.26]);
-      put(bk, 'wood', BOX(2.3, 0.1, 1.2, 0, 0.9, 0), mtx, [0.62, 0.46, 0.3]);
-      const aw = BOX(2.7, 0.04, 1.7, 0, 2.35, 0.1); aw.rotateX(0.18); put(bk, 'cloth', aw, mtx, [[0.85, 0.3, 0.22], [0.25, 0.55, 0.45], [0.9, 0.75, 0.3], [0.3, 0.45, 0.7], [0.6, 0.3, 0.55], [0.9, 0.9, 0.85]][p.col || 0]);
-      for (let i = 0; i < 7; i++) put(bk, 'fruit', new THREE.SphereGeometry(0.1, 8, 6).translate(-0.9 + i * 0.3, 1.02, (rnd() - 0.5) * 0.6), mtx, [[0.95, 0.6, 0.15], [0.8, 0.15, 0.1], [0.35, 0.6, 0.2]][i % 3], false);
-      cols.push({ ...wbox({ x: p.x, z: p.z, rot: p.rot || 0 }, p.y, -1.15, 0, -0.65, 1.15, 1.0, 0.65), walk: true });
+      // banco del mercato: bancone chiuso davanti, pali dietro più alti, tenda a strisce con la balza, cassette e ceste di frutta, insegna
+      const cc = [[0.85, 0.3, 0.22], [0.25, 0.55, 0.45], [0.9, 0.75, 0.3], [0.3, 0.45, 0.7], [0.6, 0.3, 0.55], [0.9, 0.9, 0.85]][p.col || 0];
+      for (const [px, pz, h] of [[-1.15, 0.62, 2.0], [1.15, 0.62, 2.0], [-1.15, -0.62, 2.55], [1.15, -0.62, 2.55]]) put(bk, 'wood', BOX(0.12, h, 0.12, px, h / 2, pz), mtx, [0.48, 0.36, 0.24]);
+      put(bk, 'wood', BOX(2.36, 0.08, 0.9, 0, 0.92, 0.2), mtx, [0.62, 0.46, 0.3]);
+      put(bk, 'wood', BOX(2.36, 0.88, 0.06, 0, 0.46, 0.66), mtx, [0.55, 0.4, 0.27]);
+      for (let k = 0; k < 6; k++) put(bk, 'wood', BOX(0.04, 0.84, 0.07, -1.1 + k * 0.44, 0.46, 0.69), mtx, [0.42, 0.31, 0.21]);
+      for (const sx of [-1, 1]) put(bk, 'wood', BOX(0.06, 0.88, 0.9, sx * 1.16, 0.46, 0.2), mtx, [0.52, 0.38, 0.25]);
+      // tenda: strisce alternate e balza a festoni davanti
+      const tilt = Math.atan2(0.55, 1.5);
+      for (let k = 0; k < 8; k++) { const w = 2.7 / 8, aw = BOX(w, 0.03, 1.62, -1.35 + w * (k + 0.5), 0, 0); aw.rotateX(tilt); aw.translate(0, 2.32, 0); put(bk, 'cloth', aw, mtx, k % 2 ? [0.92, 0.9, 0.84] : cc); }
+      for (let k = 0; k < 8; k++) { const w = 2.7 / 8, fl = new THREE.CylinderGeometry(w / 2, w / 2, 0.03, 10, 1, false, 0, Math.PI); fl.rotateX(Math.PI / 2); fl.rotateZ(Math.PI); fl.translate(-1.35 + w * (k + 0.5), 2.02, 0.8); put(bk, 'cloth', fl, mtx, k % 2 ? [0.92, 0.9, 0.84] : cc); }
+      // cassette e ceste
+      const crate = (x, z, y) => { put(bk, 'wood', BOX(0.5, 0.22, 0.36, x, y + 0.11, z), mtx, [0.66, 0.5, 0.32]); for (let i = 0; i < 6; i++) put(bk, 'fruit', new THREE.SphereGeometry(0.075, 10, 8).translate(x - 0.17 + (i % 3) * 0.17, y + 0.26, z - 0.08 + Math.floor(i / 3) * 0.16), mtx, [[0.95, 0.6, 0.15], [0.8, 0.15, 0.1], [0.35, 0.6, 0.2], [0.95, 0.85, 0.25]][(i + Math.round(x * 10)) & 3], false); };
+      crate(-0.75, 0.25, 0.96); crate(-0.15, 0.25, 0.96); crate(0.6, 0.3, 0.96);
+      for (const [x, z] of [[-1.5, 0.9], [1.55, 0.5]]) { const bs = new THREE.CylinderGeometry(0.26, 0.2, 0.32, 16, 1, true); bs.translate(x, 0.16, z); put(bk, 'thatch', bs, mtx); put(bk, 'thatch', CYL(0.2, 0.2, 0.02, x, 0.01, z, 14), mtx); for (let i = 0; i < 5; i++) put(bk, 'fruit', new THREE.SphereGeometry(0.08, 10, 8).translate(x + Math.cos(i * 1.3) * 0.12, 0.3 + (i > 2 ? 0.07 : 0), z + Math.sin(i * 1.3) * 0.12), mtx, [[0.35, 0.6, 0.2], [0.95, 0.6, 0.15]][i & 1], false); }
+      put(bk, 'wood', BOX(0.9, 0.34, 0.04, 0, 2.78, -0.62), mtx, [0.85, 0.7, 0.42]);
+      cols.push({ ...wbox({ x: p.x, z: p.z, rot: p.rot || 0 }, p.y, -1.2, 0, -0.3, 1.2, 1.0, 0.72), walk: true });
     } else if (p.k === 'fieno') {
       // carro di fieno ai piedi del campanile: cadere qui dentro non fa male
       put(bk, 'wood', BOX(2.6, 0.5, 1.9, 0, 0.55, 0), mtx, [0.55, 0.4, 0.26]);
@@ -1181,7 +1206,7 @@
         const disc = a.poi.type === 'village' ? 60 : a.poi.type === 'relitto' ? 26 : a.poi.type === 'tesoro' ? 0 : 40;
         if (d < disc) S.discover(a.poi);
       }
-      if (changed) { const all = []; for (const a of S.active.values()) if (a.near) all.push(...a.cols); G.Build.setExtra(all); }
+      if (changed) { const all = []; for (const a of S.active.values()) if (a.near) all.push(...a.cols); G.Build.setExtra(G.Demo ? G.Demo.filter(all) : all); }
     }
     // animazioni: pale dei mulini, bandiere, faro, luci notturne
     const night = G.sky.night;
@@ -1216,7 +1241,7 @@
     try { S.spawnDockBoats(a); } catch (e) { console.warn(e); }
     a.pieces = [];
     for (const g of a.gen) {
-      if (G.Build.byId(g.id)) continue;
+      if (G.Build.byId(g.id) || G.state.removed.has('gp:' + g.id)) continue;
       const d = { t: g.t, id: g.id, x: g.x, y: g.y, z: g.z, rot: g.rot || 0, gen: true, tier: g.tier };
       if (g.t === 'baule' || g.t === 'forziere') d.inv = G.state.chests[g.id] || null;
       const p = G.Build.add(d, true); p.gen = true; p.tier = g.tier; p.fresh = !G.state.chests[g.id];
@@ -1302,6 +1327,7 @@
     const v = a.poi, L = G.POI.layout(v);
     a.npcs = [];
     for (const n of L.npcs) {
+      if (G.Player.recruited && n.id && G.Player.recruited[n.id]) continue; // è nella tua ciurma
       const p = G.People.build(n.look, { style: v.style, female: undefined, tool: n.role === 'mercante' ? null : null });
       const tag = nameTag(n.name);
       tag.position.y = p.height + 0.35; tag.visible = false; p.root.add(tag);

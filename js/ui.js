@@ -794,7 +794,7 @@
   const CONTROLS = [['W A S D', 'muoversi · guidare la barca'], ['Ctrl', 'correre (consuma stamina)'], ['Maiusc', 'accovacciarsi · rubare (E) se nessuno ti vede'], ['L', 'abilità'], ['Spazio', 'saltare · risalire in acqua'], ['C', 'immergersi'], ['Clic sinistro', 'colpire, abbattere, estrarre'], ['Tasto destro', 'interagire (timone, bauli, porte, persone, salire in barca) · usare, mangiare, posare'],
     ['E · I', 'inventario, vestiti e creazione 3×3'], ['F', 'scambia l’oggetto in mano con la mano sinistra'], ['Tasto destro (scudo a sinistra)', 'parare'], ['B', 'libro del costruttore'], ['M · J', 'mappa · diario'],
     ['Piccone / pala sul terreno', 'scavare (tunnel, cantine, case nella montagna)'], ['Cibo in mano · tasto destro su un animale', 'attirarlo · nutrirlo (cuccioli)'], ['Spazio contro una barca', 'arrampicarsi a bordo'], ['G', 'stiva della barca'],
-    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa / sopravvivenza'], ['F5', 'visuale: prima persona, terza persona, di fronte'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
+    ['T · /', 'console dei comandi (/aiuto)'], ['K', 'strumenti: ora, meteo, vento, luna, biomi, villaggi'], ['F4', 'creativa / sopravvivenza'], ['F5', 'visuale: prima persona, terza persona, di fronte'], ['Q · Ctrl+Q', 'lascia a terra l’oggetto in mano (uno · tutta la pila)'], ['Z (tieni premuto)', 'parla nella chat vocale (se hai scelto “Tieni premuto Z”)'], ['R', 'ruotare la costruzione'], ['V', 'visuale esterna in barca'], ['O', 'ordini alla ciurma (poi 1–9)'], ['1–9 · rotella', 'scegliere l’oggetto'], ['Frecce', 'girare la visuale'], ['Esc', 'pausa']];
   UI.CONTROLS = CONTROLS;
 
   /* ---------------- MENU ---------------- */
@@ -1231,6 +1231,7 @@
         else UI._spaceT = now;
       }
       P_.keys[k] = true;
+      if (G.Crew && G.Crew.menuKey(k)) { P_.keys[k] = false; return; }
       if (/^Digit[1-9]$/.test(k)) { P_.sel = +k.slice(5) - 1; UI.refreshHotbar(); }
       else if (k === 'KeyI') UI.openInventory(3);
       else if (k === 'KeyB') UI.openBook();
@@ -1245,6 +1246,7 @@
       else if (k === 'F5') { e.preventDefault(); P_.view = ((P_.view || 0) + 1) % 3; UI.toast(['Prima persona', 'Terza persona', 'Terza persona, di fronte'][P_.view]); }
       else if (k === 'KeyT' || k === 'Slash' || k === 'NumpadDivide') { e.preventDefault(); P_.keys = {}; G.Cmd.openConsole(k === 'KeyT' ? '' : '/'); }
       else if (k === 'KeyK') UI.openCustom('strumenti');
+      else if (k === 'KeyO' && G.Crew) G.Crew.toggleMenu();
       else if (k === 'KeyZ' && G.Voice) G.Voice.setPTT(true);
       else if (k === 'KeyQ' && !e.repeat && G.Drops) G.Drops.throwHeld(e.ctrlKey || e.metaKey);
       else if (k === 'KeyR') G.Build.rotStep = (G.Build.rotStep + 1) % 4;
@@ -1252,10 +1254,12 @@
       else if (k === 'KeyX' && P_.boat) G.Boats.toggleAnchor(P_.boat);
       else if (k === 'KeyH') { G.settings.hints = G.settings.hints === false; G.store.set('deriva_settings', G.settings); }
       else if (k === 'F11' && window.deriva) { e.preventDefault(); G.settings.fullscreen = !G.settings.fullscreen; G.applySettings('fullscreen'); }
+      else if (k === 'Escape' && G.Crew && G.Crew.menu) G.Crew.toggleMenu(false);
       else if (k === 'Escape') { if (P_.placing) UI.cancelPlace(); else if (UI.boatPlacing) { UI.boatPlacing = null; G.Boats.updateGhost(null); } }
     });
     document.addEventListener('keyup', (e) => { P().keys[e.code] = false; if (e.code === 'KeyZ' && G.Voice) G.Voice.setPTT(false); });
     window.addEventListener('blur', () => { P().keys = {}; P().mouse.l = false; });
+    document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('[data-crew]'); if (b && G.Crew) { G.Crew.setOrder(b.dataset.crew); G.Crew.toggleMenu(false); } });
     canvas.addEventListener('mousedown', (e) => {
       if (!G.started || UI.open || UI.menu) return;
       if (!G.locked && !G.noLock) { G.requestLock(); return; }

@@ -127,7 +127,7 @@
 
   /* ---------- cassero e castello: muri che seguono lo scafo, ponte rialzato, paratia con la porta ---------- */
   // muro spesso lungo un percorso [[x,z],...] da yb(i) a yt(i)
-  function wallPath(path, yb, yt, th) {
+  function wallPath(path, yb, yt, th, ts) {
     const pos = [], uv = [], idx = []; let acc = 0;
     const n = path.length, nrm = path.map((p, i) => { const a = path[Math.max(0, i - 1)], b = path[Math.min(n - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; });
     const quad = (a, b, c, d) => { const o = pos.length / 3; idx.push(o, o + 1, o + 2, o + 2, o + 1, o + 3); };
@@ -136,14 +136,14 @@
       for (let i = 0; i < n; i++) {
         if (i) acc += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
         const off = side ? -th : 0, x = path[i][0] + nrm[i][0] * off, z = path[i][1] + nrm[i][1] * off;
-        pos.push(x, yb(i), z, x, yt(i), z); uv.push(acc / 2.2, yb(i) / 2.2, acc / 2.2, yt(i) / 2.2);
+        pos.push(x, yb(i), z, x * (ts || 1), yt(i), z); uv.push(acc / 2.2, yb(i) / 2.2, acc / 2.2, yt(i) / 2.2);
       }
       const o = side * n * 2;
       for (let i = 0; i < n - 1; i++) { const a = o + i * 2; if (side) idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
     }
     // bordo superiore
     const o2 = pos.length / 3;
-    for (let i = 0; i < n; i++) { const x = path[i][0], z = path[i][1]; pos.push(x, yt(i), z, x + nrm[i][0] * -th, yt(i), z + nrm[i][1] * -th); uv.push(i * 0.3, 0, i * 0.3, 0.1); }
+    for (let i = 0; i < n; i++) { const x = path[i][0] * (ts || 1), z = path[i][1]; pos.push(x, yt(i), z, x + nrm[i][0] * -th, yt(i), z + nrm[i][1] * -th); uv.push(i * 0.3, 0, i * 0.3, 0.1); }
     for (let i = 0; i < n - 1; i++) { const a = o2 + i * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
     return M.colorize(g, 1, 1, 1);
@@ -178,11 +178,18 @@
     const hwAt = (z) => H.hw(z / L + 0.5) * 0.985;
     // muri laterali (sopra la murata, fino al parapetto)
     const N = 22, path = (sd) => { const p = []; for (let i = 0; i <= N; i++) { const z = zb + (zEnd - zb) * i / N; p.push([sd * hwAt(z), z]); } return aft === (sd > 0) ? p.reverse() : p; };
-    for (const sd of [-1, 1]) { const p = path(sd); out.push(wallPath(p, (i) => H.gw(p[i][1] / L + 0.5) - 0.12, () => y + 0.95, 0.12)); }
+    // fianchi che rientrano salendo (come le navi vere), con due cinte sporgenti e una fila di finestrelle
+    const TS = 0.9, lean = (z, yy) => { const g = H.gw(z / L + 0.5) - 0.12; return 1 - (1 - TS) * G.clamp((yy - g) / (y + 0.95 - g), 0, 1); };
+    for (const sd of [-1, 1]) { const p = path(sd); out.push(wallPath(p, (i) => H.gw(p[i][1] / L + 0.5) - 0.12, () => y + 0.95, 0.12, TS));
+      for (const wy of [deck + 0.55, y - 0.3]) { const pw = p.map(([x, z]) => [x * lean(z, wy) * 1.012, z]); out.push(M.colorize(wallPath(pw, () => wy, () => wy + 0.16, 0.06), 0.45, 0.33, 0.22)); }
+      for (let k = 1; k <= 3; k++) { const z = zb + (zEnd - zb) * (k / 4.2), wy = deck + 1.35, x = sd * (hwAt(z) * lean(z, wy) + 0.015);
+        const wfr = box(0.05, 0.5, 0.62, x, wy, z); out.push(M.colorize(wfr, 0.82, 0.68, 0.46)); out.push(M.colorize(box(0.06, 0.38, 0.48, x + sd * 0.004, wy, z), 0.08, 0.1, 0.12)); } }
     // specchio di poppa con le finestre della galleria
     if (aft) {
       const w = hwAt(zEnd);
-      out.push(wallPath([[w, zEnd], [-w, zEnd]], () => H.gw(0) - 0.3, () => y + 1.25, 0.14));
+      out.push(wallPath([[w, zEnd], [-w, zEnd]], () => H.gw(0) - 0.3, () => y + 1.25, 0.14, TS * 0.98));
+      // coronamento intagliato sopra lo specchio di poppa
+      { const cr = new THREE.CylinderGeometry(w * TS * 0.8, w * TS * 0.8, 0.14, 24, 1, false, 0, Math.PI); cr.rotateX(Math.PI / 2); cr.rotateZ(Math.PI / 2); cr.rotateZ(Math.PI / 2); cr.scale(1, 0.35, 1); cr.translate(0, y + 1.25, zEnd + 0.07); out.push(M.colorize(cr, 0.55, 0.42, 0.28)); }
       for (let i = 0; i < 4; i++) { const x = -w * 0.62 + i * (w * 1.24 / 3);
         out.push(M.colorize(box(0.56, 0.78, 0.06, x, deck + 1.25, zEnd - 0.04), 0.86, 0.72, 0.5)); out.push(M.colorize(box(0.44, 0.66, 0.07, x, deck + 1.25, zEnd - 0.045), 0.08, 0.1, 0.12)); out.push(M.colorize(box(0.04, 0.66, 0.08, x, deck + 1.25, zEnd - 0.05), 0.86, 0.72, 0.5)); }
       out.push(M.colorize(box(w * 2 + 0.2, 0.12, 0.5, 0, deck + 0.75, zEnd - 0.22), 0.5, 0.38, 0.26)); // balconata
@@ -194,18 +201,18 @@
       const w = hwAt(zEnd); out.push(wallPath([[w, zEnd], [0, zEnd + 0.3], [-w, zEnd]], () => y - 0.1, () => y + 0.95, 0.12));
     }
     // ponte rialzato
-    out.push(slab(Math.min(zb, zEnd), Math.max(zb, zEnd), (z) => hwAt(z) - 0.05, y, 0.16, 20));
+    out.push(slab(Math.min(zb, zEnd), Math.max(zb, zEnd), (z) => hwAt(z) * lean(z, y) - 0.08, y, 0.16, 20));
     // travi sotto il ponte (si vedono dalla cabina)
     for (let k = 1; k < 5; k++) { const z = zb + (zEnd - zb) * k / 5; out.push(M.colorize(box(hwAt(z) * 2 - 0.2, 0.18, 0.16, 0, y - 0.25, z), 0.36, 0.27, 0.18)); }
     // paratia con la porta e due finestrelle
     const wb = hwAt(zb) - 0.06, D = T.castles.door, dz = aft ? 0.06 : -0.06;
-    out.push(wallPath([[-wb, zb], [-D, zb]], () => deck - 0.05, () => y, 0.12), wallPath([[D, zb], [wb, zb]], () => deck - 0.05, () => y, 0.12), wallPath([[-D, zb], [D, zb]], () => deck + 2.0, () => y, 0.12));
+    { const lt = lean(zb, y); out.push(wallPath([[-wb, zb], [-D / lt, zb]], () => deck - 0.05, () => y, 0.12, lt), wallPath([[D / lt, zb], [wb, zb]], () => deck - 0.05, () => y, 0.12, lt), wallPath([[-D, zb], [D, zb]], () => deck + 2.0, () => y, 0.12)); }
     for (const sd of [-1, 1]) { out.push(M.colorize(box(0.12, 2.05, 0.2, sd * (D + 0.06), deck + 1.0, zb + dz), 0.42, 0.3, 0.2)); out.push(M.colorize(box(0.5, 0.42, 0.05, sd * (wb * 0.62), deck + 1.45, zb + dz * 2.2), 0.08, 0.1, 0.12)); out.push(M.colorize(box(0.6, 0.06, 0.1, sd * (wb * 0.62), deck + 1.2, zb + dz * 2.2), 0.6, 0.48, 0.34)); }
     out.push(M.colorize(box(D * 2 + 0.24, 0.14, 0.2, 0, deck + 2.07, zb + dz), 0.42, 0.3, 0.2));
     // porta aperta verso l'interno
     { const d = box(D * 2 - 0.04, 1.96, 0.06, 0, 0, 0); d.translate(D - 0.02, 0, 0); d.rotateY(aft ? 1.75 : -1.75); d.translate(-D, deck + 0.99, zb - dz * 1.2); out.push(M.colorize(d, 0.55, 0.38, 0.24)); }
     // ringhiera davanti, con i varchi delle scale
-    railing(-wb, wb, y, zb + dz * 0.4, out, [C.sx]);
+    { const wr = wb * lean(zb, y + 0.5); railing(-wr, wr, y, zb + dz * 0.4, out, [C.sx]); }
     // scale che salgono dal ponte di coperta
     for (const sd of [-1, 1]) stairs(sd * (C.sx[0] + C.sx[1]) / 2, zb + (aft ? 0.02 : -0.02), C.run, deck, y, out, aft ? 1 : -1);
     // arredo della cabina: tavolo, panca, lanterna
@@ -787,11 +794,11 @@
       } else if (driving && BT.isComplete(b)) {
         let target = 0;
         const fwd = input.f, turn = input.t;
-        const max = T.speed * (T.sail ? BT.windFactor(b) * (G.Combat && G.Combat.has('vela_leggendaria') ? 1.3 : 1) : 1);
+        const max = T.speed * (b.crewSpeed || 1) * (T.sail ? BT.windFactor(b) * (G.Combat && G.Combat.has('vela_leggendaria') ? 1.3 : 1) : 1);
         if (fwd > 0) target = max; else if (fwd < 0) target = -max * 0.3;
         b.speed += (target - b.speed) * Math.min(1, dt * (T.sail ? 0.35 : 0.9));
         b.rudder += (turn - b.rudder) * Math.min(1, dt * 3);
-        b.yaw += b.rudder * T.turn * dt * (0.25 + Math.min(Math.abs(b.speed) / T.speed, 1) * 0.9) * Math.sign(b.speed || 1);
+        b.yaw += b.rudder * T.turn * (b.crewTurn || 1) * dt * (0.25 + Math.min(Math.abs(b.speed) / T.speed, 1) * 0.9) * Math.sign(b.speed || 1);
       } else if (b.ai && BT.isComplete(b)) {
         b.ai(b, dt); // nave guidata dal gioco (pirati)
       } else if (remoteDrive) {

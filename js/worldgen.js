@@ -77,12 +77,14 @@
   G.coldAt = function (x, z) { const c = G.climate(x, z); return G.smooth(-0.24, -0.38, c.t); };
   // banchisa: dove fa molto freddo il mare gela, con qualche canale d'acqua libera
   G.ICE_Y = 0.42;
-  G.iceAt = function (x, z) {
+  // valore continuo (> 0 = ghiaccio): serve anche a disegnare lastre dai bordi morbidi
+  G.iceVal = function (x, z) {
     // meno ghiaccio: solo dove fa freddissimo, a lastre sparse con tanta acqua libera
-    const cold = G.coldAt(x, z); if (cold < 0.85) return false;
+    const cold = G.coldAt(x, z); if (cold < 0.85) return -0.3;
     const n = G.nA(x * 0.021 + 5, z * 0.021 - 3) * 0.5 + G.nC(x * 0.07, z * 0.07) * 0.18;
-    return n + (cold - 0.97) * 1.2 > 0.2;
+    return n + (cold - 0.97) * 1.2 - 0.2;
   };
+  G.iceAt = (x, z) => G.iceVal(x, z) > 0;
 
   /* ---------- laghetti di montagna (con cascata dove trabocca) ---------- */
   const LC = 640, LAKES = new Map();

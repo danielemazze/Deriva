@@ -88,6 +88,7 @@
       sh.uniforms.uTime = G.shared.uTime; sh.uniforms.uSunInt = G.shared.uSunInt; sh.uniforms.uWind = G.shared.uWind;
       sh.uniforms.uWaterY = G.shared.uWaterY; sh.uniforms.uCamPos = G.shared.uCamPos; sh.uniforms.uGrassDist = G.shared.uGrassDist; sh.uniforms.uWet = G.shared.uWet; sh.uniforms.uDry = G.shared.uDry;
       const acgT = opt.terrain && G.ACG && G.ACG.terrain;
+      if (opt.cut && G.Demo) Object.assign(sh.uniforms, G.Demo.U);
       if (opt.terrain) { Object.assign(sh.uniforms, opt.terrain); if (G.Dig) Object.assign(sh.uniforms, G.Dig.U); if (acgT) { sh.uniforms.tAC = { value: acgT.C }; sh.uniforms.tAN = { value: acgT.N }; } }
       let vs = sh.vertexShader, fs = sh.fragmentShader;
       vs = 'varying vec3 vWPos; varying vec3 vWN; uniform float uTime; uniform float uWind; uniform vec3 uCamPos; uniform float uGrassDist;\n' + vs;
@@ -186,14 +187,17 @@
           float camD = length(vWPos - cameraPosition); tFar = camD > 80.0;
           vec4 cg = mix(triA(tAC, uvG, 0.0), triA(tAC, uvG2, 1.0), lushN), cs = triA(tAC, uvS, 2.0), cr = triA(tAC, uvR, 3.0), cd = mix(triA(tAC, uvD, 4.0), triA(tAC, uvD * 0.9, 5.0), floorK);
           vec4 cw = triA(tAC, uvW, 6.0);
+          vec4 cSn = tSnow > 0.001 ? triA(tAC, tp * 0.28, 7.0) : vec4(0.8); vec4 aSn = vec4(0.5, 0.5, 0.8, 0.5);
+          if (!tFar && tSnow > 0.001) aSn = triA(tAN, tp * 0.28, 7.0);
           vec4 aG = vec4(0.5, 0.5, 0.85, 0.5), aS = aG, aR = aG, aD = aG;
           if (!tFar) { aG = mix(triA(tAN, uvG, 0.0), triA(tAN, uvG2, 1.0), lushN); aS = mix(triA(tAN, uvS, 2.0), triA(tAN, uvW, 6.0), tUnder); aR = triA(tAN, uvR, 3.0); aD = mix(triA(tAN, uvD, 4.0), triA(tAN, uvD * 0.9, 5.0), floorK); }
           // passaggi naturali: dove due terreni si toccano vince quello più alto (sabbia nelle crepe, erba tra i sassi)
           if (!tFar) { vec4 hw = tw + vec4(aG.w, aS.w, aR.w, aD.w) * 0.6 * step(0.001, tw);
             float hm = max(max(hw.x, hw.y), max(hw.z, hw.w)) - 0.25;
             vec4 w2 = max(hw - hm, 0.0) * step(0.001, tw); tw = w2 / (w2.x + w2.y + w2.z + w2.w + 1e-4); }
-          float acgRough = aG.z * tw.x + aS.z * tw.y + aR.z * tw.z + aD.z * tw.w;
+          float acgRough = mix(aG.z * tw.x + aS.z * tw.y + aR.z * tw.z + aD.z * tw.w, aSn.z, tSnow);
           #else
+          vec4 cSn = vec4(0.78, 0.82, 0.88, 1.0) * (0.9 + tNoise(tp * 0.6) * 0.12);
           vec4 cg = tri(map, uvG), cs = tri(tSand, uvS), cr = tri(tRock, uvR), cd = tri(tDirt, uvD);
           vec4 cw = tri(tSea, uvW);
           #endif
@@ -213,7 +217,9 @@
           tcol.rgb = mix(tcol.rgb, tcol.rgb * vec3(1.15, 1.05, 0.72), smoothstep(0.55, 0.85, tNoise(tp * 0.02 + 7.0)) * tw.x * 0.6);
           float wet = max(smoothstep(1.1, 0.2, vWPos.y) * tw.y * (1.0 - tUnder), uWet * 0.55 * (1.0 - tSnow));
           tcol.rgb *= mix(1.0, 0.6, wet);
-          tcol.rgb = mix(tcol.rgb, vec3(0.9, 0.93, 0.97) * (0.92 + tNoise(tp * 0.6) * 0.1), tSnow);
+          // neve: texture vera (non bianco pieno), un po' più scura dove è in ombra di rilievo; ai bordi lascia vedere roccia e terra
+          float snowEdge = smoothstep(0.0, 1.0, tSnow * (0.75 + cSn.r * 0.5));
+          tcol.rgb = mix(tcol.rgb, cSn.rgb * (0.94 + tNoise(tp * 0.05) * 0.1), snowEdge);
           // boschi lontani: dove ci sono alberi il colpo d'occhio è verde scuro (le chiome che non si disegnano più)
           { float cd = length(vWPos - cameraPosition), farK = smoothstep(110.0, 240.0, cd) * canopy * (1.0 - tw.z) * (1.0 - tSnow);
             vec3 cc = mix(vec3(0.035, 0.07, 0.022), vec3(0.06, 0.1, 0.03), tNoise(tp * 0.07)) * mix(1.0, 0.75, vBio.y);
@@ -232,7 +238,11 @@
           vec3 nS = mix(tri(tSandN, uvS).xyz, tri(tSeaN, uvW).xyz, tUnder);
           vec3 mapN = (tri(normalMap, uvG).xyz*tw.x + nS*tw.y + tri(tRockN, uvR).xyz*tw.z + tri(tDirtN, uvD).xyz*tw.w) * 2.0 - 1.0;
           #endif
-          mapN = mix(mapN, vec3(0.0, 0.0, 1.0), tSnow * 0.7);`);
+          #ifdef ACG_T
+          { vec2 sxy = (aSn.xy * 2.0 - 1.0) * (1.0 - smoothstep(55.0, 80.0, camD)); mapN = mix(mapN, vec3(sxy * 1.3, sqrt(max(0.0, 1.0 - dot(sxy, sxy)))), tSnow); }
+          #else
+          mapN = mix(mapN, vec3(0.0, 0.0, 1.0), tSnow * 0.7);
+          #endif`);
         fs = fs.replace('#include <roughnessmap_fragment>', acgT ? 'float roughnessFactor = mix(max(acgRough, 0.62), 0.3, wet);' : 'float roughnessFactor = mix(roughness, 0.3, wet);');
         if (acgT) fs = '#define ACG_T\n' + fs;
         // crepe di lava incandescente vicino al cratere
@@ -277,10 +287,12 @@
           }
         }
         #include <output_fragment>`);
+      if (opt.cut) fs = fs.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+          for (int i = 0; i < 48; i++) { if (i >= uCutN) break; vec4 c = uCut[i]; if (all(lessThan(abs(vWPos - c.xyz), vec3(c.w)))) discard; }`).replace('void main()', 'uniform vec4 uCut[48]; uniform int uCutN;\nvoid main()');
       if (opt.alphaTag) fs = fs.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.a = ' + opt.alphaTag.toFixed(2) + ';');
       sh.vertexShader = vs; sh.fragmentShader = fs;
     };
-    mat.customProgramCacheKey = () => JSON.stringify(opt.key || opt.wind || '') + (opt.terrain ? (G.ACG && G.ACG.terrain ? 'TA' : 'T') : '') + (opt.backShade ? 'B' : '') + (opt.fadeDist ? 'F' : '') + (opt.alphaTag ? 'A' : '') + (opt.moss ? 'M' : '');
+    mat.customProgramCacheKey = () => JSON.stringify(opt.key || opt.wind || '') + (opt.terrain ? (G.ACG && G.ACG.terrain ? 'TA' : 'T') : '') + (opt.backShade ? 'B' : '') + (opt.fadeDist ? 'F' : '') + (opt.alphaTag ? 'A' : '') + (opt.moss ? 'M' : '') + (opt.cut ? 'C' : '');
     return mat;
   };
 
@@ -427,7 +439,7 @@
         uSunDir: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() }, uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() },
         uAmb: { value: new THREE.Color() }, uFogDen: { value: 0.002 }, uUnder: { value: 0 }, uOffset: { value: new THREE.Vector2() },
         uVort: { value: [new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0), new THREE.Vector4(0, 0, 1, 0)] },
-        uSSR: { value: 0 }, uVP: { value: new THREE.Matrix4() },
+        uSSR: { value: 0 }, uVP: { value: new THREE.Matrix4() }, uLag: { value: 0 },
         uDigW: (G.Dig && G.Dig.U.uDigW) || { value: Array.from({ length: 24 }, () => new THREE.Vector4(0, -999, 0, 0)) }, uDigWN: (G.Dig && G.Dig.U.uDigWN) || { value: 0 },
       },
       vertexShader: GLSL_WAVES() + `
@@ -446,7 +458,7 @@
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        uniform sampler2D tScene, tDepth, tNormal; uniform vec2 uRes; uniform float uNear, uFar, uTime, uFogDen, uUnder, uWaveAmp, uWindLv, uSSR; uniform vec2 uWaveRot; uniform vec4 uVort[4]; uniform mat4 uVP; uniform vec4 uDigW[24]; uniform int uDigWN;
+        uniform sampler2D tScene, tDepth, tNormal; uniform vec2 uRes; uniform float uNear, uFar, uTime, uFogDen, uUnder, uWaveAmp, uWindLv, uSSR, uLag; uniform vec2 uWaveRot; uniform vec4 uVort[4]; uniform mat4 uVP; uniform vec4 uDigW[24]; uniform int uDigWN;
         uniform vec3 uCam, uSunDir, uSunCol, uZen, uHor, uAmb;
         varying vec3 vWPos; varying vec3 vN; varying float vH; varying float vViewZ;
         float lin(float d){ float z = d*2.0-1.0; return 2.0*uNear*uFar/(uFar+uNear - z*(uFar-uNear)); }
@@ -478,8 +490,13 @@
           vec3 col;
           if (under < 0.5) {
             float vth = thick * max(V.y, 0.08);
-            vec3 T = exp(-vec3(0.38, 0.075, 0.055) * (thick*0.55 + vth*0.9));
-            vec3 scat = mix(vec3(0.0, 0.13, 0.17), vec3(0.02, 0.32, 0.36), exp(-vth*0.16)) * lightLvl;
+            // laguna (stile Frutiger Aero): vicino alle isole, nei mari non freddi, l'acqua bassa è turchese, limpida e luminosa
+            float lag = uLag * exp(-vth * 0.1) * (1.0 - smoothstep(250.0, 700.0, dist));
+            vec3 T = exp(-mix(vec3(0.38, 0.075, 0.055), vec3(0.26, 0.032, 0.045), lag) * (thick*0.55 + vth*0.9));
+            vec3 scat = mix(mix(vec3(0.0, 0.13, 0.17), vec3(0.02, 0.32, 0.36), exp(-vth*0.16)), mix(vec3(0.0, 0.3, 0.36), vec3(0.08, 0.62, 0.6), exp(-vth*0.12)), lag) * lightLvl;
+            // riflessi di luce sul fondo (caustiche) che si muovono
+            { vec2 cp = (vWPos.xz - V.xz / max(V.y, 0.15) * min(vth, 6.0)) * 0.35; float c1 = vn(cp + vec2(uTime * 0.21, uTime * 0.13)), c2 = vn(cp * 1.37 - vec2(uTime * 0.17, -uTime * 0.11));
+              float cau = pow(1.0 - abs(c1 - c2), 8.0); refr += vec3(0.55, 0.85, 0.8) * cau * lag * lightLvl * 0.55 * exp(-vth * 0.15); }
             col = refr * T + scat * (1.0 - T.g);
             // riflesso
             vec3 R = reflect(-V, N); R.y = abs(R.y);
@@ -502,7 +519,8 @@
                 }
               }
             }
-            col = mix(col, refl, clamp(fres, 0.0, 0.92));
+            col = mix(col, refl, clamp(fres * (1.0 - lag * 0.35), 0.0, 0.92));
+            col += uSunCol * pow(max(dot(reflect(-V, N), uSunDir), 0.0), 220.0) * 2.2 * lag; // luccichio lucido
             float sp = max(dot(R, uSunDir), 0.0);
             col += uSunCol * (pow(sp, 900.0)*6.0 + pow(sp, 90.0)*0.22);
             // luce che attraversa le creste (verde-azzurro), più visibile controluce

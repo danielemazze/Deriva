@@ -35,6 +35,20 @@ montagne con la neve. Il nome del bioma è accanto all'orologio.
 Nota: i biomi cambiano la forma del mondo, quindi un mondo creato con la
 versione precedente avrà isole diverse da come le ricordavi.
 
+NOVITÀ DELLA 1.22 «La tua ciurma»
+- Gli abitanti dei villaggi si reclutano pagandoli (scheda Recluta quando
+  parli con loro): cannonieri, carpentieri, nostromi e combattenti.
+  Ogni giorno vogliono la paga; dopo tre giorni senza se ne vanno.
+- La ciurma ti segue, sale sulla tua nave (i posti dipendono dalla nave)
+  e con O ricevi il menu degli ordini: fuoco, riparazioni, vele,
+  arrembaggio. Con l'arrembaggio la nave pirata diventa tua.
+- Tutto si smonta: con il piccone (pietra) o l'ascia (legno) castelli,
+  villaggi e covi si rompono a blocchi di 3 metri e danno muri e
+  pavimenti da ripiazzare. Anche letti, falò e bauli non chiusi a chiave.
+- Laguna turchese e limpida vicino alle isole.
+- Neve rifatta con rilievo vero, banchi di ghiaccio dai bordi morbidi.
+- Pozzo, bancarella del mercante e cassero del vascello rifatti.
+
 NOVITÀ DELLA 1.21.2 «Tetti a 45 gradi»
 - Tetto a 45 gradi e frontone nuovo, un muro tagliato in diagonale.
 - Mastio del castello senza la lastra finta che tagliava l'ingresso.
@@ -72,7 +86,7 @@ NOVITÀ DELLA 1.21 «Navi da abitare»
 - Scafi, bauli e barili più rotondi; castello senza le strisce grigie.
 - La musica del menu parte subito e nel menu non si sentono gli animali.
 - T apre la chat senza aprire il menu.
-- Chi ospita e chi entra devono avere la stessa versione (1.21).
+- Chi ospita e chi entra devono avere la stessa versione (1.22).
 
 NOVITÀ DELLA 1.20 «Cavalli e stive»
 - Cavalcature: cavallo, zebra e lama. Sella in mano (pelle + corda al banco),

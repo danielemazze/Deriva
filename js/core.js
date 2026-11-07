@@ -82,15 +82,15 @@ G.PRESETS = {
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.21.2';
+G.VERSION = '1.22';
 // novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
-G.NEWS = { v: '1.21.2', t: 'Tetti a 45 gradi', d: '6 novembre 2026', items: [
-  ['casa', 'Tetto a 45 gradi e frontone nuovo: un muro tagliato in diagonale'],
-  ['castello', 'Mastio senza la lastra finta che tagliava l’ingresso'],
-  ['persone', 'Nuovi personaggi animati: cavalieri, banditi, abitanti e piratesse'],
-  ['casa', 'I pezzi si agganciano a quelli vicini, scala alta quanto un muro'],
-  ['nota', 'I suoni registrati tornano a funzionare'],
-  ['giro', 'Controlla aggiornamento · Prossimamente e proposte'],
+G.NEWS = { v: '1.22', t: 'La tua ciurma', d: '7 novembre 2026', items: [
+  ['persone', 'Recluta gli abitanti dei villaggi pagandoli: cannonieri, carpentieri, nostromi e combattenti'],
+  ['ancora', 'La ciurma sale sulla tua nave: con O dai gli ordini mentre guidi, anche l’arrembaggio'],
+  ['piccone', 'Tutto si smonta: castelli, villaggi e covi a blocchi, e i pezzi si ripiazzano'],
+  ['goccia', 'Laguna turchese e limpida vicino alle isole'],
+  ['neve', 'Neve rifatta, con rilievo vero, e banchi di ghiaccio dai bordi morbidi'],
+  ['casa', 'Pozzo, bancarella e cassero del vascello rifatti'],
 ] };
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';
@@ -101,14 +101,13 @@ G.isTouch = (() => { try { const q = location.search; if (/[?&]touch=1/.test(q))
 // tipo di base dei pezzi di pietra (stesse regole di aggancio e collisione di quelli di legno); serve anche al server
 // cosa arriverà nei prossimi aggiornamenti (il gioco prova prima a scaricare roadmap.json dal sito, così si aggiorna da solo)
 G.ROADMAP = [
-  { s: 'lavoro', t: 'Tutto si può smontare', d: 'castelli, villaggi e covi pezzo per pezzo: muri, pavimenti e tetti da portarsi via e ripiazzare' },
-  { s: 'presto', t: 'Nuovi mari', d: 'una laguna turchese e luminosa vicino alle isole, poi oceano profondo, caldo e freddo' },
-  { s: 'presto', t: 'Neve rifatta', d: 'le montagne innevate delle isole fredde, con forme e ombre vere' },
-  { s: 'presto', t: 'Suoni veri', d: 'passi, onde, pioggia, fuoco, chitarra e flauto registrati dal vero' },
-  { s: 'poi', t: 'Nuovi oggetti 3D realistici', d: 'barili, casse, rocce, mobili e attrezzi fotografati dal vero' },
-  { s: 'poi', t: 'Pozzo, bancarella e castello rifatti', d: 'forme più sensate e dettagliate' },
-  { s: 'poi', t: 'Persone più vive', d: 'abitanti che salutano, si siedono, dormono, tirano con l’arco e nuotano; nuovi abitanti uomini' },
-  { s: 'poi', t: 'Vascello rifinito', d: 'il cassero di poppa più curato visto da fuori' },
+  { s: 'lavoro', t: 'Nuovi oggetti 3D realistici', d: 'forzieri, cannoni, lanterne, sgabelli, tavoli, scudi, vasi, porte di castello e pontili, ricostruiti da foto vere' },
+  { s: 'presto', t: 'Suoni veri', d: 'passi, onde, vento, pioggia, tuoni, fuoco, porte e bauli registrati dal vero; chitarra e flauto con note vere' },
+  { s: 'presto', t: 'Proposte e segnalazioni', d: 'dal gioco e dal sito potrai mandare idee e segnalare problemi direttamente a chi sviluppa Deriva' },
+  { s: 'poi', t: 'Oceano profondo', d: 'lontano dalle isole il mare profondo, quello caldo e quello freddo' },
+  { s: 'poi', t: 'Persone più vive', d: 'abitanti che salutano, parlano, si siedono, dormono, tirano con l’arco e nuotano; nuovi abitanti uomini' },
+  { s: 'poi', t: 'Mani in prima persona', d: 'mani e braccia dettagliate che stringono attrezzi e torce' },
+  { s: 'poi', t: 'Deriva su Steam e sul Play Store', d: 'il gioco arriverà anche su Steam, con accesso con il tuo account, amici, inviti e partite insieme, e sul Google Play Store come app per Android' },
 ];
 // modulo per proposte e segnalazioni (Google Moduli): vuoto finché non è collegato
 G.FEEDBACK = { form: '', fields: { tipo: '', testo: '', nome: '', versione: '', piattaforma: '' } };

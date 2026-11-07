@@ -1,18 +1,8 @@
 [
  {
   "s": "lavoro",
-  "t": "Tutto si può smontare",
-  "d": "castelli, villaggi e covi pezzo per pezzo: muri, pavimenti e tetti da portarsi via e ripiazzare dove vuoi"
- },
- {
-  "s": "presto",
-  "t": "Nuovi mari",
-  "d": "vicino alle isole una laguna turchese e luminosa, limpida come vetro e piena di bolle; poi l’oceano profondo, quello caldo e quello freddo"
- },
- {
-  "s": "presto",
-  "t": "Neve rifatta",
-  "d": "le montagne innevate delle isole fredde con forme, rilievo e ombre vere, e niente più chiazze bianche sull’acqua"
+  "t": "Nuovi oggetti 3D realistici",
+  "d": "forzieri, cannoni, lanterne, sgabelli, tavoli, scudi, vasi, porte di castello e pontili, ricostruiti da foto vere"
  },
  {
   "s": "presto",
@@ -26,23 +16,13 @@
  },
  {
   "s": "poi",
-  "t": "Nuovi oggetti 3D realistici",
-  "d": "barili, casse, rocce, mobili, attrezzi e oggetti da villaggio e da nave, ricostruiti da foto vere"
- },
- {
-  "s": "poi",
-  "t": "Pozzo, bancarella e castello rifatti",
-  "d": "forme più sensate e dettagliate per il pozzo, la bancarella del mercante e alcune parti del castello"
+  "t": "Oceano profondo",
+  "d": "lontano dalle isole il mare profondo, quello caldo e quello freddo"
  },
  {
   "s": "poi",
   "t": "Persone più vive",
   "d": "abitanti che salutano, parlano, si siedono, dormono, tirano con l’arco e nuotano; nuovi abitanti uomini"
- },
- {
-  "s": "poi",
-  "t": "Vascello rifinito",
-  "d": "il cassero di poppa più curato visto da fuori"
  },
  {
   "s": "poi",
