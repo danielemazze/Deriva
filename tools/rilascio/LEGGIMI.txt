@@ -35,6 +35,13 @@ montagne con la neve. Il nome del bioma è accanto all'orologio.
 Nota: i biomi cambiano la forma del mondo, quindi un mondo creato con la
 versione precedente avrà isole diverse da come le ricordavi.
 
+NOVITÀ DELLA 1.22.2 «Momenti tranquilli»
+- Nuova colonna sonora nei momenti tranquilli: in nave senza minacce,
+  esplorando, di notte. Suona una volta sola, poi qualche minuto di
+  silenzio; sfuma se arriva un pericolo.
+- Mira più comoda: anche quando sei appiccicato a un oggetto, a un
+  animale o a una persona puoi interagire.
+
 NOVITÀ DELLA 1.22.1 «Cannoni a posto»
 - Il cannone da terra non esplode più con la sua stessa palla.
 - A e D (e il mouse) girano il cannone da terra dalla parte giusta.
@@ -96,7 +103,7 @@ NOVITÀ DELLA 1.21 «Navi da abitare»
 - Scafi, bauli e barili più rotondi; castello senza le strisce grigie.
 - La musica del menu parte subito e nel menu non si sentono gli animali.
 - T apre la chat senza aprire il menu.
-- Chi ospita e chi entra devono avere la stessa versione (1.22.1).
+- Chi ospita e chi entra devono avere la stessa versione (1.22.2).
 
 NOVITÀ DELLA 1.20 «Cavalli e stive»
 - Cavalcature: cavallo, zebra e lama. Sella in mano (pelle + corda al banco),

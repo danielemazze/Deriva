@@ -465,8 +465,10 @@
     const t = A.ctx.currentTime;
     if (mus) { const old = mus; old.g.gain.cancelScheduledValues(t); old.g.gain.setTargetAtTime(0, t, 1.2); setTimeout(() => { try { old.s.stop(); } catch (e) { } }, 6000); mus = null; }
     if (!name || !hasS(name)) return;
-    const s = A.ctx.createBufferSource(); s.buffer = SM[name][0]; s.loop = true;
-    const full = 0.55 * Math.pow(10, A.MUSIC_DB / 20), g = A.ctx.createGain();
+    const once = name === 'relax'; // il brano dei momenti tranquilli non si ripete in loop
+    const s = A.ctx.createBufferSource(); s.buffer = SM[name][0]; s.loop = !once;
+    const full = 0.55 * Math.pow(10, (A.MUSIC_DB + (once ? -9 : 0)) / 20), g = A.ctx.createGain();
+    if (once) s.onended = () => { if (mus && mus.s === s) mus = null; relaxCd = 360 + Math.random() * 360; };
     if (name === 'menu') g.gain.value = full; else { g.gain.value = 0.0001; g.gain.setTargetAtTime(full, t, 1.5); }
     s.connect(g); g.connect(A.bus.mus); s.start(); mus = { name, s, g };
   };
@@ -483,12 +485,29 @@
     A.menuGate(!G.started);
     A.music(G.UI && G.UI.menu ? 'menu' : null);
   };
+  // momenti tranquilli: niente nemici vicini, nessun colpo preso da un po'
+  let calmT = 0, relaxCd = 90;
+  function threat(P) {
+    if (P._hurtAt && performance.now() - P._hurtAt < 40000) return true;
+    if (G.Sea && G.Sea.enc) for (const e of G.Sea.enc) if (!e.dead && e.pos && Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < 400) return true;
+    if (G.Entities) for (const a of G.Entities.list) if (a.def && a.def.hostile && Math.hypot(a.pos.x - P.pos.x, a.pos.z - P.pos.z) < 45) return true;
+    if (G.POI && G.POI.near(P.pos.x, P.pos.z, 130, 'covo').length) return true;
+    return false;
+  }
   function musicUpdate(dt, P) {
+    relaxCd -= dt;
     if ((musT -= dt) > 0) return; musT = 1.5;
     let want = null;
     if (G.POI && G.started && !(G.UI && G.UI.menu === 'main')) {
       const c = G.POI.near(P.pos.x, P.pos.z, 140, 'castello')[0];
       if (c && Math.hypot(c.x - P.pos.x, c.z - P.pos.z) < 120) want = 'castello';
+      else if (P.health > 0) {
+        const danger = threat(P); calmT = danger ? 0 : calmT + 1.5;
+        // in nave, esplorando o di notte: parte una volta sola, poi silenzio per qualche minuto
+        if (mus && mus.name === 'relax' && !danger) want = 'relax';
+        else if (!danger && calmT > 30 && relaxCd <= 0 && hasS('relax')) want = 'relax';
+        if (danger && mus && mus.name === 'relax') relaxCd = Math.max(relaxCd, 120);
+      }
     }
     A.music(want);
   }

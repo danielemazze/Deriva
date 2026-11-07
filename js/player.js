@@ -449,7 +449,7 @@
     if (G.creative() || P.god) return;
     // parata con lo scudo: assorbe il 75% dei colpi (non le cadute né la fame)
     if (P.blocking && !quiet && kind !== 'fall') { const ab = Math.min(0.95, 0.75 + (G.Skills.lv('parata') - 1) * 0.004); n *= 1 - ab; if ((P._parT || 0) < performance.now()) { P._parT = performance.now() + 300; G.Skills.add('parata', 3); } if (G.Audio) G.Audio.hit('wood'); G.FX.burst(P.pos.x - Math.sin(P.yaw) * 0.6, P.pos.y + 1.2, P.pos.z - Math.cos(P.yaw) * 0.6, [0.85, 0.75, 0.5], 6, 1.5); if (!P._blockTip) { P._blockTip = 1; G.UI.toast('Parato con lo scudo!', 'good'); } }
-    P.health -= n; if (!quiet) P.dmgFlash = 1; else P.dmgFlash = Math.max(P.dmgFlash, 0.25);
+    P.health -= n; if (!quiet) { P.dmgFlash = 1; if (kind !== 'fall') P._hurtAt = performance.now(); } else P.dmgFlash = Math.max(P.dmgFlash, 0.25);
     if (P.health <= 0) P.die();
   };
   P.die = function () {
@@ -498,6 +498,15 @@
     const bt = G.Boats.raycast(o, _dir, 7); if (bt && (bt.boat !== P.boat || bt.boat.free) && (!best || bt.t < best.t + (bt.boat.free || bt.boat.filled[bt.part] ? 0 : 3))) best = { kind: 'boat', t: bt.t, boat: bt.boat, part: bt.part };
     // non mirare attraverso il terreno
     if (best && best.kind !== 'boat') { const th = G.Build.terrainHit(o, _dir, best.t); if (th >= 0 && th < best.t - 0.2) best = null; }
+    // appiccicato a qualcosa (o mira un pelo storta): una seconda prova con un raggio più largo, solo vicino
+    if (!best) {
+      const near = Math.min(max, 2.2), PAD = 0.35;
+      const r2 = G.World.raycastResources(o, _dir, near, PAD); if (r2) best = { kind: 'res', t: r2.t, res: r2.res };
+      const a2 = G.Entities.raycast(o, _dir, near, PAD); if (a2 && (!best || a2.t < best.t)) best = { kind: 'animal', t: a2.t, ent: a2.ent };
+      const b2 = G.Build.raycast(o, _dir, near, 0.25); if (b2 && (!best || b2.t < best.t)) best = { kind: 'piece', t: b2.t, piece: b2.piece };
+      const n2 = G.Structures ? G.Structures.raycastNPC(o, _dir, near, PAD) : null; if (n2 && (!best || n2.t < best.t)) best = { kind: 'npc', t: n2.t, npc: n2.npc };
+      if (best) { const th = G.Build.terrainHit(o, _dir, best.t); if (th >= 0 && th < best.t - 0.5) best = null; }
+    }
     P.target = best;
     if (G.FreeBoat) G.FreeBoat.updateGhost(P);
   }

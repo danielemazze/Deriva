@@ -1,7 +1,7 @@
 {
   "name": "deriva",
   "productName": "Deriva",
-  "version": "1.22.1",
+  "version": "1.22.2",
   "description": "Sopravvivenza ed esplorazione marina in prima persona",
   "main": "electron/main.js",
   "author": "Deriva",

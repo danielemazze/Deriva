@@ -82,14 +82,12 @@ G.PRESETS = {
   alta: { label: 'Alta', pixel: 1.0, shadows: 2048, godrays: true, view: 5, grass: 1.0, texSize: 1024, waterSeg: 280, fx: true, ao: true },
   ultra: { label: 'Ultra', pixel: 1.25, shadows: 4096, godrays: true, view: 6, grass: 1.4, texSize: 1024, waterSeg: 340, fx: true, ao: true },
 };
-G.VERSION = '1.22.1';
+G.VERSION = '1.22.2';
 // novità mostrate nella pagina principale (cambiano a ogni aggiornamento)
-G.NEWS = { v: '1.22.1', t: 'Cannoni a posto', d: '7 novembre 2026', items: [
-  ['esplosione', 'Il cannone da terra non esplode più con la sua stessa palla'],
-  ['giro', 'A e D (e il mouse) girano il cannone dalla parte giusta'],
-  ['castello', 'Pavimento del mastio alla giusta altezza: guardie e forziere non affondano più'],
-  ['persone', 'Personaggi nuovi con i loro colori anche nella versione per Windows'],
-  ['ancora', 'Comandi della ciurma sempre a schermo quando è a bordo'],
+G.NEWS = { v: '1.22.2', t: 'Momenti tranquilli', d: '7 novembre 2026', items: [
+  ['nota', 'Nuova colonna sonora nei momenti tranquilli: in nave senza minacce, esplorando, di notte'],
+  ['nota', 'Il brano suona una volta sola, poi qualche minuto di silenzio; si spegne se arriva un pericolo'],
+  ['mano', 'Mira più comoda: anche appiccicato a un oggetto puoi raccoglierlo, aprirlo o colpirlo'],
 ] };
 /* versione web (anche per telefono): stesso gioco, pubblicato su GitHub Pages */
 G.WEB_URL = 'danielemazze.github.io/Deriva';

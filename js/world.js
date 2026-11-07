@@ -669,16 +669,16 @@
     }
   };
   // raggio contro cilindri delle risorse
-  W.raycastResources = function (o, d, maxDist) {
-    let best = null, bestT = maxDist;
+  W.raycastResources = function (o, d, maxDist, pad) {
+    let best = null, bestT = maxDist; pad = pad || 0;
     W.nearby(o.x, o.z, maxDist + 1, (res) => {
-      const ox = o.x - res.x, oz = o.z - res.z;
-      const a = d.x * d.x + d.z * d.z, b = 2 * (ox * d.x + oz * d.z), c = ox * ox + oz * oz - res.r * res.r;
+      const ox = o.x - res.x, oz = o.z - res.z, rr = res.r + pad;
+      const a = d.x * d.x + d.z * d.z, b = 2 * (ox * d.x + oz * d.z), c = ox * ox + oz * oz - rr * rr;
       let t;
       if (c < 0) t = 0; else { if (a < 1e-6) return; const disc = b * b - 4 * a * c; if (disc < 0) return; t = (-b - Math.sqrt(disc)) / (2 * a); }
       if (t < 0 || t > bestT) return;
       const y = o.y + d.y * t;
-      if (y < res.y - 0.4 || y > res.y + res.height) return;
+      if (y < res.y - 0.4 - pad || y > res.y + res.height + pad) return;
       bestT = t; best = res;
     });
     return best ? { res: best, t: bestT } : null;

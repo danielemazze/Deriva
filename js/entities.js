@@ -322,7 +322,7 @@
       const ox = o.x - cx, oy = o.y - cy, oz = o.z - cz;
       const b = ox * d.x + oy * d.y + oz * d.z, c = ox * ox + oy * oy + oz * oz - r * r;
       const disc = b * b - c; if (disc < 0) continue;
-      const t = -b - Math.sqrt(disc);
+      let t = -b - Math.sqrt(disc); if (t <= 0 && -b + Math.sqrt(disc) > 0) t = 0.001; // la camera è già dentro: lo stai toccando
       if (t > 0 && t < bt) { bt = t; best = a; }
     }
     return best ? { ent: best, t: bt } : null;

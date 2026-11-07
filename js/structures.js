@@ -1411,14 +1411,14 @@
       if (dn < 4.5 && n.p.root.visible && G.Audio && G.Audio.greet && G.clock > (n._salT || 0) && G.clock > (S._salT || 0)) { n._salT = G.clock + 90; if (Math.random() < 0.75) { S._salT = G.clock + 6; G.Audio.greet(new THREE.Vector3(n.x, n.y + 1.6, n.z)); } }
     }
   };
-  S.raycastNPC = function (o, d, max) {
+  S.raycastNPC = function (o, d, max, pad) {
     let best = null, bt = max;
     for (const n of S.npcs) {
       if (!n.p.root.visible) continue;
-      for (const [hy, rad] of [[1.0, 0.4], [1.55, 0.25]]) {
-        const ox = o.x - n.x, oy = o.y - (n.y + hy), oz = o.z - n.z;
+      for (const [hy, rad0] of [[1.0, 0.4], [1.55, 0.25]]) {
+        const rad = rad0 + (pad || 0), ox = o.x - n.x, oy = o.y - (n.y + hy), oz = o.z - n.z;
         const b = ox * d.x + oy * d.y + oz * d.z, c = ox * ox + oy * oy + oz * oz - rad * rad, disc = b * b - c;
-        if (disc < 0) continue; const t = -b - Math.sqrt(disc); if (t > 0 && t < bt) { bt = t; best = n; }
+        if (disc < 0) continue; let t = -b - Math.sqrt(disc); if (t <= 0 && -b + Math.sqrt(disc) > 0) t = 0.001; if (t > 0 && t < bt) { bt = t; best = n; }
       }
     }
     return best ? { npc: best, t: bt } : null;

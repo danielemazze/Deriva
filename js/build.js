@@ -447,9 +447,9 @@
   };
   // carro di fieno: chi ci cade dentro non si fa male
   B.inHay = function (x, y, z) { for (const b of B.boxes) if (b.hay && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && y < b.y1 + 0.6) return true; return false; };
-  function rayBox(o, d, b) {
-    let t0 = 0, t1 = 1e9;
-    for (const [oa, da, a0, a1] of [[o.x, d.x, b.x0, b.x1], [o.y, d.y, b.y0, b.y1], [o.z, d.z, b.z0, b.z1]]) {
+  function rayBox(o, d, b, pad) {
+    let t0 = 0, t1 = 1e9; pad = pad || 0;
+    for (const [oa, da, a0, a1] of [[o.x, d.x, b.x0 - pad, b.x1 + pad], [o.y, d.y, b.y0 - pad, b.y1 + pad], [o.z, d.z, b.z0 - pad, b.z1 + pad]]) {
       if (Math.abs(da) < 1e-9) { if (oa < a0 || oa > a1) return -1; continue; }
       let ta = (a0 - oa) / da, tb = (a1 - oa) / da; if (ta > tb) { const t = ta; ta = tb; tb = t; }
       t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); if (t0 > t1) return -1;
@@ -457,9 +457,9 @@
     return t0;
   }
   B.rayBox = rayBox;
-  B.raycast = function (o, d, max) {
+  B.raycast = function (o, d, max, pad) {
     let best = null, bt = max;
-    for (const p of B.pieces) { const t = rayBox(o, d, p.pick); if (t >= 0 && t < bt) { bt = t; best = p; } }
+    for (const p of B.pieces) { const t = rayBox(o, d, p.pick, pad); if (t >= 0 && t < bt) { bt = t; best = p; } }
     return best ? { piece: best, t: bt } : null;
   };
 
