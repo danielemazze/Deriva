@@ -168,7 +168,13 @@
     // ordini che valgono per la nave dove sei
     if (pb) shipOrders(pb, dt);
     const h = document.getElementById('crewhud');
-    if (h) { const n = pb ? C.aboard(pb).length : 0; const t = pb && n ? `Ciurma ${n}/${C.cap(pb)} · ${(ORDERS.find((o) => o[0] === C.order) || [0, 'ai posti'])[1].toLowerCase()}${pb.crewSail ? ' · vele ammainate' : ''} · O ordini` : ''; if (h.textContent !== t) h.textContent = t; h.hidden = !t; }
+    if (h) {
+      const n = pb ? C.aboard(pb).length : 0, ok = G.isTouch ? 'Ordini' : 'O';
+      const t = pb && n ? `<b>Ciurma ${n}/${C.cap(pb)}</b> · ordine: ${(ORDERS.find((o) => o[0] === C.order) || [0, 'ai posti'])[1].toLowerCase()}${pb.crewSail ? ' · vele ammainate' : ''}<span class="chk"><kbd>${ok}</kbd> ordini${C.menu ? ' · <kbd>1</kbd>…<kbd>9</kbd> scegli · <kbd>Esc</kbd> chiudi' : ''}</span>` : '';
+      if (h._t !== t) { h._t = t; h.innerHTML = t; } h.hidden = !t;
+      // la prima volta che la ciurma è a bordo: come si comanda
+      if (t && !C._taught) { C._taught = true; if (!(G.state && G.state.crewTaught)) { if (G.state) G.state.crewTaught = 1; say(G.isTouch ? 'La ciurma è a bordo: tocca Ordini per comandarla' : 'La ciurma è a bordo: premi O per gli ordini, poi un numero da 1 a 9'); } }
+    }
   };
   function follow(m, dt, i) {
     const Pl = P(), r = m.p.root;

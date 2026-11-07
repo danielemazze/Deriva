@@ -254,9 +254,10 @@
     if (p.boat) {
       const T = p.boat.T;
       const anc = ['X', p.boat.anchored ? 'salpa l’ancora' : 'getta l’ancora (senza, la barca va col vento)'];
-      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], anc, ...(G.Sea && G.Sea.nearCannon && G.Sea.nearCannon(p) ? [['Clic sinistro (mano vuota)', 'spara col cannone · guarda in alto per tirare lontano']] : []), ...(p.boat.hull !== undefined && G.Sea && p.boat.hull < G.Sea.hullMax(p.boat) ? [['Assi in mano + tasto destro', 'ripara lo scafo']] : []), ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : [])]];
-      if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], anc, [G.useKey(), 'lascia i remi']]];
-      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], anc, ...(p.boat.inv ? [['G', 'stiva']] : []), ...(G.Sea && G.Sea.hasCannons(p.boat) ? [['Clic sinistro', 'bordata di cannoni']] : []), [G.useKey(), 'lascia il timone']]];
+      const crew = G.Crew && G.Crew.aboard && !p.boat.pirate && G.Crew.aboard(p.boat).length ? (G.isTouch ? [['Ordini', 'comanda la ciurma']] : [['O', 'ordini alla ciurma'], ['O poi 1–9', 'fuoco, fuoco a sinistra / destra, cessate, ripara, vele, ammaina, arrembaggio, seguimi']]) : [];
+      if (!p.helm) return ['A bordo', [['W A S D', 'cammina sul ponte'], anc, ...(G.Sea && G.Sea.nearCannon && G.Sea.nearCannon(p) ? [['Clic sinistro (mano vuota)', 'spara col cannone · guarda in alto per tirare lontano']] : []), ...(p.boat.hull !== undefined && G.Sea && p.boat.hull < G.Sea.hullMax(p.boat) ? [['Assi in mano + tasto destro', 'ripara lo scafo']] : []), ...(p.inHelmZone() ? [[G.useKey(), 'guida (' + T.helmTxt.toLowerCase() + ')']] : []), ['Spazio contro la murata', 'scendi / tuffati'], ...(p.boat.inv ? [['G', 'stiva']] : []), ...crew]];
+      if (T.oars) return ['Ai remi', [['A', 'remo sinistro'], ['D', 'remo destro'], ['A + D', 'insieme: avanti dritto'], ['S + remi', 'indietro'], anc, ...crew, [G.useKey(), 'lascia i remi']]];
+      return ['Al timone', [['W / S', 'avanti / indietro'], ['A / D', 'timone'], ['V', 'visuale esterna'], anc, ...(p.boat.inv ? [['G', 'stiva']] : []), ...(G.Sea && G.Sea.hasCannons(p.boat) ? [['Clic sinistro', 'bordata di cannoni']] : []), ...crew, [G.useKey(), 'lascia il timone']]];
     }
     const held = p.held(), id = held && held.id, d = id && G.ITEMS[id];
     if (id === 'arco') k.push(['Tieni premuto clic sinistro', 'tendi e scocca']);

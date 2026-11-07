@@ -61,10 +61,10 @@
 
   /* ---------------- palle di cannone ---------------- */
   let ballGeo = null, ballMat = null;
-  S.fireBallV = function (from, v, owner) {
+  S.fireBallV = function (from, v, owner, src) {
     if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.16, 10, 8); ballMat = new THREE.MeshStandardMaterial((G.ACG ? G.ACG.mat : (k, o) => o)('iron', { color: 0x2a2a2d, roughness: 0.8, metalness: 0.6 })); }
     const m = new THREE.Mesh(ballGeo, ballMat); m.position.copy(from); m.castShadow = true; G.scene.add(m);
-    S.balls.push({ m, pos: from.clone(), vel: v.clone(), owner, t: 0 });
+    S.balls.push({ m, pos: from.clone(), vel: v.clone(), owner, t: 0, src });
     G.FX.burst(from.x, from.y, from.z, [0.75, 0.72, 0.7], 16, 2.8, { size: 1.7 });
     if (G.Audio) { const dist = from.distanceTo(G.Player.pos); G.Audio.cannon ? G.Audio.cannon(dist) : G.Audio.hit('stone'); }
   };
@@ -102,7 +102,8 @@
   S.impactSolid = function (b) {
     const p = b.pos;
     for (const pc of G.Build.pieces) {
-      if (pc.gen || Math.abs(pc.x - p.x) > 2 || Math.abs(pc.z - p.z) > 2 || Math.abs(pc.y + 1 - p.y) > 2.2) continue;
+      // il cannone che ha sparato (e i primi metri di volo) non si colpiscono da soli
+      if (pc === b.src || b.t < 0.15 || pc.gen || Math.abs(pc.x - p.x) > 2 || Math.abs(pc.z - p.z) > 2 || Math.abs(pc.y + 1 - p.y) > 2.2) continue;
       // pietra più resistente del legno
       const stone = G.Build.isStone && G.Build.isStone(pc.t);
       pc.hp = (pc.hp === undefined ? (stone ? 6 : 3) : pc.hp) - (stone ? 2.5 : 3.5);
@@ -254,8 +255,9 @@
     const k = P.keys;
     if (!st.land) { if (st.byaw !== undefined && P._stYaw !== undefined) P._stYaw += G.angleDiff(st.byaw, st.b.yaw); st.byaw = st.b.yaw; }
     // il mouse muove la canna come lo sguardo
-    if (P._stYaw !== undefined) { let dy = P._stYaw - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yo += dy; st.pi += P.pitch - P._stPit; }
-    st.yo += ((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0)) * dt * 0.6;
+    const sg = st.land ? -1 : 1; // sul cannone da terra la canna gira al contrario del pezzo di barca
+    if (P._stYaw !== undefined) { let dy = P._stYaw - P.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yo += dy * sg; st.pi += P.pitch - P._stPit; }
+    st.yo += ((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0)) * dt * 0.6 * sg;
     st.pi += ((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0)) * dt * 0.35;
     st.yo = G.clamp(st.yo, st.land ? -0.8 : -0.62, st.land ? 0.8 : 0.62); st.pi = G.clamp(st.pi, -0.09, st.land ? 0.6 : 0.44);
     st.cd = Math.max(0, st.cd - dt);
@@ -284,7 +286,7 @@
     st.cd = 3.2 * G.Skills.less('fuoco', 0.012, 0.45); st.kick = 1;
     const spread = 0.9 * G.Skills.less('fuoco', 0.015, 0.25);
     const v = st.world.clone().multiplyScalar(ST_V); v.x += (Math.random() - 0.5) * spread; v.y += (Math.random() - 0.5) * spread * 0.5; v.z += (Math.random() - 0.5) * spread;
-    S.fireBallV(st.muzzle.clone(), v, 'player');
+    S.fireBallV(st.muzzle.clone(), v, 'player', st.land ? st.p : null);
     G.Skills.add('fuoco', 2);
     if (P.shake !== undefined) P.shake = 0.25;
     G.UI.refreshHotbar();

@@ -946,7 +946,7 @@
     // =========== MASTIO ===========
     const KZ = -8, KW = 26, KH = 34, KT = 2.4;
     const kx0 = -KW / 2, kx1 = KW / 2, kz0 = KZ - KW / 2, kz1 = KZ + KW / 2;
-    P('stone', BOX(KW + 2.4, 0.5, KW + 2.4, 0, 0.25, KZ), ST2);
+    P('stone', BOX(KW + 2.4, 0.3, KW + 2.4, 0, 0.0, KZ), ST2); // alto quanto il pavimento calpestabile della corte (+0,15)
     for (const [w, d, x, z] of [[KW, KT, 0, kz0 + KT / 2], [KT, KW, kx0 + KT / 2, KZ], [KT, KW, kx1 - KT / 2, KZ]]) { P('stone', BOX(w, KH, d, x, KH / 2, z), tint(ST)); col(x - w / 2, 0, z - d / 2, x + w / 2, KH, z + d / 2); }
     const DW = 2.4, fz = kz1 - KT / 2;
     for (const sx of [-1, 1]) { const w = KW / 2 - DW; P('stone', BOX(w, KH, KT, sx * (DW + w / 2), KH / 2, fz), tint(ST)); col(sx > 0 ? DW : kx0, 0, fz - KT / 2, sx > 0 ? kx1 : -DW, KH, fz + KT / 2); }

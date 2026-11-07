@@ -2982,6 +2982,7 @@ class GLTFParser {
 		const URL = self.URL || self.webkitURL;
 
 		let sourceURI = sourceDef.uri || '';
+		let embedded = null;
 		let isObjectURL = false;
 
 		if ( sourceDef.bufferView !== undefined ) {
@@ -2992,6 +2993,7 @@ class GLTFParser {
 
 				isObjectURL = true;
 				const blob = new Blob( [ bufferView ], { type: sourceDef.mimeType } );
+				embedded = blob; // Deriva: decodificata direttamente (fetch di blob: non va col protocollo app:// di Electron)
 				sourceURI = URL.createObjectURL( blob );
 				return sourceURI;
 
@@ -3019,6 +3021,18 @@ class GLTFParser {
 						resolve( texture );
 
 					};
+
+				}
+
+				if ( embedded && loader.isImageBitmapLoader === true ) {
+
+					createImageBitmap( embedded, Object.assign( {}, loader.options ) ).then( onLoad ).catch( function () {
+
+						// ultima spiaggia: un'immagine normale
+						const img = new Image(); img.onload = function () { const t = new Texture( img ); t.needsUpdate = true; resolve( t ); }; img.onerror = reject; img.src = sourceURI;
+
+					} );
+					return;
 
 				}
 
